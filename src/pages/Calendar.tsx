@@ -26,13 +26,14 @@ export default function Calendar() {
   const days = eachDayOfInterval({ start, end });
 
   const reviewMap = new Map(reviews.map((r) => [r.date, r] as const));
+  const today = todayISO();
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Calendar</h1>
-          <p className="text-sm text-slate-500">月間スコアを俯瞰</p>
+          <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
+          <p className="text-sm muted">過去のスコアを俯瞰</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -56,7 +57,7 @@ export default function Calendar() {
       </div>
 
       <div className="card !p-3">
-        <div className="grid grid-cols-7 text-center text-xs text-slate-500 mb-2">
+        <div className="grid grid-cols-7 text-center text-xs muted mb-2">
           {DOW.map((d) => (
             <div key={d} className="py-1">
               {d}
@@ -68,17 +69,18 @@ export default function Calendar() {
             const iso = format(d, "yyyy-MM-dd");
             const r = reviewMap.get(iso);
             const inMonth = isSameMonth(d, month);
-            const isToday = iso === todayISO();
+            const isToday = iso === today;
+            const linkTo = isToday ? "/" : `/day/${iso}`;
             return (
               <Link
                 key={iso}
-                to={`/review/${iso}`}
+                to={linkTo}
                 className={
-                  "aspect-square sm:aspect-[4/3] rounded-lg border p-2 flex flex-col justify-between transition hover:shadow " +
+                  "aspect-square sm:aspect-[4/3] rounded-lg border p-2 flex flex-col justify-between transition hover:shadow-sm hover:border-slate-300 dark:hover:border-notion-border-strong " +
                   (inMonth
-                    ? "border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900"
-                    : "border-transparent bg-slate-50 dark:bg-slate-950/60 text-slate-400") +
-                  (isToday ? " ring-2 ring-blue-500" : "")
+                    ? "border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel"
+                    : "border-transparent bg-slate-50 dark:bg-notion-bg/40 text-slate-400 dark:text-notion-muted") +
+                  (isToday ? " ring-2 ring-notion-blue" : "")
                 }
               >
                 <div className="flex items-center justify-between text-xs">
@@ -96,19 +98,19 @@ export default function Calendar() {
                       style={{
                         color:
                           r.cluster === "A"
-                            ? "#16a34a"
+                            ? "#22c55e"
                             : r.cluster === "B"
-                            ? "#2563eb"
+                            ? "#3b82f6"
                             : r.cluster === "C"
-                            ? "#d97706"
-                            : "#dc2626",
+                            ? "#f59e0b"
+                            : "#ef4444",
                       }}
                     >
                       {Math.round(r.total_score)}
                     </div>
                   </div>
                 ) : (
-                  <div className="text-right text-[10px] text-slate-300 dark:text-slate-600">
+                  <div className="text-right text-[10px] text-slate-300 dark:text-notion-muted/60">
                     —
                   </div>
                 )}
@@ -126,14 +128,13 @@ export default function Calendar() {
 function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-slate-500">凡例:</span>
+      <span className="text-xs muted">凡例:</span>
       {(["A", "B", "C", "D"] as const).map((c) => (
         <ClusterBadge key={c} cluster={c} size="sm" />
       ))}
-      <span className="text-xs text-slate-500 ml-2">
-        日付をクリックでReviewを開く
+      <span className="text-xs muted ml-2">
+        日付をクリックして詳細を開く
       </span>
     </div>
   );
 }
-

@@ -3,12 +3,8 @@ import clsx from "clsx";
 import { useStore } from "@/lib/store";
 
 const NAV = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/tasks", label: "Tasks" },
-  { to: "/review", label: "Review" },
+  { to: "/", label: "Today", end: true },
   { to: "/calendar", label: "Calendar" },
-  { to: "/trends", label: "Trends" },
-  { to: "/archive", label: "Archive" },
 ];
 
 export default function Layout() {
@@ -17,11 +13,11 @@ export default function Layout() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-slate-200 dark:border-notion-border bg-white/80 dark:bg-notion-bg/80 backdrop-blur">
         <div className="mx-auto max-w-6xl px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold tracking-tight">Stride</span>
-            <span className="hidden sm:inline text-xs text-slate-500">
+            <span className="hidden sm:inline text-xs muted">
               Daily Task Scoring
             </span>
           </div>
@@ -35,8 +31,8 @@ export default function Layout() {
                   clsx(
                     "rounded-md px-3 py-1.5 transition",
                     isActive
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                      : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-text"
+                      : "text-slate-600 dark:text-notion-muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover/60 dark:hover:text-notion-text"
                   )
                 }
               >
@@ -53,12 +49,12 @@ export default function Layout() {
             >
               {darkMode ? "☀" : "☾"}
             </button>
-            <NavLink to="/settings" className="btn-ghost">
+            <NavLink to="/settings" className="btn-ghost" aria-label="Settings">
               ⚙
             </NavLink>
           </div>
         </div>
-        <nav className="md:hidden border-t border-slate-200 dark:border-slate-800 overflow-x-auto">
+        <nav className="md:hidden border-t border-slate-200 dark:border-notion-border overflow-x-auto">
           <div className="flex gap-1 px-3 py-2 text-sm">
             {NAV.map((n) => (
               <NavLink
@@ -69,8 +65,8 @@ export default function Layout() {
                   clsx(
                     "shrink-0 rounded-md px-3 py-1.5",
                     isActive
-                      ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                      : "text-slate-600 dark:text-slate-300"
+                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-text"
+                      : "text-slate-600 dark:text-notion-muted"
                   )
                 }
               >
