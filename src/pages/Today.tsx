@@ -132,7 +132,6 @@ export default function Today() {
           completedCount={completedCount}
         />
         <SummaryPanel
-          score={preview.total_score}
           fulfillment={preview.fulfillment_score}
           completedWeight={preview.completed_weight}
           scheduledWeight={preview.scheduled_weight}
@@ -178,9 +177,6 @@ function TasksPanel({
       <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
         <div>
           <h2 className="text-base font-semibold">タスク</h2>
-          <p className="text-xs muted mt-0.5">
-            この日の予定 — 重要度で重みづけ
-          </p>
         </div>
         <span className="text-sm tabular-nums muted">
           <span className="text-slate-900 dark:text-notion-fg font-semibold">
@@ -342,7 +338,6 @@ function TaskRow({ task }: { task: Task }) {
 }
 
 function SummaryPanel({
-  score,
   fulfillment,
   completedWeight,
   scheduledWeight,
@@ -350,7 +345,6 @@ function SummaryPanel({
   streak,
   hasReview,
 }: {
-  score: number;
   fulfillment: number;
   completedWeight: number;
   scheduledWeight: number;
@@ -363,7 +357,15 @@ function SummaryPanel({
       <div className="self-start text-xs uppercase tracking-wide muted">
         スコア
       </div>
-      <ScoreRing score={score} cluster={cluster} size={140} />
+      <ScoreRing
+        score={
+          scheduledWeight === 0
+            ? 0
+            : Math.round((completedWeight / scheduledWeight) * 100)
+        }
+        cluster={cluster}
+        size={140}
+      />
       <ClusterBadge cluster={cluster} size="lg" />
       <div className="w-full grid grid-cols-2 gap-2 text-center text-xs">
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
