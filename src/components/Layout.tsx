@@ -31,8 +31,8 @@ export default function Layout() {
                   clsx(
                     "rounded-md px-3 py-1.5 transition",
                     isActive
-                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-text"
-                      : "text-slate-600 dark:text-notion-muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover/60 dark:hover:text-notion-text"
+                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-fg"
+                      : "text-slate-600 dark:text-notion-muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover/60 dark:hover:text-notion-fg"
                   )
                 }
               >
@@ -65,7 +65,7 @@ export default function Layout() {
                   clsx(
                     "shrink-0 rounded-md px-3 py-1.5",
                     isActive
-                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-text"
+                      ? "bg-slate-900 text-white dark:bg-notion-panel-hover dark:text-notion-fg"
                       : "text-slate-600 dark:text-notion-muted"
                   )
                 }

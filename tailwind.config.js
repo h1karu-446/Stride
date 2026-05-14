@@ -17,7 +17,7 @@ export default {
           "panel-hover": "#2A2A2A",
           border: "#2F2F2F",
           "border-strong": "#373737",
-          text: "#E6E6E6",
+          fg: "#E6E6E6",
           muted: "#9B9A97",
           blue: "#2383E2",
           "blue-hover": "#1A6FC4",

@@ -184,7 +184,7 @@ function TasksPanel({
           </p>
         </div>
         <span className="text-sm tabular-nums muted">
-          <span className="text-slate-900 dark:text-notion-text font-semibold">
+          <span className="text-slate-900 dark:text-notion-fg font-semibold">
             {completedCount}
           </span>{" "}
           / {tasks.length}
@@ -444,7 +444,7 @@ function ReviewPanel(props: {
       <div>
         <label className="label">
           充実度{" "}
-          <span className="text-slate-900 dark:text-notion-text font-bold ml-1">
+          <span className="text-slate-900 dark:text-notion-fg font-bold ml-1">
             {fulfillment}
           </span>
           <span className="muted"> / 5</span>
