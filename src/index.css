@@ -9,7 +9,7 @@
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
       "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif;
-    @apply text-slate-900 dark:text-notion-text bg-white dark:bg-notion-bg;
+    @apply text-slate-900 dark:text-notion-fg bg-white dark:bg-notion-bg;
   }
   ::selection {
     @apply bg-notion-blue/30;
@@ -27,13 +27,13 @@
     @apply btn bg-blue-600 hover:bg-blue-700 text-white dark:bg-notion-blue dark:hover:bg-notion-blue-hover;
   }
   .btn-ghost {
-    @apply btn text-slate-700 dark:text-notion-text hover:bg-slate-100 dark:hover:bg-notion-panel-hover;
+    @apply btn text-slate-700 dark:text-notion-fg hover:bg-slate-100 dark:hover:bg-notion-panel-hover;
   }
   .btn-outline {
     @apply btn border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel hover:bg-slate-50 dark:hover:bg-notion-panel-hover;
   }
   .input {
-    @apply w-full rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-3 py-2 text-sm text-slate-900 dark:text-notion-text placeholder:text-slate-400 dark:placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-notion-blue;
+    @apply w-full rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-3 py-2 text-sm text-slate-900 dark:text-notion-fg placeholder:text-slate-400 dark:placeholder:text-notion-muted focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-notion-blue;
   }
   .label {
     @apply block text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-notion-muted mb-1.5;
