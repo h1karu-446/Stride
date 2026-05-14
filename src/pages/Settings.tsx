@@ -39,8 +39,8 @@ export default function Settings() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-slate-500">データ管理と環境情報</p>
+        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <p className="text-sm muted">データ管理と環境情報</p>
       </div>
 
       <section className="card space-y-3">
@@ -48,15 +48,15 @@ export default function Settings() {
         <div className="text-sm">
           Supabase 接続:{" "}
           {isSupabaseConfigured ? (
-            <span className="text-green-600 font-medium">設定済み</span>
+            <span className="text-emerald-500 font-medium">設定済み</span>
           ) : (
-            <span className="text-amber-600 font-medium">
+            <span className="text-amber-500 font-medium">
               未設定（ローカルモック使用中）
             </span>
           )}
         </div>
-        <p className="text-xs text-slate-500">
-          <code className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5">
+        <p className="text-xs muted">
+          <code className="rounded bg-slate-100 dark:bg-notion-panel-hover px-1.5 py-0.5">
             .env.local
           </code>{" "}
           に <code>VITE_SUPABASE_URL</code> /{" "}
@@ -104,7 +104,7 @@ export default function Settings() {
                 resetAll();
               }
             }}
-            className="btn-outline text-rose-600"
+            className="btn-outline text-rose-500"
           >
             全データ削除
           </button>
@@ -116,8 +116,8 @@ export default function Settings() {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3">
-      <div className="text-xs text-slate-500">{label}</div>
+    <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-3">
+      <div className="text-xs muted">{label}</div>
       <div className="text-xl font-bold tabular-nums">{value}</div>
     </div>
   );

@@ -33,7 +33,7 @@ export function ScoreRing({
           r={r}
           fill="none"
           strokeWidth={12}
-          className="stroke-slate-200 dark:stroke-slate-800"
+          className="stroke-slate-200 dark:stroke-notion-border"
         />
         <circle
           cx={size / 2}
@@ -52,7 +52,7 @@ export function ScoreRing({
         <div className="text-4xl font-bold tabular-nums">
           {Math.round(score)}
         </div>
-        <div className="text-xs text-slate-500">/ 100</div>
+        <div className="text-xs text-slate-500 dark:text-notion-muted">/ 100</div>
       </div>
     </div>
   );
