@@ -49,10 +49,17 @@ export function ScoreRing({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <div className="text-4xl font-bold tabular-nums">
-          {Math.round(score)}
+        <div className="flex items-baseline gap-0.5">
+          <span className="text-4xl font-bold tabular-nums">
+            {Math.round(score)}
+          </span>
+          <span className="text-lg font-semibold text-slate-500 dark:text-notion-muted">
+            %
+          </span>
         </div>
-        <div className="text-xs text-slate-500 dark:text-notion-muted">/ 100</div>
+        <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-notion-muted mt-0.5">
+          Score
+        </div>
       </div>
     </div>
   );
