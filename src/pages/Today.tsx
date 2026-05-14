@@ -1,13 +1,26 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
-import { useStore, selectReviewByDate } from "@/lib/store";
+import {
+  useAddTask,
+  useDeleteTask,
+  useReviews,
+  useTasks,
+  useToggleTask,
+  useUpdateTask,
+  useUpdateWakeTarget,
+  useUpsertReview,
+  useWakeTarget,
+} from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
 import { calculateScore, streakCount } from "@/lib/score";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
-import { ImportanceBadge } from "@/components/ImportanceBadge";
+import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
+
+type ViewMode = "list" | "timeline";
 
 export default function Today() {
   const { date: paramDate } = useParams<{ date?: string }>();
@@ -15,28 +28,36 @@ export default function Today() {
   const today = todayISO();
   const date = paramDate ?? today;
   const isToday = date === today;
-  const tomorrow = addDaysISO(today, 1);
 
-  const allTasks = useStore((s) => s.tasks);
-  const reviews = useStore((s) => s.reviews);
-  const review = useStore(selectReviewByDate(date));
-  const toggleTask = useStore((s) => s.toggleTask);
-  const upsertReview = useStore((s) => s.upsertReview);
+  const tasksQuery = useTasks();
+  const reviewsQuery = useReviews();
+  const allTasks = tasksQuery.data ?? [];
+  const reviews = reviewsQuery.data ?? [];
+  const review = reviews.find((r) => r.date === date);
+  const upsertReviewMut = useUpsertReview();
 
   const tasks = useMemo(
     () =>
       allTasks
         .filter((t) => t.scheduled_date === date)
-        .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+        .sort((a, b) => {
+          const aHas = !!a.start_time;
+          const bHas = !!b.start_time;
+          if (aHas && bHas) {
+            const cmp = a.start_time!.localeCompare(b.start_time!);
+            if (cmp !== 0) return cmp;
+            return a.created_at.localeCompare(b.created_at);
+          }
+          if (aHas) return -1;
+          if (bHas) return 1;
+          return a.created_at.localeCompare(b.created_at);
+        }),
     [allTasks, date]
   );
 
-  const tomorrowTasks = useMemo(
-    () => allTasks.filter((t) => t.scheduled_date === tomorrow),
-    [allTasks, tomorrow]
-  );
-
+  const wakeTarget = useWakeTarget();
   const [fulfillment, setFulfillment] = useState(review?.fulfillment ?? 3);
+  const [wakeTime, setWakeTime] = useState(review?.wake_time ?? "");
   const [highlight, setHighlight] = useState(review?.highlight ?? "");
   const [intention, setIntention] = useState(review?.tomorrow_intention ?? "");
   const [memo, setMemo] = useState(review?.memo ?? "");
@@ -44,6 +65,7 @@ export default function Today() {
 
   useEffect(() => {
     setFulfillment(review?.fulfillment ?? 3);
+    setWakeTime(review?.wake_time ?? "");
     setHighlight(review?.highlight ?? "");
     setIntention(review?.tomorrow_intention ?? "");
     setMemo(review?.memo ?? "");
@@ -51,8 +73,8 @@ export default function Today() {
   }, [date, review?.id]);
 
   const preview = useMemo(
-    () => calculateScore(tasks, review ? fulfillment : null),
-    [tasks, fulfillment, review]
+    () => calculateScore(tasks, fulfillment, wakeTime || null, wakeTarget),
+    [tasks, fulfillment, wakeTime, wakeTarget]
   );
 
   const last30 = useMemo(() => rangeBefore(today, 30), [today]);
@@ -62,17 +84,25 @@ export default function Today() {
   );
 
   const completedCount = tasks.filter((t) => t.completed).length;
+  const [view, setView] = useState<ViewMode>("list");
 
   function saveReview() {
-    upsertReview({
-      date,
-      fulfillment,
-      highlight: highlight || undefined,
-      tomorrow_intention: intention || undefined,
-      memo: memo || undefined,
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    upsertReviewMut.mutate(
+      {
+        date,
+        fulfillment,
+        wake_time: wakeTime || undefined,
+        highlight: highlight || undefined,
+        tomorrow_intention: intention || undefined,
+        memo: memo || undefined,
+      },
+      {
+        onSuccess: () => {
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1800);
+        },
+      }
+    );
   }
 
   function jumpTo(targetDate: string) {
@@ -125,20 +155,31 @@ export default function Today() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4 lg:items-stretch">
         <TasksPanel
           tasks={tasks}
           date={date}
           completedCount={completedCount}
+          view={view}
+          onViewChange={setView}
         />
-        <SummaryPanel
-          fulfillment={preview.fulfillment_score}
-          completedWeight={preview.completed_weight}
-          scheduledWeight={preview.scheduled_weight}
-          cluster={preview.cluster}
-          streak={streak}
-          hasReview={!!review}
-        />
+        <div className="flex flex-col gap-4 min-h-0">
+          <SummaryPanel
+            fulfillment={preview.fulfillment_score}
+            completedWeight={preview.completed_weight}
+            scheduledWeight={preview.scheduled_weight}
+            wakeScore={preview.wake_score}
+            wakeTime={wakeTime}
+            wakeTarget={wakeTarget}
+            onWakeTimeChange={setWakeTime}
+            totalScore={preview.total_score}
+            cluster={preview.cluster}
+            streak={streak}
+          />
+          {view === "timeline" && (
+            <UnscheduledPanel tasks={tasks} className="flex-1 min-h-0" />
+          )}
+        </div>
       </div>
 
       <ReviewPanel
@@ -156,9 +197,6 @@ export default function Today() {
         hasReview={!!review}
       />
 
-      {isToday && (
-        <TomorrowPanel tasks={tomorrowTasks} date={tomorrow} />
-      )}
     </div>
   );
 }
@@ -167,16 +205,21 @@ function TasksPanel({
   tasks,
   date,
   completedCount,
+  view,
+  onViewChange,
 }: {
   tasks: Task[];
   date: string;
   completedCount: number;
+  view: ViewMode;
+  onViewChange: (v: ViewMode) => void;
 }) {
   return (
     <section className="card !p-0 overflow-hidden">
       <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
-        <div>
+        <div className="flex items-center gap-3">
           <h2 className="text-base font-semibold">タスク</h2>
+          <ViewToggle value={view} onChange={onViewChange} />
         </div>
         <span className="text-sm tabular-nums muted">
           <span className="text-slate-900 dark:text-notion-fg font-semibold">
@@ -186,84 +229,311 @@ function TasksPanel({
         </span>
       </header>
 
-      <QuickAdd defaultDate={date} />
-
-      {tasks.length === 0 ? (
-        <p className="px-5 py-8 text-center text-sm muted">
-          タスクはまだありません。上のフォームから追加してください。
-        </p>
+      {view === "list" ? (
+        <>
+          <QuickAdd defaultDate={date} />
+          {tasks.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm muted">
+              タスクはまだありません。上のフォームから追加してください。
+            </p>
+          ) : (
+            <div className="overflow-y-auto" style={{ maxHeight: 480 }}>
+              <ul className="divide-y divide-slate-100 dark:divide-notion-border">
+                {tasks.map((t) => (
+                  <TaskRow key={t.id} task={t} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </>
       ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-notion-border">
-          {tasks.map((t) => (
-            <TaskRow key={t.id} task={t} />
-          ))}
-        </ul>
+        <TimelineView tasks={tasks} date={date} />
       )}
     </section>
   );
 }
 
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (v: ViewMode) => void;
+}) {
+  const opts: { v: ViewMode; label: string }[] = [
+    { v: "list", label: "リスト" },
+    { v: "timeline", label: "タイムライン" },
+  ];
+  return (
+    <div className="inline-flex rounded-md border border-slate-200 dark:border-notion-border p-0.5 bg-slate-50 dark:bg-notion-panel-hover/40">
+      {opts.map((o) => (
+        <button
+          key={o.v}
+          type="button"
+          onClick={() => onChange(o.v)}
+          className={
+            "text-xs px-2.5 py-1 rounded transition " +
+            (value === o.v
+              ? "bg-white dark:bg-notion-panel shadow-sm text-slate-900 dark:text-notion-fg"
+              : "muted hover:text-slate-700 dark:hover:text-notion-fg")
+          }
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function QuickAdd({ defaultDate }: { defaultDate: string }) {
-  const addTask = useStore((s) => s.addTask);
+  const addTask = useAddTask();
   const [title, setTitle] = useState("");
   const [importance, setImportance] = useState<Importance>("中");
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
+  function submit(e?: React.FormEvent) {
+    e?.preventDefault();
     if (!title.trim()) return;
-    addTask({
+    addTask.mutate({
       title: title.trim(),
       importance,
       scheduled_date: defaultDate,
     });
     setTitle("");
     setImportance("中");
+    inputRef.current?.focus();
   }
 
   return (
     <form
       onSubmit={submit}
-      className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 dark:border-notion-border bg-slate-50/40 dark:bg-notion-panel-hover/40"
+      onKeyDown={(e) => {
+        if (
+          e.key === "Enter" &&
+          !e.shiftKey &&
+          !e.isDefaultPrevented() &&
+          !e.nativeEvent.isComposing &&
+          e.keyCode !== 229
+        ) {
+          e.preventDefault();
+          submit();
+        }
+      }}
+      className="px-5 py-4 border-b border-slate-100 dark:border-notion-border bg-slate-50/40 dark:bg-notion-panel-hover/40 space-y-3"
     >
-      <span className="text-notion-blue text-lg leading-none select-none">+</span>
-      <input
-        className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400 dark:placeholder:text-notion-muted"
-        placeholder="新しいタスク..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
-      <select
-        className="text-xs bg-transparent border border-slate-200 dark:border-notion-border rounded px-2 py-1 outline-none"
-        value={importance}
-        onChange={(e) => setImportance(e.target.value as Importance)}
-      >
-        {IMPORTANCE_LIST.map((i) => (
-          <option key={i} value={i}>
-            {i} ({i === "重" ? 3 : i === "中" ? 2 : 1}pt)
-          </option>
-        ))}
-      </select>
-      <button
-        type="submit"
-        className="btn-primary !py-1 !px-3 text-xs"
-        disabled={!title.trim()}
-      >
-        追加
-      </button>
+      <div className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel px-3 py-2 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
+        <span className="text-notion-blue text-base leading-none select-none">+</span>
+        <input
+          ref={inputRef}
+          className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400 dark:placeholder:text-notion-muted"
+          placeholder="新しいタスクを追加..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <button
+          type="submit"
+          className="btn-primary !py-1 !px-3 text-xs"
+          disabled={!title.trim()}
+        >
+          追加
+        </button>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide muted">重要度</span>
+        <ImportancePicker
+          value={importance}
+          onChange={(v) => {
+            setImportance(v);
+            inputRef.current?.focus();
+          }}
+        />
+      </div>
     </form>
   );
 }
 
+const IMPORTANCE_META: Record<
+  Importance,
+  { dot: string; activeBg: string; activeText: string; pt: number }
+> = {
+  重: {
+    dot: "bg-rose-500",
+    activeBg: "bg-rose-500/10 border-rose-400 dark:bg-rose-500/20",
+    activeText: "text-rose-700 dark:text-rose-200",
+    pt: 3,
+  },
+  中: {
+    dot: "bg-amber-500",
+    activeBg: "bg-amber-500/10 border-amber-400 dark:bg-amber-500/20",
+    activeText: "text-amber-700 dark:text-amber-200",
+    pt: 2,
+  },
+  軽: {
+    dot: "bg-slate-400 dark:bg-notion-muted",
+    activeBg:
+      "bg-slate-200/70 border-slate-400 dark:bg-notion-panel-hover dark:border-notion-border-strong",
+    activeText: "text-slate-700 dark:text-notion-fg",
+    pt: 1,
+  },
+};
+
+function ImportancePicker({
+  value,
+  onChange,
+}: {
+  value: Importance;
+  onChange: (v: Importance) => void;
+}) {
+  return (
+    <div className="inline-flex gap-1">
+      {IMPORTANCE_LIST.map((i) => {
+        const meta = IMPORTANCE_META[i];
+        const active = value === i;
+        return (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(i)}
+            className={
+              "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition " +
+              (active
+                ? `${meta.activeBg} ${meta.activeText} font-semibold`
+                : "border-slate-200 dark:border-notion-border muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover")
+            }
+            aria-pressed={active}
+          >
+            <span className={"size-2 rounded-full " + meta.dot} aria-hidden />
+            <span>{i}</span>
+            <span className="text-[10px] opacity-70 tabular-nums">
+              {meta.pt}pt
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ImportanceMenu({
+  value,
+  onChange,
+}: {
+  value: Importance;
+  onChange: (v: Importance) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (
+        triggerRef.current?.contains(t) ||
+        popRef.current?.contains(t)
+      )
+        return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setPos({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setOpen(true);
+  }
+
+  const meta = IMPORTANCE_META[value];
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        className={
+          "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition " +
+          meta.activeBg +
+          " " +
+          meta.activeText
+        }
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className={"size-2 rounded-full " + meta.dot} aria-hidden />
+        <span className="font-medium">{value}</span>
+      </button>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={popRef}
+            role="listbox"
+            style={{ position: "fixed", top: pos.top, right: pos.right }}
+            className="z-50 rounded-md border border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel shadow-lg py-1 min-w-[110px]"
+          >
+            {IMPORTANCE_LIST.map((i) => {
+              const m = IMPORTANCE_META[i];
+              const isActive = i === value;
+              return (
+                <button
+                  key={i}
+                  type="button"
+                  role="option"
+                  aria-selected={isActive}
+                  onClick={() => {
+                    onChange(i);
+                    setOpen(false);
+                  }}
+                  className={
+                    "flex items-center gap-2 w-full px-2.5 py-1.5 text-xs hover:bg-slate-100 dark:hover:bg-notion-panel-hover " +
+                    (isActive ? "font-semibold" : "")
+                  }
+                >
+                  <span className={"size-2 rounded-full " + m.dot} aria-hidden />
+                  <span>{i}</span>
+                  <span className="text-[10px] muted ml-auto tabular-nums">
+                    {m.pt}pt
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body
+        )}
+    </>
+  );
+}
+
 function TaskRow({ task }: { task: Task }) {
-  const toggleTask = useStore((s) => s.toggleTask);
-  const updateTask = useStore((s) => s.updateTask);
-  const deleteTask = useStore((s) => s.deleteTask);
+  const toggleTask = useToggleTask();
+  const updateTask = useUpdateTask();
+  const deleteTask = useDeleteTask();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
 
   function save() {
     if (title.trim() && title !== task.title) {
-      updateTask(task.id, { title: title.trim() });
+      updateTask.mutate({ id: task.id, patch: { title: title.trim() } });
     } else {
       setTitle(task.title);
     }
@@ -276,7 +546,7 @@ function TaskRow({ task }: { task: Task }) {
         type="checkbox"
         className="size-4 rounded accent-notion-blue cursor-pointer"
         checked={task.completed}
-        onChange={() => toggleTask(task.id)}
+        onChange={() => toggleTask(task)}
       />
       <div className="flex-1 min-w-0">
         {editing ? (
@@ -287,6 +557,7 @@ function TaskRow({ task }: { task: Task }) {
             onChange={(e) => setTitle(e.target.value)}
             onBlur={save}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return;
               if (e.key === "Enter") save();
               if (e.key === "Escape") {
                 setTitle(task.title);
@@ -309,25 +580,15 @@ function TaskRow({ task }: { task: Task }) {
           </button>
         )}
       </div>
-      <select
-        className="text-xs bg-transparent border border-transparent group-hover:border-slate-200 dark:group-hover:border-notion-border rounded px-1.5 py-0.5 outline-none"
+      <ImportanceMenu
         value={task.importance}
-        onChange={(e) =>
-          updateTask(task.id, { importance: e.target.value as Importance })
+        onChange={(v) =>
+          updateTask.mutate({ id: task.id, patch: { importance: v } })
         }
-      >
-        {IMPORTANCE_LIST.map((i) => (
-          <option key={i} value={i}>
-            {i}
-          </option>
-        ))}
-      </select>
-      <ImportanceBadge importance={task.importance} />
+      />
       <button
         type="button"
-        onClick={() => {
-          if (confirm("削除しますか？")) deleteTask(task.id);
-        }}
+        onClick={() => deleteTask.mutate(task.id)}
         className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-sm"
         aria-label="Delete"
       >
@@ -337,67 +598,231 @@ function TaskRow({ task }: { task: Task }) {
   );
 }
 
+function WakeTargetEditor({ target }: { target: string }) {
+  const update = useUpdateWakeTarget();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(target);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(target);
+  }, [target]);
+
+  function commit() {
+    if (draft && draft !== target) {
+      update.mutate(draft);
+    }
+    setEditing(false);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setEditing(true);
+          setTimeout(() => inputRef.current?.focus(), 0);
+        }}
+        className="text-[11px] muted hover:text-notion-blue tabular-nums underline-offset-2 hover:underline"
+        title="目標時刻を変更"
+      >
+        目標 {target} ✎
+      </button>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <span className="text-[11px] muted">目標</span>
+      <input
+        ref={inputRef}
+        type="time"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+          if (e.key === "Enter") commit();
+          if (e.key === "Escape") {
+            setDraft(target);
+            setEditing(false);
+          }
+        }}
+        className="text-[11px] tabular-nums bg-transparent border border-slate-300 dark:border-notion-border rounded px-1 py-0.5 outline-none focus:ring-2 focus:ring-notion-blue"
+      />
+    </span>
+  );
+}
+
+function WakeTimeInput({
+  value,
+  target,
+  onChange,
+}: {
+  value: string;
+  target: string;
+  onChange: (v: string) => void;
+}) {
+  const wakeMin = toMinutes(value);
+  const targetMin = toMinutes(target);
+  const diff =
+    wakeMin != null && targetMin != null ? wakeMin - targetMin : null;
+
+  const tone =
+    diff == null
+      ? { text: "text-slate-500 dark:text-notion-muted", bar: "bg-slate-300 dark:bg-notion-border" }
+      : diff <= 0
+      ? { text: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" }
+      : diff <= 30
+      ? { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" }
+      : diff <= 90
+      ? { text: "text-orange-600 dark:text-orange-400", bar: "bg-orange-500" }
+      : { text: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" };
+
+  const diffLabel =
+    diff == null
+      ? "未入力"
+      : diff === 0
+      ? "ぴったり"
+      : diff < 0
+      ? `目標より${Math.abs(diff)}分早い☀️`
+      : `目標より${diff}分遅れ😣`;
+
+  function setNow() {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    onChange(`${hh}:${mm}`);
+  }
+
+  // Bar position: -60min (full early) → 0%, target → ~28%, +150min → 100%
+  const BAR_MIN = -60;
+  const BAR_MAX = 150;
+  const markerPct =
+    diff == null
+      ? null
+      : Math.max(
+          0,
+          Math.min(100, ((diff - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100)
+        );
+  const targetPct = ((0 - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100;
+
+  return (
+    <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wide muted">
+          🌅 起床時刻
+        </span>
+        <WakeTargetEditor target={target} />
+      </div>
+
+      <div className="flex items-center gap-1 rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-1.5 py-1 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
+        <input
+          aria-label="起床時刻"
+          type="time"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-transparent outline-none text-lg font-bold tabular-nums flex-1 min-w-0 px-1"
+        />
+        <button
+          type="button"
+          onClick={setNow}
+          className="text-[11px] font-medium text-notion-blue hover:bg-notion-blue/10 rounded px-2 py-1 transition whitespace-nowrap"
+          title="現在時刻を入力"
+        >
+          今すぐ
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-slate-400 hover:text-rose-500 px-1.5 text-sm"
+            aria-label="クリア"
+            title="クリア"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      <div className={"text-xs font-semibold tabular-nums " + tone.text}>
+        {diffLabel}
+      </div>
+    </div>
+  );
+}
+
+function toMinutes(time: string): number | null {
+  if (!time) return null;
+  const [h, m] = time.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
 function SummaryPanel({
   fulfillment,
   completedWeight,
   scheduledWeight,
+  wakeScore,
+  wakeTime,
+  wakeTarget,
+  onWakeTimeChange,
+  totalScore,
   cluster,
   streak,
-  hasReview,
 }: {
   fulfillment: number;
   completedWeight: number;
   scheduledWeight: number;
+  wakeScore: number;
+  wakeTime: string;
+  wakeTarget: string;
+  onWakeTimeChange: (v: string) => void;
+  totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
-  hasReview: boolean;
 }) {
+  const completionPct =
+    scheduledWeight === 0
+      ? 0
+      : Math.round((completedWeight / scheduledWeight) * 100);
   return (
     <aside className="card flex flex-col items-center gap-3">
       <div className="self-start text-xs uppercase tracking-wide muted">
         スコア
       </div>
-      <ScoreRing
-        score={
-          scheduledWeight === 0
-            ? 0
-            : Math.round((completedWeight / scheduledWeight) * 100)
-        }
-        cluster={cluster}
-        size={140}
-      />
+      <ScoreRing score={Math.round(totalScore)} cluster={cluster} size={140} />
       <ClusterBadge cluster={cluster} size="lg" />
-      <div className="w-full grid grid-cols-2 gap-2 text-center text-xs">
+      <div className="w-full grid grid-cols-3 gap-2 text-center text-xs">
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
-          <div className="muted">完了率</div>
+          <div className="muted">完了 (90)</div>
           <div className="font-semibold tabular-nums">
-            {scheduledWeight === 0
-              ? "—"
-              : `${Math.round((completedWeight / scheduledWeight) * 100)}%`}
+            {scheduledWeight === 0 ? "—" : `${completionPct}%`}
           </div>
         </div>
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
-          <div className="muted">充実度</div>
-          <div className="font-semibold tabular-nums">{fulfillment} / 10</div>
+          <div className="muted">充実 (5)</div>
+          <div className="font-semibold tabular-nums">{fulfillment} / 5</div>
+        </div>
+        <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
+          <div className="muted">起床 (5)</div>
+          <div className="font-semibold tabular-nums">
+            {wakeTime ? wakeScore.toFixed(1) : "—"} / 5
+          </div>
         </div>
       </div>
-      <div className="w-full flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-notion-border">
-        <span className="muted">完了重み</span>
-        <span className="tabular-nums">
-          {completedWeight} / {scheduledWeight} pt
-        </span>
-      </div>
+
+      <WakeTimeInput
+        value={wakeTime}
+        target={wakeTarget}
+        onChange={onWakeTimeChange}
+      />
+
       <div className="w-full flex items-center justify-between text-xs">
         <span className="muted">A/B 連続日数</span>
         <span className="tabular-nums font-semibold">
           {streak} <span className="muted font-normal">日</span>
         </span>
       </div>
-      {!hasReview && (
-        <p className="text-xs muted text-center pt-1">
-          下のレビューを保存するとスコアが確定します
-        </p>
-      )}
     </aside>
   );
 }
@@ -444,31 +869,7 @@ function ReviewPanel(props: {
         )}
       </header>
 
-      <div>
-        <label className="label">
-          充実度{" "}
-          <span className="text-slate-900 dark:text-notion-fg font-bold ml-1">
-            {fulfillment}
-          </span>
-          <span className="muted"> / 5</span>
-        </label>
-        <input
-          type="range"
-          min={1}
-          max={5}
-          step={1}
-          value={fulfillment}
-          onChange={(e) => setFulfillment(Number(e.target.value))}
-          className="w-full accent-notion-blue"
-        />
-        <div className="flex justify-between text-[10px] muted mt-1">
-          <span>1 低</span>
-          <span>2</span>
-          <span>3</span>
-          <span>4</span>
-          <span>5 高</span>
-        </div>
-      </div>
+      <FulfillmentPicker value={fulfillment} onChange={setFulfillment} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
@@ -513,64 +914,67 @@ function ReviewPanel(props: {
   );
 }
 
-function TomorrowPanel({ tasks, date }: { tasks: Task[]; date: string }) {
-  const addTask = useStore((s) => s.addTask);
-  const [title, setTitle] = useState("");
+const FULFILLMENT_OPTIONS: {
+  value: number;
+  emoji: string;
+  label: string;
+  active: string;
+}[] = [
+  { value: 1, emoji: "😞", label: "厳しい", active: "bg-rose-500/10 border-rose-400 text-rose-700 dark:text-rose-200 dark:bg-rose-500/20" },
+  { value: 2, emoji: "😕", label: "不調", active: "bg-orange-500/10 border-orange-400 text-orange-700 dark:text-orange-200 dark:bg-orange-500/20" },
+  { value: 3, emoji: "😐", label: "普通", active: "bg-amber-500/10 border-amber-400 text-amber-700 dark:text-amber-200 dark:bg-amber-500/20" },
+  { value: 4, emoji: "🙂", label: "好調", active: "bg-blue-500/10 border-blue-400 text-blue-700 dark:text-blue-200 dark:bg-blue-500/20" },
+  { value: 5, emoji: "😄", label: "最高", active: "bg-emerald-500/10 border-emerald-400 text-emerald-700 dark:text-emerald-200 dark:bg-emerald-500/20" },
+];
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    addTask({
-      title: title.trim(),
-      importance: "中",
-      scheduled_date: date,
-    });
-    setTitle("");
-  }
-
+function FulfillmentPicker({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+}) {
+  const current = FULFILLMENT_OPTIONS.find((o) => o.value === value);
   return (
-    <section className="card !p-0 overflow-hidden">
-      <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
-        <div>
-          <h2 className="text-base font-semibold">明日の準備</h2>
-          <p className="text-xs muted mt-0.5">
-            {format(parseISO(date), "M月d日 (EEE)")} のタスクを先に並べる
-          </p>
-        </div>
-        <span className="text-xs muted tabular-nums">{tasks.length} 件</span>
-      </header>
-
-      <form
-        onSubmit={submit}
-        className="flex items-center gap-2 px-5 py-3 border-b border-slate-100 dark:border-notion-border bg-slate-50/40 dark:bg-notion-panel-hover/40"
-      >
-        <span className="text-notion-blue text-lg leading-none select-none">+</span>
-        <input
-          className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400 dark:placeholder:text-notion-muted"
-          placeholder="明日のタスク..."
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <button
-          type="submit"
-          className="btn-ghost !py-1 !px-3 text-xs"
-          disabled={!title.trim()}
-        >
-          追加
-        </button>
-      </form>
-
-      {tasks.length === 0 ? (
-        <p className="px-5 py-6 text-center text-sm muted">
-          明日のタスクはまだありません
-        </p>
-      ) : (
-        <ul className="divide-y divide-slate-100 dark:divide-notion-border">
-          {tasks.map((t) => (
-            <TaskRow key={t.id} task={t} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="label !mb-0">充実度</span>
+        <span className="text-xs muted">
+          <span className="text-slate-900 dark:text-notion-fg font-semibold tabular-nums">
+            {value}
+          </span>{" "}
+          / 5 · {current?.label ?? ""}
+        </span>
+      </div>
+      <div className="grid grid-cols-5 gap-2">
+        {FULFILLMENT_OPTIONS.map((o) => {
+          const active = o.value === value;
+          return (
+            <button
+              key={o.value}
+              type="button"
+              onClick={() => onChange(o.value)}
+              aria-pressed={active}
+              aria-label={`${o.value} ${o.label}`}
+              className={
+                "flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 transition " +
+                (active
+                  ? `${o.active} font-semibold shadow-sm`
+                  : "border-slate-200 dark:border-notion-border hover:bg-slate-50 dark:hover:bg-notion-panel-hover")
+              }
+            >
+              <span className={"text-2xl leading-none " + (active ? "" : "grayscale opacity-70")}>
+                {o.emoji}
+              </span>
+              <span className="text-[10px] tabular-nums opacity-80">
+                {o.value}
+              </span>
+              <span className="text-[10px]">{o.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
+

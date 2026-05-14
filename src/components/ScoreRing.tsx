@@ -4,7 +4,8 @@ const COLOR: Record<Cluster, string> = {
   A: "#22c55e",
   B: "#3b82f6",
   C: "#f59e0b",
-  D: "#ef4444",
+  D: "#f97316",
+  E: "#ef4444",
 };
 
 export function ScoreRing({

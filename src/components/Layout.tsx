@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import clsx from "clsx";
-import { useStore } from "@/lib/store";
+import { useUiStore } from "@/lib/uiStore";
+import { useAuth } from "@/lib/auth";
 
 const NAV = [
   { to: "/", label: "Today", end: true },
@@ -8,8 +9,9 @@ const NAV = [
 ];
 
 export default function Layout() {
-  const darkMode = useStore((s) => s.darkMode);
-  const toggleDarkMode = useStore((s) => s.toggleDarkMode);
+  const darkMode = useUiStore((s) => s.darkMode);
+  const toggleDarkMode = useUiStore((s) => s.toggleDarkMode);
+  const { signOut } = useAuth();
 
   return (
     <div className="min-h-full">
@@ -52,6 +54,14 @@ export default function Layout() {
             <NavLink to="/settings" className="btn-ghost" aria-label="Settings">
               ⚙
             </NavLink>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="btn-ghost text-xs"
+              aria-label="Sign out"
+            >
+              ログアウト
+            </button>
           </div>
         </div>
         <nav className="md:hidden border-t border-slate-200 dark:border-notion-border overflow-x-auto">

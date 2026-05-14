@@ -10,7 +10,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { useStore } from "@/lib/store";
+import { useReviews } from "@/lib/queries";
 import { CLUSTER_META } from "@/types";
 import { todayISO } from "@/lib/date";
 import { ClusterBadge } from "@/components/ClusterBadge";
@@ -19,7 +19,7 @@ const DOW = ["月", "火", "水", "木", "金", "土", "日"];
 
 export default function Calendar() {
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const reviews = useStore((s) => s.reviews);
+  const reviews = useReviews().data ?? [];
 
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
   const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
@@ -103,6 +103,8 @@ export default function Calendar() {
                             ? "#3b82f6"
                             : r.cluster === "C"
                             ? "#f59e0b"
+                            : r.cluster === "D"
+                            ? "#f97316"
                             : "#ef4444",
                       }}
                     >
@@ -129,7 +131,7 @@ function Legend() {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="text-xs muted">凡例:</span>
-      {(["A", "B", "C", "D"] as const).map((c) => (
+      {(["A", "B", "C", "D", "E"] as const).map((c) => (
         <ClusterBadge key={c} cluster={c} size="sm" />
       ))}
       <span className="text-xs muted ml-2">
