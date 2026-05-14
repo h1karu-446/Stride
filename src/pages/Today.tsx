@@ -133,7 +133,6 @@ export default function Today() {
         />
         <SummaryPanel
           score={preview.total_score}
-          completion={preview.completion_score}
           fulfillment={preview.fulfillment_score}
           completedWeight={preview.completed_weight}
           scheduledWeight={preview.scheduled_weight}
@@ -344,7 +343,6 @@ function TaskRow({ task }: { task: Task }) {
 
 function SummaryPanel({
   score,
-  completion,
   fulfillment,
   completedWeight,
   scheduledWeight,
@@ -353,7 +351,6 @@ function SummaryPanel({
   hasReview,
 }: {
   score: number;
-  completion: number;
   fulfillment: number;
   completedWeight: number;
   scheduledWeight: number;
@@ -371,7 +368,11 @@ function SummaryPanel({
       <div className="w-full grid grid-cols-2 gap-2 text-center text-xs">
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
           <div className="muted">完了率</div>
-          <div className="font-semibold tabular-nums">{completion} / 90</div>
+          <div className="font-semibold tabular-nums">
+            {scheduledWeight === 0
+              ? "—"
+              : `${Math.round((completedWeight / scheduledWeight) * 100)}%`}
+          </div>
         </div>
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
           <div className="muted">充実度</div>
