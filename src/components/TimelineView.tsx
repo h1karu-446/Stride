@@ -149,6 +149,10 @@ export function TimelineView({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftImportance, setDraftImportance] = useState<Importance>("中");
   const [dropMin, setDropMin] = useState<number | null>(null);
+  const [nowMin, setNowMin] = useState<number>(() => {
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  });
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -157,6 +161,24 @@ export function TimelineView({
     const target = earliest ?? new Date().getHours() * 60;
     el.scrollTop = Math.max(0, ((target - START_HOUR * 60) / 60) * HOUR_PX - HOUR_PX);
   }, []);
+
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowMin(d.getHours() * 60 + d.getMinutes());
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const isToday = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return date === `${y}-${m}-${day}`;
+  }, [date]);
 
   const scheduled = useMemo(
     () => tasks.filter((t) => t.start_time && t.end_time),
@@ -455,6 +477,17 @@ export function TimelineView({
                 <div className="text-[10px] text-notion-blue px-1.5 py-0.5 tabular-nums">
                   {toTime(Math.min(drag.startMin, drag.currentMin))} -{" "}
                   {toTime(Math.max(drag.startMin, drag.currentMin))}
+                </div>
+              </div>
+            )}
+
+            {isToday && nowMin >= START_HOUR * 60 && nowMin <= END_HOUR * 60 && (
+              <div
+                className="absolute left-0 right-0 pointer-events-none z-10"
+                style={{ top: minToY(nowMin) }}
+              >
+                <div className="relative h-0 border-t border-rose-500">
+                  <div className="absolute -left-1 -top-1 size-2 rounded-full bg-rose-500" />
                 </div>
               </div>
             )}
