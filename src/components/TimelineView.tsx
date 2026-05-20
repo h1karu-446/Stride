@@ -12,6 +12,7 @@ const END_HOUR = 24;
 const HOUR_PX = 56;
 const SNAP_MIN = 15;
 const VIEWPORT_PX = 560;
+const DRAG_THRESHOLD_PX = 4;
 
 type DragState =
   | {
@@ -25,7 +26,9 @@ type DragState =
       origStart: number;
       origEnd: number;
       pointerStartMin: number;
+      pointerStartClientY: number;
       currentMin: number;
+      activated: boolean;
     }
   | {
       kind: "resize";
@@ -149,6 +152,11 @@ export function TimelineView({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftImportance, setDraftImportance] = useState<Importance>("中");
   const [dropMin, setDropMin] = useState<number | null>(null);
+  const [editing, setEditing] = useState<Task | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editImportance, setEditImportance] = useState<Importance>("中");
+  const [editStart, setEditStart] = useState("");
+  const [editEnd, setEditEnd] = useState("");
   const [nowMin, setNowMin] = useState<number>(() => {
     const d = new Date();
     return d.getHours() * 60 + d.getMinutes();
@@ -210,7 +218,10 @@ export function TimelineView({
     if (drag.kind === "create") {
       setDrag({ ...drag, currentMin: min });
     } else if (drag.kind === "move") {
-      setDrag({ ...drag, currentMin: min });
+      const activated =
+        drag.activated ||
+        Math.abs(e.clientY - drag.pointerStartClientY) > DRAG_THRESHOLD_PX;
+      setDrag({ ...drag, currentMin: min, activated });
     } else if (drag.kind === "resize") {
       if (drag.edge === "top") {
         const newStart = Math.max(
@@ -239,16 +250,21 @@ export function TimelineView({
       setDraftTitle("");
       setDraftImportance("中");
     } else if (drag.kind === "move") {
-      const delta = drag.currentMin - drag.pointerStartMin;
-      const newStart = Math.max(START_HOUR * 60, drag.origStart + delta);
-      const newEnd = Math.min(END_HOUR * 60, drag.origEnd + delta);
-      updateTaskMut.mutate({
-        id: drag.taskId,
-        patch: {
-          start_time: toTime(newStart),
-          end_time: toTime(newEnd),
-        },
-      });
+      if (!drag.activated) {
+        const task = tasks.find((t) => t.id === drag.taskId);
+        if (task) openEdit(task);
+      } else {
+        const delta = drag.currentMin - drag.pointerStartMin;
+        const newStart = Math.max(START_HOUR * 60, drag.origStart + delta);
+        const newEnd = Math.min(END_HOUR * 60, drag.origEnd + delta);
+        updateTaskMut.mutate({
+          id: drag.taskId,
+          patch: {
+            start_time: toTime(newStart),
+            end_time: toTime(newEnd),
+          },
+        });
+      }
     } else if (drag.kind === "resize") {
       const patch: { start_time?: string; end_time?: string } = {};
       if (drag.edge === "top") {
@@ -259,6 +275,38 @@ export function TimelineView({
       updateTaskMut.mutate({ id: drag.taskId, patch });
     }
     setDrag(null);
+  }
+
+  function openEdit(task: Task) {
+    setEditing(task);
+    setEditTitle(task.title);
+    setEditImportance(task.importance);
+    setEditStart(task.start_time ?? "");
+    setEditEnd(task.end_time ?? "");
+  }
+
+  function commitEdit() {
+    if (!editing) return;
+    const title = editTitle.trim();
+    if (!title) {
+      setEditing(null);
+      return;
+    }
+    const sMin = toMin(editStart);
+    const eMin = toMin(editEnd);
+    if (sMin == null || eMin == null || eMin <= sMin) {
+      return;
+    }
+    updateTaskMut.mutate({
+      id: editing.id,
+      patch: {
+        title,
+        importance: editImportance,
+        start_time: editStart,
+        end_time: editEnd,
+      },
+    });
+    setEditing(null);
   }
 
   function commitCreate() {
@@ -291,7 +339,9 @@ export function TimelineView({
       origStart: startMin,
       origEnd: endMin,
       pointerStartMin: min,
+      pointerStartClientY: e.clientY,
       currentMin: min,
+      activated: false,
     });
   }
 
@@ -412,7 +462,9 @@ export function TimelineView({
                 const sMin = toMin(t.start_time)!;
                 const eMin = toMin(t.end_time)!;
                 const isMoving =
-                  drag?.kind === "move" && drag.taskId === t.id;
+                  drag?.kind === "move" &&
+                  drag.taskId === t.id &&
+                  drag.activated;
                 const isResizing =
                   drag?.kind === "resize" && drag.taskId === t.id;
                 const start = isMoving
@@ -448,6 +500,11 @@ export function TimelineView({
                     height={Math.max(HOUR_PX / 4, minToY(end) - minToY(start))}
                     leftPct={leftPct}
                     widthPct={widthPct}
+                    isDragging={
+                      drag?.kind === "move" &&
+                      drag.taskId === t.id &&
+                      drag.activated
+                    }
                     onMoveStart={(e) => startMoveDrag(e, t, sMin, eMin)}
                     onResizeTopStart={(e) =>
                       startResizeDrag(e, t, sMin, eMin, "top")
@@ -509,6 +566,89 @@ export function TimelineView({
         </div>
         </div>
       </div>
+
+      {editing && (
+        <div
+          className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
+          onClick={() => setEditing(null)}
+        >
+          <div
+            className="card w-[min(92vw,360px)] space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-sm font-semibold">予定を編集</div>
+            <input
+              autoFocus
+              className="input"
+              placeholder="タイトル"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") setEditing(null);
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="time"
+                className="input flex-1"
+                value={editStart}
+                onChange={(e) => setEditStart(e.target.value)}
+              />
+              <span className="text-xs muted">〜</span>
+              <input
+                type="time"
+                className="input flex-1"
+                value={editEnd}
+                onChange={(e) => setEditEnd(e.target.value)}
+              />
+            </div>
+            <select
+              className="input"
+              value={editImportance}
+              onChange={(e) =>
+                setEditImportance(e.target.value as Importance)
+              }
+            >
+              {IMPORTANCE_LIST.map((i) => (
+                <option key={i} value={i}>
+                  {i} ({i === "重" ? 3 : i === "中" ? 2 : 1}pt)
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-between gap-2">
+              <button
+                type="button"
+                className="btn-ghost !py-1 !px-3 text-xs text-rose-500"
+                onClick={() => {
+                  deleteTaskMut.mutate(editing.id);
+                  setEditing(null);
+                }}
+              >
+                削除
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="btn-ghost !py-1 !px-3 text-xs"
+                  onClick={() => setEditing(null)}
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary !py-1 !px-3 text-xs"
+                  onClick={commitEdit}
+                  disabled={!editTitle.trim()}
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {pendingCreate && (
         <div
@@ -578,6 +718,7 @@ function TimelineBlock({
   height,
   leftPct,
   widthPct,
+  isDragging,
   onMoveStart,
   onResizeTopStart,
   onResizeBottomStart,
@@ -589,6 +730,7 @@ function TimelineBlock({
   height: number;
   leftPct: number;
   widthPct: number;
+  isDragging: boolean;
   onMoveStart: (e: React.PointerEvent<HTMLDivElement>) => void;
   onResizeTopStart: (e: React.PointerEvent<HTMLDivElement>) => void;
   onResizeBottomStart: (e: React.PointerEvent<HTMLDivElement>) => void;
@@ -599,7 +741,8 @@ function TimelineBlock({
   return (
     <div
       className={
-        "group absolute rounded-md border px-2 py-1 text-xs shadow-sm cursor-grab active:cursor-grabbing overflow-hidden " +
+        "group absolute rounded-md border px-2 py-1 text-xs shadow-sm overflow-hidden " +
+        (isDragging ? "cursor-grabbing " : "cursor-default ") +
         IMPORTANCE_COLOR[task.importance] +
         (task.completed ? " opacity-60" : "")
       }
