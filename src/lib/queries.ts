@@ -31,6 +31,7 @@ interface ReviewRow {
   date: string;
   fulfillment: number;
   wake_time: string | null;
+  wake_target: string | null;
   highlight: string | null;
   tomorrow_intention: string | null;
   memo: string | null;
@@ -66,6 +67,7 @@ function rowToReview(r: ReviewRow): DailyReview {
     date: r.date,
     fulfillment: r.fulfillment,
     wake_time: r.wake_time ? r.wake_time.slice(0, 5) : undefined,
+    wake_target: r.wake_target ? r.wake_target.slice(0, 5) : undefined,
     highlight: r.highlight ?? undefined,
     tomorrow_intention: r.tomorrow_intention ?? undefined,
     memo: r.memo ?? undefined,
@@ -207,6 +209,7 @@ export type UpsertReviewInput = {
   date: string;
   fulfillment: number;
   wake_time?: string;
+  wake_target?: string;
   highlight?: string;
   tomorrow_intention?: string;
   memo?: string;
@@ -223,9 +226,43 @@ export function useUpsertReview() {
         date: input.date,
         fulfillment: input.fulfillment,
         wake_time: input.wake_time ?? null,
+        wake_target: input.wake_target ?? null,
         highlight: input.highlight ?? null,
         tomorrow_intention: input.tomorrow_intention ?? null,
         memo: input.memo ?? null,
+      };
+      const { data, error } = await supabase
+        .from("daily_reviews")
+        .upsert(payload, { onConflict: "user_id,date" })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return rowToReview(data as ReviewRow);
+    },
+    onSuccess: () => invalidateAll(qc),
+  });
+}
+
+export type UpdateWakeFieldsInput = {
+  date: string;
+  wake_time?: string;
+  wake_target?: string;
+};
+
+// Saves only wake_time/wake_target, leaving fulfillment/highlight/memo on the
+// row untouched — lets the wake fields autosave independently of the "save
+// review" button.
+export function useUpdateWakeFields() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async (input: UpdateWakeFieldsInput): Promise<DailyReview> => {
+      if (!session) throw new Error("Not signed in");
+      const payload = {
+        user_id: session.user.id,
+        date: input.date,
+        wake_time: input.wake_time ?? null,
+        wake_target: input.wake_target ?? null,
       };
       const { data, error } = await supabase
         .from("daily_reviews")

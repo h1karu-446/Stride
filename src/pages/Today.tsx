@@ -9,7 +9,7 @@ import {
   useTasks,
   useToggleTask,
   useUpdateTask,
-  useUpdateWakeTarget,
+  useUpdateWakeFields,
   useUpsertReview,
   useWakeTarget,
 } from "@/lib/queries";
@@ -35,6 +35,7 @@ export default function Today() {
   const reviews = reviewsQuery.data ?? [];
   const review = reviews.find((r) => r.date === date);
   const upsertReviewMut = useUpsertReview();
+  const updateWakeFieldsMut = useUpdateWakeFields();
 
   const tasks = useMemo(
     () =>
@@ -55,9 +56,12 @@ export default function Today() {
     [allTasks, date]
   );
 
-  const wakeTarget = useWakeTarget();
+  const globalWakeTarget = useWakeTarget();
   const [fulfillment, setFulfillment] = useState(review?.fulfillment ?? 3);
   const [wakeTime, setWakeTime] = useState(review?.wake_time ?? "");
+  const [wakeTargetOverride, setWakeTargetOverride] = useState(
+    review?.wake_target ?? ""
+  );
   const [highlight, setHighlight] = useState(review?.highlight ?? "");
   const [intention, setIntention] = useState(review?.tomorrow_intention ?? "");
   const [memo, setMemo] = useState(review?.memo ?? "");
@@ -66,11 +70,45 @@ export default function Today() {
   useEffect(() => {
     setFulfillment(review?.fulfillment ?? 3);
     setWakeTime(review?.wake_time ?? "");
+    setWakeTargetOverride(review?.wake_target ?? "");
     setHighlight(review?.highlight ?? "");
     setIntention(review?.tomorrow_intention ?? "");
     setMemo(review?.memo ?? "");
     setSaved(false);
   }, [date, review?.id]);
+
+  const wakeSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    return () => clearTimeout(wakeSaveTimer.current);
+  }, [date]);
+
+  function scheduleWakeSave(nextWakeTime: string, nextWakeTargetOverride: string) {
+    clearTimeout(wakeSaveTimer.current);
+    wakeSaveTimer.current = setTimeout(() => {
+      updateWakeFieldsMut.mutate({
+        date,
+        wake_time: nextWakeTime || undefined,
+        wake_target: nextWakeTargetOverride || undefined,
+      });
+    }, 500);
+  }
+
+  function handleWakeTimeChange(v: string) {
+    setWakeTime(v);
+    scheduleWakeSave(v, wakeTargetOverride);
+  }
+
+  function handleWakeTargetChange(v: string) {
+    setWakeTargetOverride(v);
+    scheduleWakeSave(wakeTime, v);
+  }
+
+  function handleWakeTargetReset() {
+    setWakeTargetOverride("");
+    scheduleWakeSave(wakeTime, "");
+  }
+
+  const wakeTarget = wakeTargetOverride || globalWakeTarget;
 
   const preview = useMemo(
     () => calculateScore(tasks, fulfillment, wakeTime || null, wakeTarget),
@@ -92,6 +130,7 @@ export default function Today() {
         date,
         fulfillment,
         wake_time: wakeTime || undefined,
+        wake_target: wakeTargetOverride || undefined,
         highlight: highlight || undefined,
         tomorrow_intention: intention || undefined,
         memo: memo || undefined,
@@ -171,7 +210,10 @@ export default function Today() {
             wakeScore={preview.wake_score}
             wakeTime={wakeTime}
             wakeTarget={wakeTarget}
-            onWakeTimeChange={setWakeTime}
+            isWakeTargetOverridden={!!wakeTargetOverride}
+            onWakeTimeChange={handleWakeTimeChange}
+            onWakeTargetChange={handleWakeTargetChange}
+            onWakeTargetReset={handleWakeTargetReset}
             totalScore={preview.total_score}
             cluster={preview.cluster}
             streak={streak}
@@ -598,8 +640,17 @@ function TaskRow({ task }: { task: Task }) {
   );
 }
 
-function WakeTargetEditor({ target }: { target: string }) {
-  const update = useUpdateWakeTarget();
+function WakeTargetEditor({
+  target,
+  isOverridden,
+  onChange,
+  onReset,
+}: {
+  target: string;
+  isOverridden: boolean;
+  onChange: (v: string) => void;
+  onReset: () => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(target);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -610,24 +661,37 @@ function WakeTargetEditor({ target }: { target: string }) {
 
   function commit() {
     if (draft && draft !== target) {
-      update.mutate(draft);
+      onChange(draft);
     }
     setEditing(false);
   }
 
   if (!editing) {
     return (
-      <button
-        type="button"
-        onClick={() => {
-          setEditing(true);
-          setTimeout(() => inputRef.current?.focus(), 0);
-        }}
-        className="text-[11px] muted hover:text-notion-blue tabular-nums underline-offset-2 hover:underline"
-        title="目標時刻を変更"
-      >
-        目標 {target} ✎
-      </button>
+      <span className="inline-flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            setEditing(true);
+            setTimeout(() => inputRef.current?.focus(), 0);
+          }}
+          className="text-[11px] muted hover:text-notion-blue tabular-nums underline-offset-2 hover:underline"
+          title="この日の目標時刻を変更"
+        >
+          目標 {target}
+          {isOverridden && "・カスタム"} ✎
+        </button>
+        {isOverridden && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-[11px] muted hover:text-notion-blue underline-offset-2 hover:underline"
+            title="設定の目標時刻に戻す"
+          >
+            既定に戻す
+          </button>
+        )}
+      </span>
     );
   }
 
@@ -658,10 +722,16 @@ function WakeTimeInput({
   value,
   target,
   onChange,
+  isTargetOverridden,
+  onTargetChange,
+  onTargetReset,
 }: {
   value: string;
   target: string;
   onChange: (v: string) => void;
+  isTargetOverridden: boolean;
+  onTargetChange: (v: string) => void;
+  onTargetReset: () => void;
 }) {
   const wakeMin = toMinutes(value);
   const targetMin = toMinutes(target);
@@ -713,7 +783,12 @@ function WakeTimeInput({
         <span className="text-xs uppercase tracking-wide muted">
           🌅 起床時刻
         </span>
-        <WakeTargetEditor target={target} />
+        <WakeTargetEditor
+          target={target}
+          isOverridden={isTargetOverridden}
+          onChange={onTargetChange}
+          onReset={onTargetReset}
+        />
       </div>
 
       <div className="flex items-center gap-1 rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-1.5 py-1 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
@@ -765,7 +840,10 @@ function SummaryPanel({
   wakeScore,
   wakeTime,
   wakeTarget,
+  isWakeTargetOverridden,
   onWakeTimeChange,
+  onWakeTargetChange,
+  onWakeTargetReset,
   totalScore,
   cluster,
   streak,
@@ -776,7 +854,10 @@ function SummaryPanel({
   wakeScore: number;
   wakeTime: string;
   wakeTarget: string;
+  isWakeTargetOverridden: boolean;
   onWakeTimeChange: (v: string) => void;
+  onWakeTargetChange: (v: string) => void;
+  onWakeTargetReset: () => void;
   totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
@@ -815,6 +896,9 @@ function SummaryPanel({
         value={wakeTime}
         target={wakeTarget}
         onChange={onWakeTimeChange}
+        isTargetOverridden={isWakeTargetOverridden}
+        onTargetChange={onWakeTargetChange}
+        onTargetReset={onWakeTargetReset}
       />
 
       <div className="w-full flex items-center justify-between text-xs">

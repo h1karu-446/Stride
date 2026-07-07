@@ -22,6 +22,7 @@ export interface DailyReview {
   date: string; // YYYY-MM-DD
   fulfillment: number; // 1-5
   wake_time?: string; // "HH:mm"
+  wake_target?: string; // "HH:mm" — per-day override of the account default
   highlight?: string;
   tomorrow_intention?: string;
   memo?: string;
