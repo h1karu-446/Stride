@@ -1,7 +1,6 @@
 import { FormEvent, useState } from "react";
 import {
   useBedTarget,
-  useDeleteAll,
   useReviews,
   useTasks,
   useUpdateBedTarget,
@@ -15,7 +14,6 @@ export default function Settings() {
   const { session, signOut } = useAuth();
   const tasks = useTasks().data ?? [];
   const reviews = useReviews().data ?? [];
-  const deleteAll = useDeleteAll();
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -46,24 +44,6 @@ export default function Settings() {
         <div className="grid grid-cols-2 gap-2 text-sm">
           <Stat label="タスク数" value={tasks.length} />
           <Stat label="レビュー数" value={reviews.length} />
-        </div>
-        <div className="flex gap-2 pt-2">
-          <button
-            type="button"
-            onClick={() => {
-              if (
-                confirm(
-                  "すべてのタスクとレビューを削除します。よろしいですか？"
-                )
-              ) {
-                deleteAll.mutate();
-              }
-            }}
-            className="btn-outline text-rose-500"
-            disabled={deleteAll.isPending}
-          >
-            全データ削除
-          </button>
         </div>
       </section>
     </div>
