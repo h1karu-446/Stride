@@ -17,20 +17,31 @@ export interface ScoreResult {
   completion_score: number;
   fulfillment_score: number;
   wake_score: number;
+  bed_score: number;
   total_score: number;
   cluster: Cluster;
   completed_weight: number;
   scheduled_weight: number;
 }
 
-const WAKE_MAX = 5;
-const WAKE_PENALTY_MIN_FULL = 150; // 150min late → 0 pt
+const WAKE_MAX = 7.5;
+const BED_MAX = 7.5;
+const PENALTY_MIN_FULL = 150; // 150min late → 0 pt
+const NOON_MIN = 12 * 60;
+const DAY_MIN = 24 * 60;
 
 function timeToMin(time: string | null | undefined): number | null {
   if (!time) return null;
   const [h, m] = time.split(":").map(Number);
   if (Number.isNaN(h) || Number.isNaN(m)) return null;
   return h * 60 + m;
+}
+
+// Bedtimes can cross midnight (e.g. target 23:00, actual 00:30). Treat any
+// time before noon as belonging to the next day so late-night times compare
+// correctly against evening targets instead of looking artificially early.
+export function normalizeLateNight(min: number): number {
+  return min < NOON_MIN ? min + DAY_MIN : min;
 }
 
 export function calculateWakeScore(
@@ -41,8 +52,23 @@ export function calculateWakeScore(
   const t = timeToMin(wakeTarget);
   if (w == null || t == null) return 0;
   const lateMin = Math.max(0, w - t);
-  const ratio = Math.max(0, 1 - lateMin / WAKE_PENALTY_MIN_FULL);
+  const ratio = Math.max(0, 1 - lateMin / PENALTY_MIN_FULL);
   return WAKE_MAX * ratio;
+}
+
+export function calculateBedScore(
+  bedTime: string | null | undefined,
+  bedTarget: string | null | undefined
+): number {
+  const b = timeToMin(bedTime);
+  const t = timeToMin(bedTarget);
+  if (b == null || t == null) return 0;
+  const lateMin = Math.max(
+    0,
+    normalizeLateNight(b) - normalizeLateNight(t)
+  );
+  const ratio = Math.max(0, 1 - lateMin / PENALTY_MIN_FULL);
+  return BED_MAX * ratio;
 }
 
 /**
@@ -50,13 +76,15 @@ export function calculateWakeScore(
  * supabase/migrations. Kept in TS so the UI can preview scores
  * before the row is persisted.
  *
- * Weights: completion 90 / fulfillment 5 / wake 5 (max 100).
+ * Weights: completion 80 / fulfillment 5 / wake 7.5 / bed 7.5 (max 100).
  */
 export function calculateScore(
   tasks: Task[],
   fulfillment: number | null | undefined,
   wakeTime?: string | null,
-  wakeTarget?: string | null
+  wakeTarget?: string | null,
+  bedTime?: string | null,
+  bedTarget?: string | null
 ): ScoreResult {
   const scheduled_weight = tasks.reduce(
     (acc, t) => acc + IMPORTANCE_WEIGHT[t.importance],
@@ -67,15 +95,18 @@ export function calculateScore(
     .reduce((acc, t) => acc + IMPORTANCE_WEIGHT[t.importance], 0);
 
   const completion_score =
-    scheduled_weight === 0 ? 0 : (completed_weight / scheduled_weight) * 90;
+    scheduled_weight === 0 ? 0 : (completed_weight / scheduled_weight) * 80;
   const fulfillment_score = (fulfillment ?? 0) * 1;
   const wake_score = calculateWakeScore(wakeTime, wakeTarget);
-  const total_score = completion_score + fulfillment_score + wake_score;
+  const bed_score = calculateBedScore(bedTime, bedTarget);
+  const total_score =
+    completion_score + fulfillment_score + wake_score + bed_score;
 
   return {
     completion_score: round(completion_score),
     fulfillment_score: round(fulfillment_score),
     wake_score: round(wake_score),
+    bed_score: round(bed_score),
     total_score: round(total_score),
     cluster: clusterFromScore(total_score),
     completed_weight,

@@ -1,8 +1,10 @@
 import { FormEvent, useState } from "react";
 import {
+  useBedTarget,
   useDeleteAll,
   useReviews,
   useTasks,
+  useUpdateBedTarget,
   useUpdateWakeTarget,
   useWakeTarget,
 } from "@/lib/queries";
@@ -34,6 +36,8 @@ export default function Settings() {
       </section>
 
       <WakeTargetSection />
+
+      <BedTargetSection />
 
       <PasswordChangeSection />
 
@@ -90,7 +94,64 @@ function WakeTargetSection() {
       <div>
         <h2 className="text-sm font-semibold">目標起床時刻</h2>
         <p className="text-xs muted mt-0.5">
-          スコアの起床配分(5%)はこの時刻との差分で決まります（150分以上遅れで0点）
+          スコアの起床配分(7.5%)はこの時刻との差分で決まります（150分以上遅れで0点）
+        </p>
+      </div>
+      <form onSubmit={submit} className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="label">目標時刻</label>
+          <input
+            type="time"
+            className="input"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </div>
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={update.isPending || value === current}
+        >
+          保存
+        </button>
+      </form>
+      {info && (
+        <p className="text-sm text-emerald-600 dark:text-emerald-400">{info}</p>
+      )}
+      {error && (
+        <p className="text-sm text-rose-500" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function BedTargetSection() {
+  const current = useBedTarget();
+  const update = useUpdateBedTarget();
+  const [value, setValue] = useState(current);
+  const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setInfo(null);
+    setError(null);
+    try {
+      await update.mutateAsync(value);
+      setInfo("目標就寝時刻を更新しました。");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "不明なエラー");
+    }
+  }
+
+  return (
+    <section className="card space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold">目標就寝時刻</h2>
+        <p className="text-xs muted mt-0.5">
+          スコアの就寝配分(7.5%)はこの時刻との差分で決まります（150分以上遅れで0点）
         </p>
       </div>
       <form onSubmit={submit} className="flex items-end gap-2">

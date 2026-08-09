@@ -4,17 +4,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import {
   useAddTask,
+  useBedTarget,
   useDeleteTask,
   useReviews,
   useTasks,
   useToggleTask,
+  useUpdateBedFields,
   useUpdateTask,
   useUpdateWakeFields,
   useUpsertReview,
   useWakeTarget,
 } from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
-import { calculateScore, streakCount } from "@/lib/score";
+import { calculateScore, normalizeLateNight, streakCount } from "@/lib/score";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
@@ -36,6 +38,7 @@ export default function Today() {
   const review = reviews.find((r) => r.date === date);
   const upsertReviewMut = useUpsertReview();
   const updateWakeFieldsMut = useUpdateWakeFields();
+  const updateBedFieldsMut = useUpdateBedFields();
 
   const tasks = useMemo(
     () =>
@@ -57,10 +60,15 @@ export default function Today() {
   );
 
   const globalWakeTarget = useWakeTarget();
+  const globalBedTarget = useBedTarget();
   const [fulfillment, setFulfillment] = useState(review?.fulfillment ?? 3);
   const [wakeTime, setWakeTime] = useState(review?.wake_time ?? "");
   const [wakeTargetOverride, setWakeTargetOverride] = useState(
     review?.wake_target ?? ""
+  );
+  const [bedTime, setBedTime] = useState(review?.bed_time ?? "");
+  const [bedTargetOverride, setBedTargetOverride] = useState(
+    review?.bed_target ?? ""
   );
   const [highlight, setHighlight] = useState(review?.highlight ?? "");
   const [intention, setIntention] = useState(review?.tomorrow_intention ?? "");
@@ -71,6 +79,8 @@ export default function Today() {
     setFulfillment(review?.fulfillment ?? 3);
     setWakeTime(review?.wake_time ?? "");
     setWakeTargetOverride(review?.wake_target ?? "");
+    setBedTime(review?.bed_time ?? "");
+    setBedTargetOverride(review?.bed_target ?? "");
     setHighlight(review?.highlight ?? "");
     setIntention(review?.tomorrow_intention ?? "");
     setMemo(review?.memo ?? "");
@@ -78,8 +88,12 @@ export default function Today() {
   }, [date, review?.id]);
 
   const wakeSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const bedSaveTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    return () => clearTimeout(wakeSaveTimer.current);
+    return () => {
+      clearTimeout(wakeSaveTimer.current);
+      clearTimeout(bedSaveTimer.current);
+    };
   }, [date]);
 
   function scheduleWakeSave(nextWakeTime: string, nextWakeTargetOverride: string) {
@@ -108,11 +122,46 @@ export default function Today() {
     scheduleWakeSave(wakeTime, "");
   }
 
+  function scheduleBedSave(nextBedTime: string, nextBedTargetOverride: string) {
+    clearTimeout(bedSaveTimer.current);
+    bedSaveTimer.current = setTimeout(() => {
+      updateBedFieldsMut.mutate({
+        date,
+        bed_time: nextBedTime || undefined,
+        bed_target: nextBedTargetOverride || undefined,
+      });
+    }, 500);
+  }
+
+  function handleBedTimeChange(v: string) {
+    setBedTime(v);
+    scheduleBedSave(v, bedTargetOverride);
+  }
+
+  function handleBedTargetChange(v: string) {
+    setBedTargetOverride(v);
+    scheduleBedSave(bedTime, v);
+  }
+
+  function handleBedTargetReset() {
+    setBedTargetOverride("");
+    scheduleBedSave(bedTime, "");
+  }
+
   const wakeTarget = wakeTargetOverride || globalWakeTarget;
+  const bedTarget = bedTargetOverride || globalBedTarget;
 
   const preview = useMemo(
-    () => calculateScore(tasks, fulfillment, wakeTime || null, wakeTarget),
-    [tasks, fulfillment, wakeTime, wakeTarget]
+    () =>
+      calculateScore(
+        tasks,
+        fulfillment,
+        wakeTime || null,
+        wakeTarget,
+        bedTime || null,
+        bedTarget
+      ),
+    [tasks, fulfillment, wakeTime, wakeTarget, bedTime, bedTarget]
   );
 
   const last30 = useMemo(() => rangeBefore(today, 30), [today]);
@@ -131,6 +180,8 @@ export default function Today() {
         fulfillment,
         wake_time: wakeTime || undefined,
         wake_target: wakeTargetOverride || undefined,
+        bed_time: bedTime || undefined,
+        bed_target: bedTargetOverride || undefined,
         highlight: highlight || undefined,
         tomorrow_intention: intention || undefined,
         memo: memo || undefined,
@@ -201,6 +252,7 @@ export default function Today() {
           completedCount={completedCount}
           view={view}
           onViewChange={setView}
+          bedTarget={bedTarget}
         />
         <div className="flex flex-col gap-4 min-h-0">
           <SummaryPanel
@@ -214,6 +266,13 @@ export default function Today() {
             onWakeTimeChange={handleWakeTimeChange}
             onWakeTargetChange={handleWakeTargetChange}
             onWakeTargetReset={handleWakeTargetReset}
+            bedScore={preview.bed_score}
+            bedTime={bedTime}
+            bedTarget={bedTarget}
+            isBedTargetOverridden={!!bedTargetOverride}
+            onBedTimeChange={handleBedTimeChange}
+            onBedTargetChange={handleBedTargetChange}
+            onBedTargetReset={handleBedTargetReset}
             totalScore={preview.total_score}
             cluster={preview.cluster}
             streak={streak}
@@ -249,12 +308,14 @@ function TasksPanel({
   completedCount,
   view,
   onViewChange,
+  bedTarget,
 }: {
   tasks: Task[];
   date: string;
   completedCount: number;
   view: ViewMode;
   onViewChange: (v: ViewMode) => void;
+  bedTarget: string;
 }) {
   return (
     <section className="card !p-0 overflow-hidden">
@@ -289,7 +350,7 @@ function TasksPanel({
           )}
         </>
       ) : (
-        <TimelineView tasks={tasks} date={date} />
+        <TimelineView tasks={tasks} date={date} bedTarget={bedTarget} />
       )}
     </section>
   );
@@ -640,7 +701,7 @@ function TaskRow({ task }: { task: Task }) {
   );
 }
 
-function WakeTargetEditor({
+function TargetTimeEditor({
   target,
   isOverridden,
   onChange,
@@ -783,7 +844,7 @@ function WakeTimeInput({
         <span className="text-xs uppercase tracking-wide muted">
           🌅 起床時刻
         </span>
-        <WakeTargetEditor
+        <TargetTimeEditor
           target={target}
           isOverridden={isTargetOverridden}
           onChange={onTargetChange}
@@ -833,6 +894,116 @@ function toMinutes(time: string): number | null {
   return h * 60 + m;
 }
 
+function BedTimeInput({
+  value,
+  target,
+  onChange,
+  isTargetOverridden,
+  onTargetChange,
+  onTargetReset,
+}: {
+  value: string;
+  target: string;
+  onChange: (v: string) => void;
+  isTargetOverridden: boolean;
+  onTargetChange: (v: string) => void;
+  onTargetReset: () => void;
+}) {
+  const bedMin = toMinutes(value);
+  const targetMin = toMinutes(target);
+  const diff =
+    bedMin != null && targetMin != null
+      ? normalizeLateNight(bedMin) - normalizeLateNight(targetMin)
+      : null;
+
+  const tone =
+    diff == null
+      ? { text: "text-slate-500 dark:text-notion-muted", bar: "bg-slate-300 dark:bg-notion-border" }
+      : diff <= 0
+      ? { text: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500" }
+      : diff <= 30
+      ? { text: "text-amber-600 dark:text-amber-400", bar: "bg-amber-500" }
+      : diff <= 90
+      ? { text: "text-orange-600 dark:text-orange-400", bar: "bg-orange-500" }
+      : { text: "text-rose-600 dark:text-rose-400", bar: "bg-rose-500" };
+
+  const diffLabel =
+    diff == null
+      ? "未入力"
+      : diff === 0
+      ? "ぴったり"
+      : diff < 0
+      ? `目標より${Math.abs(diff)}分早い🌙`
+      : `目標より${diff}分遅れ😵`;
+
+  function setNow() {
+    const d = new Date();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+    onChange(`${hh}:${mm}`);
+  }
+
+  // Bar position: -60min (full early) → 0%, target → ~28%, +150min → 100%
+  const BAR_MIN = -60;
+  const BAR_MAX = 150;
+  const markerPct =
+    diff == null
+      ? null
+      : Math.max(
+          0,
+          Math.min(100, ((diff - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100)
+        );
+  const targetPct = ((0 - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100;
+
+  return (
+    <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wide muted">
+          🌙 就寝時刻
+        </span>
+        <TargetTimeEditor
+          target={target}
+          isOverridden={isTargetOverridden}
+          onChange={onTargetChange}
+          onReset={onTargetReset}
+        />
+      </div>
+
+      <div className="flex items-center gap-1 rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-1.5 py-1 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
+        <input
+          aria-label="就寝時刻"
+          type="time"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="bg-transparent outline-none text-lg font-bold tabular-nums flex-1 min-w-0 px-1"
+        />
+        <button
+          type="button"
+          onClick={setNow}
+          className="text-[11px] font-medium text-notion-blue hover:bg-notion-blue/10 rounded px-2 py-1 transition whitespace-nowrap"
+          title="現在時刻を入力"
+        >
+          今すぐ
+        </button>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-slate-400 hover:text-rose-500 px-1.5 text-sm"
+            aria-label="クリア"
+            title="クリア"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      <div className={"text-xs font-semibold tabular-nums " + tone.text}>
+        {diffLabel}
+      </div>
+    </div>
+  );
+}
+
 function SummaryPanel({
   fulfillment,
   completedWeight,
@@ -844,6 +1015,13 @@ function SummaryPanel({
   onWakeTimeChange,
   onWakeTargetChange,
   onWakeTargetReset,
+  bedScore,
+  bedTime,
+  bedTarget,
+  isBedTargetOverridden,
+  onBedTimeChange,
+  onBedTargetChange,
+  onBedTargetReset,
   totalScore,
   cluster,
   streak,
@@ -858,6 +1036,13 @@ function SummaryPanel({
   onWakeTimeChange: (v: string) => void;
   onWakeTargetChange: (v: string) => void;
   onWakeTargetReset: () => void;
+  bedScore: number;
+  bedTime: string;
+  bedTarget: string;
+  isBedTargetOverridden: boolean;
+  onBedTimeChange: (v: string) => void;
+  onBedTargetChange: (v: string) => void;
+  onBedTargetReset: () => void;
   totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
@@ -873,9 +1058,9 @@ function SummaryPanel({
       </div>
       <ScoreRing score={Math.round(totalScore)} cluster={cluster} size={140} />
       <ClusterBadge cluster={cluster} size="lg" />
-      <div className="w-full grid grid-cols-3 gap-2 text-center text-xs">
+      <div className="w-full grid grid-cols-4 gap-1.5 text-center text-[11px]">
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
-          <div className="muted">完了 (90)</div>
+          <div className="muted">完了 (80)</div>
           <div className="font-semibold tabular-nums">
             {scheduledWeight === 0 ? "—" : `${completionPct}%`}
           </div>
@@ -885,9 +1070,15 @@ function SummaryPanel({
           <div className="font-semibold tabular-nums">{fulfillment} / 5</div>
         </div>
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
-          <div className="muted">起床 (5)</div>
+          <div className="muted">起床 (7.5)</div>
           <div className="font-semibold tabular-nums">
-            {wakeTime ? wakeScore.toFixed(1) : "—"} / 5
+            {wakeTime ? wakeScore.toFixed(1) : "—"} / 7.5
+          </div>
+        </div>
+        <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
+          <div className="muted">就寝 (7.5)</div>
+          <div className="font-semibold tabular-nums">
+            {bedTime ? bedScore.toFixed(1) : "—"} / 7.5
           </div>
         </div>
       </div>
@@ -899,6 +1090,15 @@ function SummaryPanel({
         isTargetOverridden={isWakeTargetOverridden}
         onTargetChange={onWakeTargetChange}
         onTargetReset={onWakeTargetReset}
+      />
+
+      <BedTimeInput
+        value={bedTime}
+        target={bedTarget}
+        onChange={onBedTimeChange}
+        isTargetOverridden={isBedTargetOverridden}
+        onTargetChange={onBedTargetChange}
+        onTargetReset={onBedTargetReset}
       />
 
       <div className="w-full flex items-center justify-between text-xs">

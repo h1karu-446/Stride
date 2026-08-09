@@ -23,12 +23,15 @@ export interface DailyReview {
   fulfillment: number; // 1-5
   wake_time?: string; // "HH:mm"
   wake_target?: string; // "HH:mm" — per-day override of the account default
+  bed_time?: string; // "HH:mm"
+  bed_target?: string; // "HH:mm" — per-day override of the account default
   highlight?: string;
   tomorrow_intention?: string;
   memo?: string;
   completion_score: number;
   fulfillment_score: number;
   wake_score: number;
+  bed_score: number;
   total_score: number;
   cluster: Cluster;
   created_at: string;
@@ -36,6 +39,7 @@ export interface DailyReview {
 }
 
 export const DEFAULT_WAKE_TARGET = "07:00";
+export const DEFAULT_BED_TARGET = "23:00";
 
 export interface DailyScore {
   date: string;

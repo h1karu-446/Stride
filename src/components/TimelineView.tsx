@@ -133,9 +133,11 @@ const IMPORTANCE_COLOR: Record<Importance, string> = {
 export function TimelineView({
   tasks,
   date,
+  bedTarget,
 }: {
   tasks: Task[];
   date: string;
+  bedTarget?: string;
 }) {
   const addTaskMut = useAddTask();
   const updateTaskMut = useUpdateTask();
@@ -192,6 +194,8 @@ export function TimelineView({
     () => tasks.filter((t) => t.start_time && t.end_time),
     [tasks]
   );
+
+  const bedTargetMin = toMin(bedTarget);
 
   function pointerMin(e: React.PointerEvent | PointerEvent): number {
     const grid = gridRef.current;
@@ -548,6 +552,22 @@ export function TimelineView({
                 </div>
               </div>
             )}
+
+            {bedTargetMin != null &&
+              bedTargetMin >= START_HOUR * 60 &&
+              bedTargetMin <= END_HOUR * 60 && (
+                <div
+                  className="absolute left-0 right-0 pointer-events-none z-10"
+                  style={{ top: minToY(bedTargetMin) }}
+                >
+                  <div className="relative h-0 border-t border-dashed border-indigo-400">
+                    <div className="absolute -left-1 -top-1 size-2 rounded-full bg-indigo-400" />
+                    <span className="absolute left-2 -top-2.5 text-[10px] leading-none text-indigo-500 bg-white dark:bg-notion-panel px-1 rounded tabular-nums">
+                      就寝目標 {bedTarget}
+                    </span>
+                  </div>
+                </div>
+              )}
 
             {dropMin != null && (
               <div
