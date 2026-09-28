@@ -1,177 +1,56 @@
-# Supabase CLI
+# Stride
 
-[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=develop)](https://coveralls.io/github/supabase/cli?branch=develop) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
-](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
+日々のタスク達成度を「点数化」して可視化する、自己改善向けのタスク分析アプリ。
 
-[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
+## 主な機能
 
-This repository contains all the functionality for Supabase CLI.
+- **タスク管理**：日付ごとにタスクを登録し、重要度（重・中・軽）と時間帯を設定する。タイムラインで1日の予定を確認・編集できる。
+- **振り返り**：充実度（1〜5）、起床・就寝時刻、今日のハイライト、明日の意図、メモを記録する。目標時刻はその日だけ上書きできる。
+- **スコア**：1日を100点満点で採点し、A〜E のランクに分ける。
 
-- [x] Running Supabase locally
-- [x] Managing database migrations
-- [x] Creating and deploying Supabase Functions
-- [x] Generating types directly from your database schema
-- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
+  | 要素 | 配点 | 内容 |
+  | --- | --- | --- |
+  | 完了 | 80 | 重要度で重み付けしたタスクの完了率 |
+  | 充実 | 5 | 充実度（1〜5） |
+  | 起床 | 7.5 | 目標起床時刻からの遅れで減点（150分遅れで0点） |
+  | 就寝 | 7.5 | 目標就寝時刻からの遅れで減点（150分遅れで0点） |
 
-## Getting started
+- **カレンダー**：過去のスコアとランクを俯瞰する。「今日」画面では A/B ランクの連続日数も確認できる。
+- **設定**：既定の目標起床・就寝時刻、パスワード変更。
 
-### Install the CLI
+## 必要なもの
 
-Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
+- Node.js 24 と npm
+- Supabase プロジェクト（認証とデータベース）
 
-```bash
-npm i supabase --save-dev
-```
-
-When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
-
-```
-NODE_OPTIONS=--no-experimental-fetch yarn add supabase
-```
-
-> **Note**
-For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
-
-<details>
-  <summary><b>macOS</b></summary>
-
-  Available via [Homebrew](https://brew.sh). To install:
-
-  ```sh
-  brew install supabase/tap/supabase
-  ```
-
-  To install the beta release channel:
-  
-  ```sh
-  brew install supabase/tap/supabase-beta
-  brew link --overwrite supabase-beta
-  ```
-  
-  To upgrade:
-
-  ```sh
-  brew upgrade supabase
-  ```
-</details>
-
-<details>
-  <summary><b>Windows</b></summary>
-
-  Available via [Scoop](https://scoop.sh). To install:
-
-  ```powershell
-  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-  scoop install supabase
-  ```
-
-  To upgrade:
-
-  ```powershell
-  scoop update supabase
-  ```
-</details>
-
-<details>
-  <summary><b>Linux</b></summary>
-
-  Available via [Homebrew](https://brew.sh) and Linux packages.
-
-  #### via Homebrew
-
-  To install:
-
-  ```sh
-  brew install supabase/tap/supabase
-  ```
-
-  To upgrade:
-
-  ```sh
-  brew upgrade supabase
-  ```
-
-  #### via Linux packages
-
-  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
-
-  ```sh
-  sudo apk add --allow-untrusted <...>.apk
-  ```
-
-  ```sh
-  sudo dpkg -i <...>.deb
-  ```
-
-  ```sh
-  sudo rpm -i <...>.rpm
-  ```
-
-  ```sh
-  sudo pacman -U <...>.pkg.tar.zst
-  ```
-</details>
-
-<details>
-  <summary><b>Other Platforms</b></summary>
-
-  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
-
-  ```sh
-  go install github.com/supabase/cli@latest
-  ```
-
-  Add a symlink to the binary in `$PATH` for easier access:
-
-  ```sh
-  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
-  ```
-
-  This works on other non-standard Linux distros.
-</details>
-
-<details>
-  <summary><b>Community Maintained Packages</b></summary>
-
-  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
-  To install in your working directory:
-
-  ```bash
-  pkgx install supabase
-  ```
-
-  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
-</details>
-
-### Run the CLI
-
-```bash
-supabase bootstrap
-```
-
-Or using npx:
-
-```bash
-npx supabase bootstrap
-```
-
-The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
-
-## Docs
-
-Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
-
-## Breaking changes
-
-We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
-
-However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
-
-## Developing
-
-To run from source:
+## セットアップ
 
 ```sh
-# Go >= 1.22
-go run . help
+npm install
+cp .env.example .env.local
 ```
+
+`.env.local` に Supabase の `VITE_SUPABASE_URL` と `VITE_SUPABASE_ANON_KEY` を設定し、`supabase/migrations/` のスキーマを Supabase に適用する。
+
+## 起動と使い方
+
+```sh
+npm run dev
+```
+
+表示されたURLを開き、メールアドレスとパスワードでサインアップ・サインインする。「今日」画面でタスクと振り返りを記録すると、スコアが計算される。
+
+## 開発
+
+| 目的 | コマンド |
+| --- | --- |
+| テスト | `npm test`（監視モードは `npm run test:watch`） |
+| 型チェック | `npm run lint` |
+| ビルド | `npm run build` |
+
+AIエージェント（Claude Code / Codex）との開発は、以下の文書に沿って進める。
+
+- [共通ルール](AGENTS.md)
+- [開発手順](docs/development-workflow.md)
+- [プロジェクト固有Context](docs/project-context.md)（技術構成・検証コマンド・軽量運用の例外）
+- [AI開発テンプレートの導入・管理ガイド](docs/ai-dev-starter-guide.md)

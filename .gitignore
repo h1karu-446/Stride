@@ -1,10 +1,19 @@
 node_modules
 dist
-.claude/
 dist-ssr
 *.local
 .env
-.env.local
+.env.*
+!.env.example
 .DS_Store
 *.log
 .vite
+
+# Claude Code: personal settings stay local; .claude/skills is shared and committed
+.claude/settings.local.json
+.claude/launch.json
+CLAUDE.local.md
+
+# Python helpers from ai-dev-starter
+__pycache__/
+*.py[cod]
