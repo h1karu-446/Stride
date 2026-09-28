@@ -13,7 +13,7 @@
 | 主要な利用者 / ユースケース | 個人（開発者本人）。タスクの予定と完了、1日の振り返り、スコアの推移確認 |
 | 基準ブランチ | main |
 | 実装担当 / レビュー担当 / マージ担当 | 個人開発：実装は Claude Code / Codex / 本人、マージ判断は本人（h1karu-446） |
-| Workflow mode の既定値 | `light`（個人開発のため）。詳細は「Workflow modeの既定値」 |
+| Workflow mode の既定値 | `standard` |
 | テンプレート導入元 | https://github.com/h1karu-446/ai-dev-starter（`TEMPLATE_VERSION` 1.0.0、commit `705a334` の内容を 2026-09-29 に導入） |
 
 ## 技術・構造
@@ -65,34 +65,19 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - テスト（`npm test`）は純粋な関数だけを対象にしており、Supabase への通信は行わない。
 - DB 変更は `supabase/migrations/` に追加し、Supabase CLI で適用する。本番データを使った検証・削除は明示の指示がある場合だけ行う。
 
-## Workflow modeの既定値
-
-プロジェクト既定値は `light`（個人開発のため、h1karu-446 が 2026-09-29 に選択）。Issue で `standard` が選ばれていればそれを優先する。
-ただし次に当たる変更は、指定にかかわらず `standard` を適用する。
-
-- DB migration、スコア計算・ランク判定（`src/lib/score.ts` と SQL の関数）の変更
-- 認証まわりの変更
-- 複数画面にまたがる機能追加
-- 依存パッケージのメジャー更新
-
-手順と選択基準は [開発ワークフロー](development-workflow.md#workflow-modeissueごと) を参照する。
-
 ## レビューと例外
 
 - レビュー手順は開発ワークフローの mode 定義に従う。Human review とマージ判断は本人（h1karu-446）が担当する。
 - Claude Code での別Agentレビューは `reviewer` subagent を指定して依頼する。
 - GitHubへ投稿してよい範囲: 未設定。Issue / PR の作成・コメントは、その都度ユーザーの依頼を確認する。
 
-### 合意済み例外：light の手続き簡略化
+### light の手続き簡略化
 
 - 対象: `light` を適用する変更のみ。`standard` の変更には適用しない。
 - 内容:
   1. **Issue と PR を省略してよい。** 作業ブランチを作らず main へ直接コミットしてよい。Plan・検証結果・別Agentレビューを省略した理由は、チャットでの完了報告に含める。
   2. **Human review は、コミット前に本人が差分を確認することで行う。**
   3. **検証は省略しない。** 変更対象の確認に加え、test / typecheck / build は変更ごとに実行し、PASS / FAIL / BLOCKED / N/A で報告する（共通ルールの light より厳しくする。どれも数秒で終わるため）。
-- 理由: 利用者・開発者が本人のみの個人開発で、小さな変更に Issue / PR を作るのは規模に比べて重いため。
-- 承認者 / 日付: h1karu-446 / 2026-09-29
-- 見直し条件: 共同開発者が加わる、他者に公開・提供する、本番データの事故が起きる、のいずれか。
 
 ## 未決事項
 
