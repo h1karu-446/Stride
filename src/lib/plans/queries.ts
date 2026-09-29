@@ -1,0 +1,313 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
+import { todayISO } from "@/lib/date";
+import type {
+  Importance,
+  Phase,
+  Plan,
+  PlanColor,
+  PlanStatus,
+  Routine,
+} from "@/types";
+
+export const PLANS_KEY = ["plans"] as const;
+
+interface RoutineRow {
+  id: string;
+  phase_id: string;
+  title: string;
+  minutes: number;
+  weekdays: number[];
+  importance: Importance;
+  menu: string | null;
+  created_at: string;
+}
+interface PhaseRow {
+  id: string;
+  plan_id: string;
+  is_implicit: boolean;
+  name: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  routines: RoutineRow[] | null;
+}
+interface PlanRow {
+  id: string;
+  name: string;
+  color: PlanColor;
+  status: PlanStatus;
+  due_date: string | null;
+  goal: string | null;
+  goal_note: string | null;
+  completed_at: string | null;
+  overdue_notice_dismissed_for: string | null;
+  created_at: string;
+  updated_at: string;
+  phases: PhaseRow[] | null;
+}
+
+function rowToRoutine(r: RoutineRow): Routine {
+  return {
+    id: r.id,
+    phase_id: r.phase_id,
+    title: r.title,
+    minutes: r.minutes,
+    weekdays: r.weekdays,
+    importance: r.importance,
+    menu: r.menu ?? undefined,
+  };
+}
+
+function rowToPhase(r: PhaseRow): Phase {
+  return {
+    id: r.id,
+    plan_id: r.plan_id,
+    is_implicit: r.is_implicit,
+    name: r.name ?? undefined,
+    start_date: r.start_date ?? undefined,
+    end_date: r.end_date ?? undefined,
+    routines: [...(r.routines ?? [])]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map(rowToRoutine),
+  };
+}
+
+function rowToPlan(r: PlanRow): Plan {
+  return {
+    id: r.id,
+    name: r.name,
+    color: r.color,
+    status: r.status,
+    due_date: r.due_date ?? undefined,
+    goal: r.goal ?? undefined,
+    goal_note: r.goal_note ?? undefined,
+    completed_at: r.completed_at ?? undefined,
+    overdue_notice_dismissed_for: r.overdue_notice_dismissed_for ?? undefined,
+    phases: (r.phases ?? []).map(rowToPhase),
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+  };
+}
+
+export function usePlans() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: PLANS_KEY,
+    enabled: !!session,
+    queryFn: async (): Promise<Plan[]> => {
+      const { data, error } = await supabase
+        .from("plans")
+        .select("*, phases(*, routines(*))");
+      if (error) throw error;
+      return ((data ?? []) as PlanRow[]).map(rowToPlan);
+    },
+  });
+}
+
+// --- plans -------------------------------------------------------------
+
+export type PlanInput = {
+  name: string;
+  color: PlanColor;
+  status: PlanStatus;
+  due_date?: string;
+  goal?: string;
+  goal_note?: string;
+};
+
+export function useCreatePlan() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async (input: PlanInput): Promise<string> => {
+      if (!session) throw new Error("Not signed in");
+      const { data, error } = await supabase
+        .from("plans")
+        .insert({
+          user_id: session.user.id,
+          name: input.name.trim(),
+          color: input.color,
+          status: input.status,
+          due_date: input.due_date || null,
+          goal: input.goal?.trim() || null,
+          goal_note: input.goal_note?.trim() || null,
+          completed_at: input.status === "done" ? todayISO() : null,
+        })
+        .select("id")
+        .single();
+      if (error) throw error;
+      return (data as { id: string }).id;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+export type PlanPatch = Partial<
+  PlanInput & { overdue_notice_dismissed_for: string | null }
+>;
+
+export function useUpdatePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: PlanPatch }) => {
+      const db: Record<string, unknown> = { ...patch };
+      if ("name" in patch && patch.name !== undefined) db.name = patch.name.trim();
+      for (const k of ["due_date", "goal", "goal_note"] as const) {
+        if (k in patch) db[k] = patch[k]?.trim?.() || null;
+      }
+      // The client sends its local date so completed_at is not shifted by UTC.
+      if (patch.status === "done") db.completed_at = todayISO();
+      const { error } = await supabase.from("plans").update(db).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+export function useDeletePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("delete_plan", {
+        p_plan_id: id,
+        p_today: todayISO(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["reviews"] });
+    },
+  });
+}
+
+// --- phases ------------------------------------------------------------
+
+export type PhaseInput = { name: string; start_date: string; end_date: string };
+
+export function useSavePhase() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      planId,
+      phaseId,
+      input,
+    }: {
+      planId: string;
+      phaseId?: string;
+      input: PhaseInput;
+    }) => {
+      if (!session) throw new Error("Not signed in");
+      const body = {
+        name: input.name.trim(),
+        start_date: input.start_date,
+        end_date: input.end_date,
+      };
+      if (phaseId) {
+        const { error } = await supabase
+          .from("phases").update(body).eq("id", phaseId);
+        if (error) throw error;
+        return;
+      }
+      // Adding a phase: the implicit phase becomes the first real phase so its
+      // routines carry over (BR-03); otherwise insert a new row.
+      const { data: implicit, error: e1 } = await supabase
+        .from("phases")
+        .select("id")
+        .eq("plan_id", planId)
+        .eq("is_implicit", true)
+        .maybeSingle();
+      if (e1) throw e1;
+      if (implicit) {
+        const { error } = await supabase
+          .from("phases")
+          .update({ ...body, is_implicit: false })
+          .eq("id", (implicit as { id: string }).id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("phases").insert({
+          ...body,
+          user_id: session.user.id,
+          plan_id: planId,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+export function useDeletePhase() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (phaseId: string) => {
+      const { error } = await supabase.rpc("delete_phase", {
+        p_phase_id: phaseId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+// --- routines ----------------------------------------------------------
+
+export type RoutineInput = {
+  title: string;
+  minutes: number;
+  weekdays: number[];
+  importance: Importance;
+  menu?: string;
+};
+
+export function useSaveRoutine() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      phaseId,
+      routineId,
+      input,
+    }: {
+      phaseId: string;
+      routineId?: string;
+      input: RoutineInput;
+    }) => {
+      if (!session) throw new Error("Not signed in");
+      const body = {
+        title: input.title.trim(),
+        minutes: input.minutes,
+        weekdays: [...input.weekdays].sort((a, b) => a - b),
+        importance: input.importance,
+        menu: input.menu?.trim() || null,
+      };
+      if (routineId) {
+        const { error } = await supabase
+          .from("routines").update(body).eq("id", routineId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("routines").insert({
+          ...body,
+          user_id: session.user.id,
+          phase_id: phaseId,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+export function useDeleteRoutine() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("routines").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
