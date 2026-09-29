@@ -13,6 +13,7 @@ export interface Task {
   plan_id?: string; // set on plan schedules and routine tasks
   routine_id?: string; // set only on tasks generated from a routine
   planned_minutes?: number; // duration, used by routine tasks
+  is_milestone: boolean; // milestone mark on plan schedules
   created_at: string;
   updated_at: string;
 }
@@ -90,6 +91,19 @@ export interface Routine {
   weekdays: number[]; // ISO weekdays, 1 = Mon ... 7 = Sun
   importance: Importance;
   menu?: string;
+}
+
+export type MaterialStatus = "todo" | "in_progress" | "done";
+
+export interface Material {
+  id: string;
+  plan_id: string;
+  title: string;
+  url?: string;
+  status: MaterialStatus;
+  completed_at?: string; // YYYY-MM-DD, set while status is "done"
+  phase_ids: string[]; // linked phases (material_phases)
+  created_at: string;
 }
 
 export interface Phase {
