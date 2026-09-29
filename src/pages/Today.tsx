@@ -16,6 +16,7 @@ import {
   useWakeTarget,
 } from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
+import { normalizeRecordedTime } from "@/lib/recordedTime";
 import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
 import { memoOneLine } from "@/lib/plans/logic";
 import { planHex } from "@/lib/plans/colors";
@@ -98,9 +99,8 @@ export default function Today() {
     setIntention(review?.tomorrow_intention ?? "");
   }, [date, reviewsQuery.isSuccess]);
 
-  const wakeSaveTimer = useRef<ReturnType<typeof setTimeout>>();
-  const bedSaveTimer = useRef<ReturnType<typeof setTimeout>>();
   const reviewSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const pendingReviewDate = useRef(date);
   const pendingReview = useRef<{
     fulfillment?: number;
     highlight?: string;
@@ -112,18 +112,17 @@ export default function Today() {
     const fields = pendingReview.current;
     if (Object.keys(fields).length === 0) return;
     pendingReview.current = {};
-    updateReviewFieldsMut.mutate({ date, ...fields });
+    updateReviewFieldsMut.mutate({ date: pendingReviewDate.current, ...fields });
   };
   useEffect(() => {
     return () => {
-      clearTimeout(wakeSaveTimer.current);
-      clearTimeout(bedSaveTimer.current);
       // Text edits are not thrown away when the day changes: send them now.
       flushReviewSave.current();
     };
   }, [date]);
 
   function scheduleReviewSave(fields: typeof pendingReview.current) {
+    pendingReviewDate.current = date;
     pendingReview.current = { ...pendingReview.current, ...fields };
     clearTimeout(reviewSaveTimer.current);
     reviewSaveTimer.current = setTimeout(() => flushReviewSave.current(), 500);
@@ -145,14 +144,11 @@ export default function Today() {
   }
 
   function scheduleWakeSave(nextWakeTime: string, nextWakeTargetOverride: string) {
-    clearTimeout(wakeSaveTimer.current);
-    wakeSaveTimer.current = setTimeout(() => {
-      updateWakeFieldsMut.mutate({
-        date,
-        wake_time: nextWakeTime || undefined,
-        wake_target: nextWakeTargetOverride || undefined,
-      });
-    }, 500);
+    updateWakeFieldsMut.mutate({
+      date,
+      wake_time: nextWakeTime || undefined,
+      wake_target: nextWakeTargetOverride || undefined,
+    });
   }
 
   function handleWakeTimeChange(v: string) {
@@ -171,14 +167,11 @@ export default function Today() {
   }
 
   function scheduleBedSave(nextBedTime: string, nextBedTargetOverride: string) {
-    clearTimeout(bedSaveTimer.current);
-    bedSaveTimer.current = setTimeout(() => {
-      updateBedFieldsMut.mutate({
-        date,
-        bed_time: nextBedTime || undefined,
-        bed_target: nextBedTargetOverride || undefined,
-      });
-    }, 500);
+    updateBedFieldsMut.mutate({
+      date,
+      bed_time: nextBedTime || undefined,
+      bed_target: nextBedTargetOverride || undefined,
+    });
   }
 
   function handleBedTimeChange(v: string) {
@@ -282,6 +275,8 @@ export default function Today() {
         />
         <div className="flex flex-col gap-4 min-h-0">
           <SummaryPanel
+            key={date}
+            isToday={isToday}
             fulfillment={fulfillment == null ? null : preview.fulfillment_score}
             completedWeight={preview.completed_weight}
             scheduledWeight={preview.scheduled_weight}
@@ -308,6 +303,12 @@ export default function Today() {
             onHighlightChange={handleHighlightChange}
             intention={intention}
             onIntentionChange={handleIntentionChange}
+            onCommitReview={() => flushReviewSave.current()}
+            onRetrySave={() => {
+              updateReviewFieldsMut.mutate({ date, fulfillment: fulfillment ?? undefined, highlight, tomorrow_intention: intention });
+              updateWakeFieldsMut.mutate({ date, wake_time: wakeTime || undefined, wake_target: wakeTargetOverride || undefined });
+              updateBedFieldsMut.mutate({ date, bed_time: bedTime || undefined, bed_target: bedTargetOverride || undefined });
+            }}
             saveState={
               updateReviewFieldsMut.isError ||
               updateWakeFieldsMut.isError ||
@@ -841,6 +842,7 @@ function WakeTimeInput({
   value,
   target,
   onChange,
+  isToday,
   isTargetOverridden,
   onTargetChange,
   onTargetReset,
@@ -848,6 +850,7 @@ function WakeTimeInput({
   value: string;
   target: string;
   onChange: (v: string) => void;
+  isToday: boolean;
   isTargetOverridden: boolean;
   onTargetChange: (v: string) => void;
   onTargetReset: () => void;
@@ -877,13 +880,6 @@ function WakeTimeInput({
       ? `目標より${Math.abs(diff)}分早い☀️`
       : `目標より${diff}分遅れ😣`;
 
-  function setNow() {
-    const d = new Date();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    onChange(`${hh}:${mm}`);
-  }
-
   // Bar position: -60min (full early) → 0%, target → ~28%, +150min → 100%
   const BAR_MIN = -60;
   const BAR_MAX = 150;
@@ -910,34 +906,7 @@ function WakeTimeInput({
         />
       </div>
 
-      <div className="flex items-center gap-1 rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-1.5 py-1 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
-        <input
-          aria-label="起床時刻"
-          type="time"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="bg-transparent outline-none text-lg font-bold tabular-nums flex-1 min-w-0 px-1"
-        />
-        <button
-          type="button"
-          onClick={setNow}
-          className="text-[11px] font-medium text-notion-blue hover:bg-notion-blue/10 rounded px-2 py-1 transition whitespace-nowrap"
-          title="現在時刻を入力"
-        >
-          今すぐ
-        </button>
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-slate-400 hover:text-rose-500 px-1.5 text-sm"
-            aria-label="クリア"
-            title="クリア"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <RecordedTimeField label="起床時刻" value={value} onChange={onChange} isToday={isToday} />
       <div className={"text-xs font-semibold tabular-nums " + tone.text}>
         {diffLabel}
       </div>
@@ -956,6 +925,7 @@ function BedTimeInput({
   value,
   target,
   onChange,
+  isToday,
   isTargetOverridden,
   onTargetChange,
   onTargetReset,
@@ -963,6 +933,7 @@ function BedTimeInput({
   value: string;
   target: string;
   onChange: (v: string) => void;
+  isToday: boolean;
   isTargetOverridden: boolean;
   onTargetChange: (v: string) => void;
   onTargetReset: () => void;
@@ -994,13 +965,6 @@ function BedTimeInput({
       ? `目標より${Math.abs(diff)}分早い🌙`
       : `目標より${diff}分遅れ😵`;
 
-  function setNow() {
-    const d = new Date();
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-    onChange(`${hh}:${mm}`);
-  }
-
   // Bar position: -60min (full early) → 0%, target → ~28%, +150min → 100%
   const BAR_MIN = -60;
   const BAR_MAX = 150;
@@ -1027,34 +991,7 @@ function BedTimeInput({
         />
       </div>
 
-      <div className="flex items-center gap-1 rounded-md border border-slate-300 dark:border-notion-border bg-white dark:bg-notion-panel px-1.5 py-1 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
-        <input
-          aria-label="就寝時刻"
-          type="time"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="bg-transparent outline-none text-lg font-bold tabular-nums flex-1 min-w-0 px-1"
-        />
-        <button
-          type="button"
-          onClick={setNow}
-          className="text-[11px] font-medium text-notion-blue hover:bg-notion-blue/10 rounded px-2 py-1 transition whitespace-nowrap"
-          title="現在時刻を入力"
-        >
-          今すぐ
-        </button>
-        {value && (
-          <button
-            type="button"
-            onClick={() => onChange("")}
-            className="text-slate-400 hover:text-rose-500 px-1.5 text-sm"
-            aria-label="クリア"
-            title="クリア"
-          >
-            ✕
-          </button>
-        )}
-      </div>
+      <RecordedTimeField label="就寝時刻" value={value} onChange={onChange} isToday={isToday} />
       <div className={"text-xs font-semibold tabular-nums " + tone.text}>
         {diffLabel}
       </div>
@@ -1062,7 +999,105 @@ function BedTimeInput({
   );
 }
 
+function RecordedTimeField({
+  label,
+  value,
+  onChange,
+  isToday,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  isToday: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  const [invalid, setInvalid] = useState(false);
+  const cancelBlur = useRef(false);
+
+  useEffect(() => {
+    setDraft(value);
+    setInvalid(false);
+  }, [value]);
+
+  function commit() {
+    if (!draft.trim()) {
+      setDraft("");
+      setInvalid(false);
+      if (value) onChange("");
+      return;
+    }
+    const normalized = normalizeRecordedTime(draft);
+    if (!normalized) {
+      setInvalid(true);
+      return;
+    }
+    setDraft(normalized);
+    setInvalid(false);
+    if (normalized !== value) onChange(normalized);
+  }
+
+  function setNow() {
+    const now = new Date();
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    setDraft(time);
+    setInvalid(false);
+    onChange(time);
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <input
+        aria-label={label}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? `${label}-error` : undefined}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="HH:mm"
+        maxLength={5}
+        value={draft}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          setInvalid(false);
+        }}
+        onBlur={() => {
+          if (cancelBlur.current) {
+            cancelBlur.current = false;
+            return;
+          }
+          commit();
+        }}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+          if (event.key === "Enter") {
+            if (normalizeRecordedTime(draft) || !draft.trim()) event.currentTarget.blur();
+            else commit();
+          }
+          if (event.key === "Escape") {
+            cancelBlur.current = true;
+            setDraft(value);
+            setInvalid(false);
+            event.currentTarget.blur();
+          }
+        }}
+        className={`w-full min-w-0 rounded-lg border bg-white px-3 py-2 text-2xl font-bold tabular-nums tracking-wide outline-none focus:ring-2 focus:ring-notion-blue dark:bg-notion-panel ${invalid ? "border-rose-500" : "border-slate-300 dark:border-notion-border"}`}
+      />
+      {invalid && <p id={`${label}-error`} role="alert" className="text-xs text-rose-600">時刻は HH:mm または数字4桁で入力してください</p>}
+      {(value || (isToday && !draft)) && (
+        <div className="flex justify-end">
+          {value ? (
+            <button type="button" onClick={() => { setDraft(""); setInvalid(false); onChange(""); }} className="text-xs muted hover:text-rose-600">時刻をクリア</button>
+          ) : (
+            <button type="button" onClick={setNow} className="text-xs font-medium text-notion-blue hover:underline">今すぐ</button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SummaryPanel({
+  isToday,
   fulfillment,
   completedWeight,
   scheduledWeight,
@@ -1089,8 +1124,11 @@ function SummaryPanel({
   onHighlightChange,
   intention,
   onIntentionChange,
+  onCommitReview,
+  onRetrySave,
   saveState,
 }: {
+  isToday: boolean;
   fulfillment: number | null;
   completedWeight: number;
   scheduledWeight: number;
@@ -1117,6 +1155,8 @@ function SummaryPanel({
   onHighlightChange: (s: string) => void;
   intention: string;
   onIntentionChange: (s: string) => void;
+  onCommitReview: () => void;
+  onRetrySave: () => void;
   saveState: "idle" | "saving" | "error";
 }) {
   const completionPct =
@@ -1136,7 +1176,7 @@ function SummaryPanel({
           }
         >
           {saveState === "error"
-            ? "保存に失敗しました（入力は残っています。再度編集すると再試行します）"
+            ? <span>保存に失敗しました <button type="button" onClick={onRetrySave} className="font-semibold underline">再試行</button></span>
             : saveState === "saving"
             ? "保存中…"
             : "自動保存"}
@@ -1180,6 +1220,7 @@ function SummaryPanel({
 
       <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
         <WakeTimeInput
+          isToday={isToday}
           value={wakeTime}
           target={wakeTarget}
           onChange={onWakeTimeChange}
@@ -1189,6 +1230,7 @@ function SummaryPanel({
         />
 
         <BedTimeInput
+          isToday={isToday}
           value={bedTime}
           target={bedTarget}
           onChange={onBedTimeChange}
@@ -1208,6 +1250,7 @@ function SummaryPanel({
             placeholder="今日一番良かったこと"
             value={highlight}
             onChange={onHighlightChange}
+            onCommit={onCommitReview}
           />
         </div>
         <div>
@@ -1219,6 +1262,7 @@ function SummaryPanel({
             placeholder="明日意識したいこと"
             value={intention}
             onChange={onIntentionChange}
+            onCommit={onCommitReview}
           />
         </div>
       </div>
@@ -1239,11 +1283,13 @@ function AutoGrowTextarea({
   id,
   value,
   onChange,
+  onCommit,
   placeholder,
 }: {
   id: string;
   value: string;
   onChange: (v: string) => void;
+  onCommit: () => void;
   placeholder: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -1298,6 +1344,12 @@ function AutoGrowTextarea({
       onFocus={() => setEditing(true)}
       onBlur={() => setEditing(false)}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          onCommit();
+          e.currentTarget.blur();
+        }
         if (e.key === "Escape") e.currentTarget.blur();
       }}
     />
@@ -1371,4 +1423,3 @@ function FulfillmentPicker({
     </div>
   );
 }
-

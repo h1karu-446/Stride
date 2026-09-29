@@ -289,6 +289,7 @@ export function useUpdateWakeFields() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
+    scope: { id: "daily-review-wake" },
     mutationFn: async (input: UpdateWakeFieldsInput): Promise<DailyReview> => {
       if (!session) throw new Error("Not signed in");
       const payload = {
@@ -321,6 +322,7 @@ export function useUpdateBedFields() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
+    scope: { id: "daily-review-bed" },
     mutationFn: async (input: UpdateBedFieldsInput): Promise<DailyReview> => {
       if (!session) throw new Error("Not signed in");
       const payload = {
