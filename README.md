@@ -54,3 +54,7 @@ AIエージェント（Claude Code / Codex）との開発は、以下の文書�
 - [開発手順](docs/development-workflow.md)
 - [プロジェクト固有Context](docs/project-context.md)（技術構成・検証コマンド・軽量運用の例外）
 - [AI開発テンプレートの導入・管理ガイド](docs/ai-dev-starter-guide.md)
+
+機能ごとの設計文書。
+
+- 学習計画機能: [企画書](docs/prd/study-plans.md) / [機能仕様書](docs/specs/study-plans.md) / [技術設計書](docs/design/study-plans.md) / [テスト計画](docs/test-plans/study-plans.md) / [ADR](docs/adr/README.md) / [デザインモック](docs/mocks/study-plans/README.md)

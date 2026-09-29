@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Today — タイムライン表示</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#191919;color:#E6E6E6}
+a{color:#E6E6E6;text-decoration:none}a:hover{color:#ffffff}
+button{font-family:inherit;cursor:pointer}
+input[type=checkbox]{accent-color:#2383E2;width:16px;height:16px;margin:0;flex-shrink:0}
+</style>
+</head>
+<body>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; background: #191919; display: flex; flex-direction: column">
+
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2F2F2F; display: flex; align-items: center; justify-content: space-between; padding: 0 64px; box-sizing: border-box">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em">Stride</span><span style="font-size: 12px; color: #9B9A97">Daily Task Scoring</span></div>
+<nav style="display: flex; gap: 4px; font-size: 14px">
+<a href="03-today-list.html" style="padding: 6px 12px; border-radius: 6px; background: #2A2A2A; color: #E6E6E6">Today</a>
+<a href="01-plans.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Plans</a>
+<a href="05-journey.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Journey</a>
+</nav>
+<div style="display: flex; gap: 12px; align-items: center; font-size: 12px; color: #E6E6E6"><span>ログアウト</span></div>
+</header>
+
+<main style="padding: 40px 64px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em">Today</h1>
+<span style="font-size: 14px; color: #9B9A97">2026年9月29日 (Tue)</span>
+</div>
+<div style="display: flex; gap: 6px">
+<button aria-label="前日" style="background: #202020; border: 1px solid #2F2F2F; color: #E6E6E6; border-radius: 6px; padding: 8px 12px; font-size: 14px">←</button>
+<button style="background: #202020; border: 1px solid #2F2F2F; color: #6F6E6B; border-radius: 6px; padding: 8px 12px; font-size: 14px">今日</button>
+<button aria-label="翌日" style="background: #202020; border: 1px solid #2F2F2F; color: #E6E6E6; border-radius: 6px; padding: 8px 12px; font-size: 14px">→</button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: stretch">
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2F2F2F">
+<div style="display: flex; align-items: center; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">タスク</h2>
+<div style="display: flex; border: 1px solid #2F2F2F; border-radius: 6px; padding: 2px; background: #242424; font-size: 12px">
+<button style="background: none; border: 0; color: #9B9A97; border-radius: 4px; padding: 4px 10px">リスト</button>
+<button style="background: #202020; border: 0; color: #E6E6E6; border-radius: 4px; padding: 4px 10px">タイムライン</button>
+</div>
+</div>
+<span style="font-size: 14px; color: #9B9A97"><b style="color: #E6E6E6">1</b> / 5</span>
+</div>
+<div style="display: grid; grid-template-columns: 220px minmax(0, 1fr); min-height: 0">
+<aside style="border-right: 1px solid #2F2F2F; background: #1D1D1D; padding: 16px 14px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px"><span style="font-size: 12px; font-weight: 600">時刻未設定</span><span style="font-size: 11px; color: #9B9A97">3</span></div>
+<div draggable="true" style="display: flex; align-items: center; gap: 8px; background: #262626; border: 1px solid #333333; border-radius: 8px; padding: 9px 10px; cursor: grab"><span style="color: #5A5A5A; font-size: 11px; letter-spacing: -2px">⋮⋮</span><span style="width: 4px; height: 18px; border-radius: 2px; background: #F59E0B; flex-shrink: 0"></span><span style="flex-grow: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">英語 60分</span><span style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #F0B6D3"><span style="width: 6px; height: 6px; border-radius: 3px; background: #D15796"></span></span><span style="font-size: 11px; color: #9B9A97; flex-shrink: 0">60分</span></div>
+<div draggable="true" style="display: flex; align-items: center; gap: 8px; background: #262626; border: 1px solid #333333; border-radius: 8px; padding: 9px 10px; cursor: grab"><span style="color: #5A5A5A; font-size: 11px; letter-spacing: -2px">⋮⋮</span><span style="width: 4px; height: 18px; border-radius: 2px; background: #F43F5E; flex-shrink: 0"></span><span style="flex-grow: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">応用情報 90分</span><span style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #F2B77A"><span style="width: 6px; height: 6px; border-radius: 3px; background: #D9730D"></span></span><span style="font-size: 11px; color: #9B9A97; flex-shrink: 0">90分</span></div>
+<div draggable="true" style="display: flex; align-items: center; gap: 8px; background: #262626; border: 1px solid #333333; border-radius: 8px; padding: 9px 10px; cursor: grab"><span style="color: #5A5A5A; font-size: 11px; letter-spacing: -2px">⋮⋮</span><span style="width: 4px; height: 18px; border-radius: 2px; background: #9B9A97; flex-shrink: 0"></span><span style="flex-grow: 1; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">オンライン英会話の体験を予約</span><span style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #F0B6D3"><span style="width: 6px; height: 6px; border-radius: 3px; background: #D15796"></span></span><span style="font-size: 11px; color: #9B9A97; flex-shrink: 0"></span></div>
+</aside>
+<div style="position: relative; height: 600px; overflow: hidden; padding: 16px 16px 0">
+<div style="position: relative; height: 580px">
+<div style="position: absolute; left: 0; right: 0; top: 0px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">8:00</span></div><div style="position: absolute; left: 0; right: 0; top: 48px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">9:00</span></div><div style="position: absolute; left: 0; right: 0; top: 96px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">10:00</span></div><div style="position: absolute; left: 0; right: 0; top: 144px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">11:00</span></div><div style="position: absolute; left: 0; right: 0; top: 192px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">12:00</span></div><div style="position: absolute; left: 0; right: 0; top: 240px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">13:00</span></div><div style="position: absolute; left: 0; right: 0; top: 288px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">14:00</span></div><div style="position: absolute; left: 0; right: 0; top: 336px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">15:00</span></div><div style="position: absolute; left: 0; right: 0; top: 384px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">16:00</span></div><div style="position: absolute; left: 0; right: 0; top: 432px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">17:00</span></div><div style="position: absolute; left: 0; right: 0; top: 480px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">18:00</span></div><div style="position: absolute; left: 0; right: 0; top: 528px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">19:00</span></div><div style="position: absolute; left: 0; right: 0; top: 576px; border-top: 1px solid #2A2A2A"><span style="position: absolute; left: 0; top: -8px; font-size: 11px; color: #6F6E6B; background: #202020; padding-right: 6px">20:00</span></div><div style="position: absolute; left: 52px; right: 8px; top: 0px; height: 24px; box-sizing: border-box; background: #1F2B29; border-left: 3px solid #4DAB9A; border-radius: 6px; padding: 5px 10px; display: flex; justify-content: space-between; font-size: 12px; color: #6F8F88; overflow: hidden; text-decoration: line-through;"><span style="font-weight: 600">web技術 30分</span><span style="opacity: 0.7">8:00–8:30</span></div><div style="position: absolute; left: 52px; right: 8px; top: 96px; height: 48px; box-sizing: border-box; background: #3A3020; border-left: 3px solid #F59E0B; border-radius: 6px; padding: 5px 10px; display: flex; justify-content: space-between; font-size: 12px; color: #FDE68A; overflow: hidden;"><span style="font-weight: 600">ミライビルド定例</span><span style="opacity: 0.7">10:00–11:00</span></div><div style="position: absolute; left: 52px; right: 8px; top: 240px; height: 48px; box-sizing: border-box; border: 1.5px dashed #2383E2; background: rgba(35,131,226,0.12); border-radius: 6px; padding: 5px 10px; display: flex; justify-content: space-between; font-size: 12px; color: #A9CBEF"><span style="font-weight: 600">英語 60分</span><span>13:00–14:00</span></div><div style="position: absolute; left: 44px; right: 0; top: 200px; border-top: 2px solid #ef4444"><span style="position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 4px; background: #ef4444"></span></div>
+</div>
+</div>
+</div>
+</section>
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 14px; color: #9B9A97">スコア</span><span style="font-size: 11px; color: #6F6E6B">自動保存</span></div>
+<div style="display: flex; align-items: center; gap: 18px">
+<svg width="116" height="116" viewBox="0 0 150 150" style="flex-shrink: 0"><circle cx="75" cy="75" r="64" fill="none" stroke="#2F2F2F" stroke-width="12"></circle><circle cx="75" cy="75" r="64" fill="none" stroke="#ef4444" stroke-width="12" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="330" transform="rotate(-90 75 75)"></circle><text x="75" y="84" text-anchor="middle" font-size="40" font-weight="700" fill="#E6E6E6">18<tspan font-size="18" fill="#9B9A97">%</tspan></text></svg>
+<div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1">
+<span style="align-self: flex-start; font-size: 13px; font-weight: 600; background: rgba(239,68,68,0.15); color: #FCA5A5; border-radius: 999px; padding: 4px 12px">E · Worst Day</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+<div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">完了 (80)</span><span style="font-size: 12px; font-weight: 700">11%</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">充実 (5)</span><span style="font-size: 12px; font-weight: 700">3 / 5</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">起床 (7.5)</span><span style="font-size: 12px; font-weight: 700">— / 7.5</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">就寝 (7.5)</span><span style="font-size: 12px; font-weight: 700">— / 7.5</span></div>
+</div>
+</div>
+</div>
+<div style="border-top: 1px solid #2F2F2F; padding-top: 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>充実度</span><span style="color: #9B9A97">普通</span></div>
+<div style="display: flex; gap: 6px"><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">1</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">2</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #FBBF24; background: rgba(245,158,11,0.2); color: #FDE68A; border-radius: 6px; padding: 7px 0; font-size: 13px; font-weight: 700">3</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">4</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">5</button></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>起床</span><span style="color: #9B9A97">目標 06:00</span></div>
+<div style="border: 1px solid #2F2F2F; border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 700; color: #9B9A97; display: flex; justify-content: space-between; align-items: center"><span>--:--</span><span style="font-size: 11px; font-weight: 500; color: #2383E2">今すぐ</span></div>
+</div><div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>就寝</span><span style="color: #9B9A97">目標 23:00</span></div>
+<div style="border: 1px solid #2F2F2F; border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 700; color: #9B9A97; display: flex; justify-content: space-between; align-items: center"><span>--:--</span><span style="font-size: 11px; font-weight: 500; color: #2383E2">今すぐ</span></div>
+</div>
+</div>
+<div style="border-top: 1px solid #2F2F2F; padding-top: 16px; display: flex; flex-direction: column; gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 0.04em; color: #9B9A97">今日のハイライト</span><span style="border: 1px solid #2F2F2F; background: #202020; border-radius: 6px; padding: 9px 12px; font-size: 14px; color: #6F6E6B">今日一番良かったこと</span></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 0.04em; color: #9B9A97">明日の意図</span><span style="border: 1px solid #2F2F2F; background: #202020; border-radius: 6px; padding: 9px 12px; font-size: 14px; color: #6F6E6B">明日意識したいこと</span></label>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; color: #9B9A97; border-top: 1px solid #2F2F2F; padding-top: 14px"><span>A/B 連続日数</span><span style="color: #E6E6E6; font-weight: 700">0 日</span></div>
+</section>
+</div>
+</main>
+</div>
+</body>
+</html>
