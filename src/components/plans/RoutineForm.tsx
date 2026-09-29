@@ -30,7 +30,10 @@ export default function RoutineForm({
   const canSave = !hasErrors(errors);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
+    const onKey = (e: KeyboardEvent) => {
+      // A modal handles its own Esc; do not also discard this form.
+      if (e.key === "Escape" && !document.querySelector("[role=dialog]")) onCancel();
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel]);
@@ -48,7 +51,7 @@ export default function RoutineForm({
       className="rounded-lg border border-slate-200 dark:border-notion-border p-4 space-y-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (canSave) onSubmit({ ...v, minutes });
+        if (canSave && !saving) onSubmit({ ...v, minutes });
       }}
     >
       <Field label="タイトル" error={v.title ? errors.title : undefined}>

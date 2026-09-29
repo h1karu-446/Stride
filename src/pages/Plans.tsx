@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import PlanCard from "@/components/plans/PlanCard";
 import PlanFormModal from "@/components/plans/PlanFormModal";
 import { planHex } from "@/lib/plans/colors";
@@ -171,6 +172,9 @@ function StatusColumn({ status, plans }: { status: PlanStatus; plans: Plan[] }) 
               )}
             </div>
           ))}
+          {update.isError && (
+            <p className="px-4 py-2 text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>
+          )}
           {rest > 0 && (
             <button
               type="button"

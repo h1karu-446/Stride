@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import ExecutionSquares from "@/components/plans/ExecutionSquares";
@@ -68,8 +69,10 @@ export default function PlanDetail() {
   const setEditing = useCallback((e: Editing) => {
     savePhase.reset();
     saveRoutine.reset();
+    deletePhase.reset();
+    deleteRoutine.reset();
     setEditingRaw(e);
-  }, [savePhase, saveRoutine]);
+  }, [savePhase, saveRoutine, deletePhase, deleteRoutine]);
   const closeEditing = useCallback(() => setEditing(null), [setEditing]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
@@ -91,7 +94,7 @@ export default function PlanDetail() {
   const phaseHeading = () => {
     if (!selected.start_date || !selected.end_date) return "";
     if (selected.start_date <= today && today <= selected.end_date) {
-      return `残り ${daysLeftN(selected.end_date, today)}日`;
+      return `残り ${differenceInCalendarDays(parseISO(selected.end_date), parseISO(today))}日`;
     }
     return selected.start_date > today
       ? `${formatDateLabel(selected.start_date, today)} から`
@@ -315,9 +318,4 @@ export default function PlanDetail() {
       )}
     </div>
   );
-}
-
-function daysLeftN(end: string, today: string): number {
-  const ms = new Date(end).getTime() - new Date(today).getTime();
-  return Math.round(ms / 86400000);
 }

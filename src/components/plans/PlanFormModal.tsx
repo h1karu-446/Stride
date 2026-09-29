@@ -34,7 +34,7 @@ export default function PlanFormModal({
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault();
-          if (canSave) onSubmit(v);
+          if (canSave && !saving) onSubmit(v);
         }}
       >
         <Field label="計画名" error={v.name ? errors.name : undefined}>
