@@ -113,6 +113,10 @@ export default function ScheduleList({
     );
   };
 
+  // A collapsed group still shows the row being edited (spec 3.5).
+  const shown = (list: Task[], open: boolean) =>
+    open ? list : list.filter((t) => t.id === editing);
+
   if (total === 0 && editing !== "new") {
     // Not stretched to the height of the card next to it (spec 3.4).
     return (
@@ -133,7 +137,7 @@ export default function ScheduleList({
       <div className="flex flex-col">
         {editing === "new" && form()}
         {groups.visible.map(row)}
-        {showHidden && groups.hidden.map(row)}
+        {shown(groups.hidden, showHidden).map(row)}
       </div>
       {groups.hidden.length > 0 && (
         <FoldButton open={showHidden} label={`他 ${groups.hidden.length}件`}
@@ -141,7 +145,7 @@ export default function ScheduleList({
       )}
       {groups.done.length > 0 && (
         <>
-          {showDone && <div className="flex flex-col">{groups.done.map(row)}</div>}
+          <div className="flex flex-col">{shown(groups.done, showDone).map(row)}</div>
           <FoldButton open={showDone} label={`完了 ${groups.done.length}`}
             onToggle={() => setShowDone(!showDone)} />
         </>

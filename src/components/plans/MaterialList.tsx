@@ -9,6 +9,8 @@ import {
   nextMaterialStatus,
 } from "@/lib/plans/logic";
 import {
+  MaterialSaveError,
+  type MaterialInput,
   useDeleteMaterial,
   useSaveMaterial,
   useSetMaterialStatus,
@@ -46,43 +48,97 @@ export default function MaterialList({
   const setStatus = useSetMaterialStatus();
   const [showOther, setShowOther] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  // What the user typed when a save failed. The form may remount after a
+  // failure (the row moves to another group, or a new row gets its id), so
+  // the input is restored from here instead of from the saved row.
+  const [draft, setDraft] = useState<{ id: string; input: MaterialInput } | null>(null);
+  // Materials whose status change is in flight: their badge is disabled so
+  // two clicks can never be applied out of order.
+  const [statusPending, setStatusPending] = useState<ReadonlySet<string>>(new Set());
   const materials = plan.materials;
   const groups = materialGroups(materials, selectedPhaseId);
+  const editingRow = materials.find((m) => m.id === editing);
 
   const open = (target: string) => {
     save.reset();
     del.reset();
+    setDraft(null);
     onEdit(target);
   };
+  const close = () => {
+    setDraft(null);
+    onClose();
+  };
 
-  const form = (m?: Material) => (
-    <MaterialForm
-      key={m?.id ?? "new"}
-      initial={
-        m
-          ? { title: m.title, url: m.url ?? "", status: m.status, phase_ids: m.phase_ids }
-          : { title: "", url: "", status: "todo", phase_ids: [] }
+  const submit = (input: MaterialInput, m?: Material) => {
+    save.mutate(
+      { planId: plan.id, material: m, phases: plan.phases, input },
+      {
+        onSuccess: close,
+        onError: (e) => {
+          if (e instanceof MaterialSaveError) {
+            // The row exists now: keep the input and retry as an edit of it,
+            // so saving again never inserts a duplicate.
+            setDraft({ id: e.materialId, input });
+            if (!m) onEdit(e.materialId);
+          } else if (m) {
+            setDraft({ id: m.id, input });
+          }
+        },
       }
-      phases={phases}
-      color={color}
-      saving={save.isPending || del.isPending}
-      failed={save.isError || del.isError}
-      onCancel={onClose}
-      onSubmit={(input) =>
-        save.mutate(
-          { planId: plan.id, material: m, phases: plan.phases, input },
-          { onSuccess: onClose }
-        )
-      }
-      onDelete={m ? () => del.mutate(m.id, { onSuccess: onClose }) : undefined}
-    />
-  );
+    );
+  };
+
+  /** `m` is undefined for "new"; `id` is set for a new row not yet refetched. */
+  const form = (m?: Material, id?: string) => {
+    const key = m?.id ?? id ?? "new";
+    const own = draft && draft.id === key ? draft.input : undefined;
+    const target: Material | undefined =
+      m ??
+      (id && own
+        ? { id, plan_id: plan.id, title: own.title, status: own.status, phase_ids: [], created_at: "" }
+        : undefined);
+    return (
+      <MaterialForm
+        key={key}
+        initial={
+          own ??
+          (m
+            ? { title: m.title, url: m.url ?? "", status: m.status, phase_ids: m.phase_ids }
+            : { title: "", url: "", status: "todo", phase_ids: [] })
+        }
+        phases={phases}
+        color={color}
+        saving={save.isPending || del.isPending}
+        failed={save.isError || del.isError}
+        onCancel={close}
+        onSubmit={(input) => submit(input, target)}
+        onDelete={target ? () => del.mutate(target.id, { onSuccess: close }) : undefined}
+      />
+    );
+  };
+
+  const cycleStatus = (m: Material) => {
+    if (statusPending.has(m.id)) return;
+    setStatusPending((s) => new Set(s).add(m.id));
+    setStatus
+      .mutateAsync({ id: m.id, status: nextMaterialStatus(m.status) })
+      .catch(() => undefined) // shown via setStatus.isError
+      .finally(() =>
+        setStatusPending((s) => {
+          const next = new Set(s);
+          next.delete(m.id);
+          return next;
+        })
+      );
+  };
 
   const badge = (m: Material) => (
     <button type="button"
       aria-label={`状態: ${MATERIAL_STATUS_LABEL[m.status]}（押して切り替え）`}
-      onClick={() => setStatus.mutate({ id: m.id, status: nextMaterialStatus(m.status) })}
-      className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px]"
+      disabled={statusPending.has(m.id)}
+      onClick={() => cycleStatus(m)}
+      className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-60 disabled:cursor-wait"
       style={
         m.status === "in_progress"
           ? { background: `${color}33`, color }
@@ -121,7 +177,20 @@ export default function MaterialList({
     );
   };
 
-  if (materials.length === 0 && editing !== "new") {
+  // A form that has no row to sit in: a new material, or one whose row was
+  // just inserted (partial failure) and is not in the cache yet.
+  const topForm =
+    editing === "new"
+      ? form()
+      : editing && !editingRow && draft?.id === editing
+        ? form(undefined, editing)
+        : null;
+  // A collapsed group still shows the row being edited (spec 3.5: a failed
+  // save keeps the form and the error visible).
+  const shown = (list: Material[], open: boolean) =>
+    open ? list : list.filter((m) => m.id === editing);
+
+  if (materials.length === 0 && !topForm) {
     // Not stretched to the height of the card next to it (spec 3.4).
     return (
       <div className="self-start">
@@ -144,19 +213,19 @@ export default function MaterialList({
       </div>
       {setStatus.isError && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
       <div className="flex flex-col">
-        {editing === "new" && form()}
+        {topForm}
         {groups.main.map(row)}
       </div>
       {groups.otherPhases.length > 0 && (
         <>
-          {showOther && <div className="flex flex-col">{groups.otherPhases.map(row)}</div>}
+          <div className="flex flex-col">{shown(groups.otherPhases, showOther).map(row)}</div>
           <FoldButton open={showOther} label={`他のフェーズ ${groups.otherPhases.length}`}
             onToggle={() => setShowOther(!showOther)} />
         </>
       )}
       {groups.done.length > 0 && (
         <>
-          {showDone && <div className="flex flex-col">{groups.done.map(row)}</div>}
+          <div className="flex flex-col">{shown(groups.done, showDone).map(row)}</div>
           <FoldButton open={showDone} label={`完了 ${groups.done.length}`}
             onToggle={() => setShowDone(!showDone)} />
         </>

@@ -291,6 +291,38 @@ export type MaterialInput = {
   phase_ids: string[];
 };
 
+/** The material row was saved, but syncing its phase links failed. */
+export class MaterialSaveError extends Error {
+  constructor(public readonly materialId: string, cause: unknown) {
+    super("material_phases sync failed");
+    this.cause = cause;
+  }
+}
+
+/**
+ * Makes the stored links equal `phaseIds`. It compares with the DB, not with
+ * the cached row, so retrying after a partial failure converges.
+ */
+async function syncMaterialPhases(
+  materialId: string,
+  phaseIds: string[],
+  { userId, isNew }: { userId: string; isNew: boolean }
+) {
+  if (!isNew) {
+    let del = supabase.from("material_phases").delete().eq("material_id", materialId);
+    if (phaseIds.length > 0) del = del.not("phase_id", "in", `(${phaseIds.join(",")})`);
+    const { error } = await del;
+    if (error) throw error;
+  }
+  if (phaseIds.length > 0) {
+    const { error } = await supabase.from("material_phases").upsert(
+      phaseIds.map((phase_id) => ({ material_id: materialId, phase_id, user_id: userId })),
+      { onConflict: "material_id,phase_id", ignoreDuplicates: true }
+    );
+    if (error) throw error;
+  }
+}
+
 /**
  * Inserts or updates a material and syncs its material_phases rows.
  * `phases` are the plan's phases: links to any other phase are dropped, since
@@ -336,29 +368,18 @@ export function useSaveMaterial() {
         id = (data as { id: string }).id;
       }
 
-      const phaseIds = linkablePhaseIds(input.phase_ids, phases);
-      const before = material?.phase_ids ?? [];
-      const removed = before.filter((p) => !phaseIds.includes(p));
-      const added = phaseIds.filter((p) => !before.includes(p));
-      if (removed.length > 0) {
-        const { error } = await supabase
-          .from("material_phases")
-          .delete()
-          .eq("material_id", id)
-          .in("phase_id", removed);
-        if (error) throw error;
+      // The row is saved from here on. If syncing the links fails, report the
+      // id so the caller retries as an edit of this row instead of inserting
+      // a duplicate (the two writes are not one transaction).
+      try {
+        await syncMaterialPhases(id, linkablePhaseIds(input.phase_ids, phases), {
+          userId: session.user.id,
+          isNew: !material,
+        });
+      } catch (e) {
+        throw new MaterialSaveError(id, e);
       }
-      if (added.length > 0) {
-        const { error } = await supabase.from("material_phases").upsert(
-          added.map((phase_id) => ({
-            material_id: id,
-            phase_id,
-            user_id: session.user.id,
-          })),
-          { onConflict: "material_id,phase_id", ignoreDuplicates: true }
-        );
-        if (error) throw error;
-      }
+      return id;
     },
     // Invalidate on failure too: a partial save (row saved, links not) must
     // not leave the cache showing the old state. Completed materials appear
