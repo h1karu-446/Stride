@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
@@ -12,7 +12,7 @@ import {
   useUpdateBedFields,
   useUpdateTask,
   useUpdateWakeFields,
-  useUpsertReview,
+  useUpdateReviewFields,
   useWakeTarget,
 } from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
@@ -36,7 +36,7 @@ export default function Today() {
   const allTasks = tasksQuery.data ?? [];
   const reviews = reviewsQuery.data ?? [];
   const review = reviews.find((r) => r.date === date);
-  const upsertReviewMut = useUpsertReview();
+  const updateReviewFieldsMut = useUpdateReviewFields();
   const updateWakeFieldsMut = useUpdateWakeFields();
   const updateBedFieldsMut = useUpdateBedFields();
 
@@ -72,8 +72,6 @@ export default function Today() {
   );
   const [highlight, setHighlight] = useState(review?.highlight ?? "");
   const [intention, setIntention] = useState(review?.tomorrow_intention ?? "");
-  const [memo, setMemo] = useState(review?.memo ?? "");
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setFulfillment(review?.fulfillment ?? 3);
@@ -83,18 +81,53 @@ export default function Today() {
     setBedTargetOverride(review?.bed_target ?? "");
     setHighlight(review?.highlight ?? "");
     setIntention(review?.tomorrow_intention ?? "");
-    setMemo(review?.memo ?? "");
-    setSaved(false);
-  }, [date, review?.id]);
+  }, [date, reviewsQuery.isSuccess]);
 
   const wakeSaveTimer = useRef<ReturnType<typeof setTimeout>>();
   const bedSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const reviewSaveTimer = useRef<ReturnType<typeof setTimeout>>();
+  const pendingReview = useRef<{
+    fulfillment?: number;
+    highlight?: string;
+    tomorrow_intention?: string;
+  }>({});
+  const flushReviewSave = useRef<() => void>(() => {});
+  flushReviewSave.current = () => {
+    clearTimeout(reviewSaveTimer.current);
+    const fields = pendingReview.current;
+    if (Object.keys(fields).length === 0) return;
+    pendingReview.current = {};
+    updateReviewFieldsMut.mutate({ date, ...fields });
+  };
   useEffect(() => {
     return () => {
       clearTimeout(wakeSaveTimer.current);
       clearTimeout(bedSaveTimer.current);
+      // Text edits are not thrown away when the day changes: send them now.
+      flushReviewSave.current();
     };
   }, [date]);
+
+  function scheduleReviewSave(fields: typeof pendingReview.current) {
+    pendingReview.current = { ...pendingReview.current, ...fields };
+    clearTimeout(reviewSaveTimer.current);
+    reviewSaveTimer.current = setTimeout(() => flushReviewSave.current(), 500);
+  }
+
+  function handleFulfillmentChange(v: number) {
+    setFulfillment(v);
+    scheduleReviewSave({ fulfillment: v });
+  }
+
+  function handleHighlightChange(v: string) {
+    setHighlight(v);
+    scheduleReviewSave({ highlight: v });
+  }
+
+  function handleIntentionChange(v: string) {
+    setIntention(v);
+    scheduleReviewSave({ tomorrow_intention: v });
+  }
 
   function scheduleWakeSave(nextWakeTime: string, nextWakeTargetOverride: string) {
     clearTimeout(wakeSaveTimer.current);
@@ -172,28 +205,6 @@ export default function Today() {
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const [view, setView] = useState<ViewMode>("list");
-
-  function saveReview() {
-    upsertReviewMut.mutate(
-      {
-        date,
-        fulfillment,
-        wake_time: wakeTime || undefined,
-        wake_target: wakeTargetOverride || undefined,
-        bed_time: bedTime || undefined,
-        bed_target: bedTargetOverride || undefined,
-        highlight: highlight || undefined,
-        tomorrow_intention: intention || undefined,
-        memo: memo || undefined,
-      },
-      {
-        onSuccess: () => {
-          setSaved(true);
-          setTimeout(() => setSaved(false), 1800);
-        },
-      }
-    );
-  }
 
   function jumpTo(targetDate: string) {
     navigate(targetDate === today ? "/" : `/day/${targetDate}`);
@@ -276,28 +287,26 @@ export default function Today() {
             totalScore={preview.total_score}
             cluster={preview.cluster}
             streak={streak}
+            fulfillmentValue={fulfillment}
+            onFulfillmentChange={handleFulfillmentChange}
+            highlight={highlight}
+            onHighlightChange={handleHighlightChange}
+            intention={intention}
+            onIntentionChange={handleIntentionChange}
+            saveState={
+              updateReviewFieldsMut.isError ||
+              updateWakeFieldsMut.isError ||
+              updateBedFieldsMut.isError
+                ? "error"
+                : updateReviewFieldsMut.isPending ||
+                  updateWakeFieldsMut.isPending ||
+                  updateBedFieldsMut.isPending
+                ? "saving"
+                : "idle"
+            }
           />
-          {view === "timeline" && (
-            <UnscheduledPanel tasks={tasks} className="flex-1 min-h-0" />
-          )}
         </div>
       </div>
-
-      <ReviewPanel
-        date={date}
-        fulfillment={fulfillment}
-        setFulfillment={setFulfillment}
-        highlight={highlight}
-        setHighlight={setHighlight}
-        intention={intention}
-        setIntention={setIntention}
-        memo={memo}
-        setMemo={setMemo}
-        onSave={saveReview}
-        saved={saved}
-        hasReview={!!review}
-      />
-
     </div>
   );
 }
@@ -350,7 +359,15 @@ function TasksPanel({
           )}
         </>
       ) : (
-        <TimelineView tasks={tasks} date={date} bedTarget={bedTarget} />
+        <div className="flex flex-col md:flex-row">
+          <UnscheduledPanel
+            tasks={tasks}
+            className="md:w-[220px] md:flex-shrink-0 border-b md:border-b-0 md:border-r border-slate-100 dark:border-notion-border"
+          />
+          <div className="flex-1 min-w-0">
+            <TimelineView tasks={tasks} date={date} bedTarget={bedTarget} />
+          </div>
+        </div>
       )}
     </section>
   );
@@ -839,7 +856,7 @@ function WakeTimeInput({
   const targetPct = ((0 - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100;
 
   return (
-    <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border space-y-2">
+    <div className="w-full space-y-2 min-w-0">
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-wide muted">
           🌅 起床時刻
@@ -956,7 +973,7 @@ function BedTimeInput({
   const targetPct = ((0 - BAR_MIN) / (BAR_MAX - BAR_MIN)) * 100;
 
   return (
-    <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border space-y-2">
+    <div className="w-full space-y-2 min-w-0">
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-wide muted">
           🌙 就寝時刻
@@ -1025,6 +1042,13 @@ function SummaryPanel({
   totalScore,
   cluster,
   streak,
+  fulfillmentValue,
+  onFulfillmentChange,
+  highlight,
+  onHighlightChange,
+  intention,
+  onIntentionChange,
+  saveState,
 }: {
   fulfillment: number;
   completedWeight: number;
@@ -1046,6 +1070,13 @@ function SummaryPanel({
   totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
+  fulfillmentValue: number;
+  onFulfillmentChange: (n: number) => void;
+  highlight: string;
+  onHighlightChange: (s: string) => void;
+  intention: string;
+  onIntentionChange: (s: string) => void;
+  saveState: "idle" | "saving" | "error";
 }) {
   const completionPct =
     scheduledWeight === 0
@@ -1053,8 +1084,22 @@ function SummaryPanel({
       : Math.round((completedWeight / scheduledWeight) * 100);
   return (
     <aside className="card flex flex-col items-center gap-3">
-      <div className="self-start text-xs uppercase tracking-wide muted">
-        スコア
+      <div className="self-stretch flex items-center justify-between text-xs">
+        <span className="uppercase tracking-wide muted">スコア</span>
+        <span
+          role="status"
+          className={
+            saveState === "error"
+              ? "text-rose-500"
+              : "muted"
+          }
+        >
+          {saveState === "error"
+            ? "保存に失敗しました（入力は残っています。再度編集すると再試行します）"
+            : saveState === "saving"
+            ? "保存中…"
+            : "自動保存"}
+        </span>
       </div>
       <ScoreRing score={Math.round(totalScore)} cluster={cluster} size={140} />
       <ClusterBadge cluster={cluster} size="lg" />
@@ -1083,25 +1128,59 @@ function SummaryPanel({
         </div>
       </div>
 
-      <WakeTimeInput
-        value={wakeTime}
-        target={wakeTarget}
-        onChange={onWakeTimeChange}
-        isTargetOverridden={isWakeTargetOverridden}
-        onTargetChange={onWakeTargetChange}
-        onTargetReset={onWakeTargetReset}
-      />
+      <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border">
+        <FulfillmentPicker
+          value={fulfillmentValue}
+          onChange={onFulfillmentChange}
+        />
+      </div>
 
-      <BedTimeInput
-        value={bedTime}
-        target={bedTarget}
-        onChange={onBedTimeChange}
-        isTargetOverridden={isBedTargetOverridden}
-        onTargetChange={onBedTargetChange}
-        onTargetReset={onBedTargetReset}
-      />
+      <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <WakeTimeInput
+          value={wakeTime}
+          target={wakeTarget}
+          onChange={onWakeTimeChange}
+          isTargetOverridden={isWakeTargetOverridden}
+          onTargetChange={onWakeTargetChange}
+          onTargetReset={onWakeTargetReset}
+        />
 
-      <div className="w-full flex items-center justify-between text-xs">
+        <BedTimeInput
+          value={bedTime}
+          target={bedTarget}
+          onChange={onBedTimeChange}
+          isTargetOverridden={isBedTargetOverridden}
+          onTargetChange={onBedTargetChange}
+          onTargetReset={onBedTargetReset}
+        />
+      </div>
+
+      <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border space-y-3">
+        <div>
+          <label className="label" htmlFor="review-highlight">
+            今日のハイライト
+          </label>
+          <AutoGrowTextarea
+            id="review-highlight"
+            placeholder="今日一番良かったこと"
+            value={highlight}
+            onChange={onHighlightChange}
+          />
+        </div>
+        <div>
+          <label className="label" htmlFor="review-intention">
+            明日の意図
+          </label>
+          <AutoGrowTextarea
+            id="review-intention"
+            placeholder="明日意識したいこと"
+            value={intention}
+            onChange={onIntentionChange}
+          />
+        </div>
+      </div>
+
+      <div className="w-full pt-3 border-t border-slate-100 dark:border-notion-border flex items-center justify-between text-xs">
         <span className="muted">A/B 連続日数</span>
         <span className="tabular-nums font-semibold">
           {streak} <span className="muted font-normal">日</span>
@@ -1111,90 +1190,74 @@ function SummaryPanel({
   );
 }
 
-function ReviewPanel(props: {
-  date: string;
-  fulfillment: number;
-  setFulfillment: (n: number) => void;
-  highlight: string;
-  setHighlight: (s: string) => void;
-  intention: string;
-  setIntention: (s: string) => void;
-  memo: string;
-  setMemo: (s: string) => void;
-  onSave: () => void;
-  saved: boolean;
-  hasReview: boolean;
+// Shows the text as plain text once it has content; clicking it (or Enter /
+// Space when focused) switches back to the textarea. Empty values stay editable.
+function AutoGrowTextarea({
+  id,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
 }) {
-  const {
-    fulfillment,
-    setFulfillment,
-    highlight,
-    setHighlight,
-    intention,
-    setIntention,
-    memo,
-    setMemo,
-    onSave,
-    saved,
-    hasReview,
-  } = props;
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const [editing, setEditing] = useState(false);
+  const showText = !!value && !editing;
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value, showText]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editing]);
+
+  if (showText) {
+    return (
+      <div
+        id={id}
+        role="button"
+        tabIndex={0}
+        title="クリックして編集"
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setEditing(true);
+          }
+        }}
+        className="text-sm whitespace-pre-wrap break-words rounded-md px-3 py-2 cursor-text hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition"
+      >
+        {value}
+      </div>
+    );
+  }
 
   return (
-    <section className="card space-y-5">
-      <header className="flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold">レビュー</h2>
-          <p className="text-xs muted mt-0.5">
-            一日の振り返りで翌日の方向を整える
-          </p>
-        </div>
-        {hasReview && (
-          <span className="text-xs muted">保存済み</span>
-        )}
-      </header>
-
-      <FulfillmentPicker value={fulfillment} onChange={setFulfillment} />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="label">今日のハイライト</label>
-          <textarea
-            className="input min-h-[88px] resize-y"
-            placeholder="今日一番良かったこと"
-            value={highlight}
-            onChange={(e) => setHighlight(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="label">明日の意図</label>
-          <textarea
-            className="input min-h-[88px] resize-y"
-            placeholder="明日意識したいこと"
-            value={intention}
-            onChange={(e) => setIntention(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="label">メモ</label>
-        <textarea
-          className="input min-h-[64px] resize-y"
-          placeholder="その他"
-          value={memo}
-          onChange={(e) => setMemo(e.target.value)}
-        />
-      </div>
-
-      <div className="flex items-center justify-end gap-3">
-        {saved && (
-          <span className="text-sm text-emerald-500">✓ 保存しました</span>
-        )}
-        <button type="button" onClick={onSave} className="btn-primary">
-          レビューを保存
-        </button>
-      </div>
-    </section>
+    <textarea
+      ref={ref}
+      id={id}
+      rows={1}
+      className="input resize-none overflow-hidden"
+      placeholder={placeholder}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={() => setEditing(true)}
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") e.currentTarget.blur();
+      }}
+    />
   );
 }
 
