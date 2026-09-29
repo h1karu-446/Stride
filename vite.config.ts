@@ -9,4 +9,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  test: {
+    // Agent worktrees live inside the repo; don't pick up their copies of the tests.
+    exclude: ["**/node_modules/**", "**/dist/**", ".claude/**", ".codex/**"],
+  },
 });
