@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { todayISO } from "@/lib/date";
+import { fetchAllPages } from "@/lib/pagination";
 import { achievementRange } from "./logic";
 import type { Achievement, Wish } from "@/types";
 
@@ -9,15 +10,8 @@ export function useWishes() {
   const { session } = useAuth();
   return useQuery({
     queryKey: ["wishes", session?.user.id], enabled: !!session,
-    queryFn: async (): Promise<Wish[]> => {
-      const rows: Wish[] = [];
-      for (let offset = 0; ; offset += 500) {
-        const { data, error } = await supabase.from("wishes").select("*").is("achieved_at", null).order("created_at").order("id").range(offset, offset + 499);
-        if (error) throw error;
-        rows.push(...(data ?? []));
-        if (!data || data.length < 500) return rows;
-      }
-    },
+    queryFn: (): Promise<Wish[]> =>
+      fetchAllPages<Wish>((from, to) => supabase.from("wishes").select("*").is("achieved_at", null).order("created_at").order("id").range(from, to)),
   });
 }
 
@@ -28,16 +22,9 @@ export function useAchievements(months: number, today: string) {
     queryKey: ["achievements", session?.user.id, from, to], enabled: !!session,
     // Keep the current feed on screen while "もっと見る" loads the wider range.
     placeholderData: keepPreviousData,
-    queryFn: async (): Promise<Achievement[]> => {
-      const rows: Achievement[] = [];
-      for (let offset = 0; ; offset += 500) {
-        const { data, error } = await supabase.from("achievements").select("*").gte("achieved_on", from).lt("achieved_on", to)
-          .order("achieved_on", { ascending: false }).order("kind").order("id").range(offset, offset + 499);
-        if (error) throw error;
-        rows.push(...((data ?? []) as Achievement[]));
-        if (!data || data.length < 500) return rows;
-      }
-    },
+    queryFn: (): Promise<Achievement[]> =>
+      fetchAllPages<Achievement>((start, end) => supabase.from("achievements").select("*").gte("achieved_on", from).lt("achieved_on", to)
+        .order("achieved_on", { ascending: false }).order("kind").order("id").range(start, end)),
   });
 }
 
