@@ -21,16 +21,19 @@
 ## 必要なもの
 
 - Node.js 24 と npm
-- Supabase プロジェクト（認証とデータベース）
+- Supabase（認証とデータベース）。検証用はDocker上のローカル環境を使用
+- ローカル検証にはDockerとSupabase CLI
 
 ## セットアップ
 
 ```sh
 npm install
-cp .env.example .env.local
+test -e .env.local || cp .env.example .env.local
 ```
 
 `.env.local` に Supabase の `VITE_SUPABASE_URL` と `VITE_SUPABASE_ANON_KEY` を設定し、`supabase/migrations/` のスキーマを Supabase に適用する。
+
+既存の `.env.local` は保持する。Docker上のSupabaseの起動、DB権限の設定、接続先の切り替えは [プロジェクト固有Context](docs/project-context.md#ローカル検証環境issue-5) を参照する。
 
 ## 起動と使い方
 

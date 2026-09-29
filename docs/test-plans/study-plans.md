@@ -45,11 +45,12 @@
 | 用途 | 環境 |
 | --- | --- |
 | 単体テスト | ローカル（`npm test`）、GitHub Actions |
-| DBテスト・受け入れテスト | 検証用の Supabase プロジェクト（本番とは別に作る）。`.env.local` を検証用の URL とキーに切り替えて `npm run dev` |
+| DBテスト・受け入れテスト | Docker上のローカルSupabase（本番と分離）。`.env.docker.local` にローカルのURLと公開キーを設定し、`npm run dev -- --mode docker` |
 | リリース後の確認 | 本番。第7章の「リリース後の確認」だけを行う |
 
-- Docker を使うローカルの Supabase（`supabase start`）は使わない（2026-09-29 決定。Docker を導入していないため）
-- 検証用プロジェクトには、本番と同じ migration（0001〜）を順に適用してから、今回の migration を適用する。適用は `supabase link` で検証用プロジェクトにつないで `supabase db push`、またはダッシュボードの SQL エディタで行う
+- 2026-09-29 方針変更：Dockerが利用可能になったため、検証用クラウドプロジェクトの代わりにローカルSupabaseを使用する。Issue #5でmigration 0001〜0006とテストユーザー2人を用意した。0007以降は各Issueで追加・検証する
+- 既存migrationのAPI権限は現在のSupabase既定値では不足するため、[プロジェクト固有Context](../project-context.md#起動とdb権限) のローカル専用SQLを適用する。新規テーブルを追加するmigrationではRLSとGRANTの両方を確認する
+- 接続先の切り替えと既存 `.env.local` の保持は [プロジェクト固有Context](../project-context.md#接続先の切り替え) を参照する。クラウドへの `supabase link` / `supabase db push` は検証環境の構築には使わない
 - 本番での検証・削除は `docs/project-context.md` のとおり、明示の許可を得てから行う
 - ブラウザは PC の Chrome で確認する
 
@@ -115,7 +116,7 @@ echo ok
 
 ### 5.2 DBテスト（DB）
 
-検証用プロジェクトのダッシュボードの SQL エディタで実行する。SQL エディタは管理者権限で動き RLS が効かないので、ユーザーとして実行するケースは次の形で包む。
+ローカルSupabase Studioの SQL エディタで実行する（接続URLは `supabase status` で確認する）。SQL エディタは管理者権限で動き RLS が効かないので、ユーザーとして実行するケースは次の形で包む。
 
 ```sql
 begin;
