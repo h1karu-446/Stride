@@ -1190,6 +1190,8 @@ function SummaryPanel({
   );
 }
 
+// Shows the text as plain text once it has content; clicking it (or Enter /
+// Space when focused) switches back to the textarea. Empty values stay editable.
 function AutoGrowTextarea({
   id,
   value,
@@ -1202,12 +1204,45 @@ function AutoGrowTextarea({
   placeholder: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
+  const [editing, setEditing] = useState(false);
+  const showText = !!value && !editing;
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  }, [value, showText]);
+
+  useEffect(() => {
+    if (!editing) return;
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [editing]);
+
+  if (showText) {
+    return (
+      <div
+        id={id}
+        role="button"
+        tabIndex={0}
+        title="クリックして編集"
+        onClick={() => setEditing(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setEditing(true);
+          }
+        }}
+        className="text-sm whitespace-pre-wrap break-words rounded-md px-3 py-2 cursor-text hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition"
+      >
+        {value}
+      </div>
+    );
+  }
+
   return (
     <textarea
       ref={ref}
@@ -1217,6 +1252,11 @@ function AutoGrowTextarea({
       placeholder={placeholder}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onFocus={() => setEditing(true)}
+      onBlur={() => setEditing(false)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") e.currentTarget.blur();
+      }}
     />
   );
 }
