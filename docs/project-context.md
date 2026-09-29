@@ -29,12 +29,16 @@
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
   - `docs/` 運用、`skills/` スキル原本、`scripts/` と `tests/*.py` はテンプレートの補助スクリプトとそのテスト
 - パスの別名: `@/` → `src/`（`vite.config.ts` と `tsconfig.json`）。
-- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
+- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`、学習計画機能の `plans` / `phases` / `routines` / `routine_skips`（migration 0007。設計は `docs/design/study-plans.md`）。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
 - デプロイ先: 未設定（リポジトリ内にデプロイ設定なし）。
 
 ### 守るべき制約
 
 - **スコア計算は2か所にある。** 保存される点数は PostgreSQL の `calculate_daily_score`（最新定義は `supabase/migrations/` の最後のファイル）とトリガーで計算する。`src/lib/score.ts` の `calculateScore` は画面でのプレビュー用の写し。計算式やランクの境界を変えるときは、新しい migration と `score.ts`、`src/lib/score.test.ts` を同時に更新する。
+- **計画・フェーズ・ルーティン（migration 0007）。** 計画を作ると、期間を持たない暗黙のフェーズ（`phases.is_implicit`）が自動で1つできる（ADR-0004）。ルーティンは必ずフェーズに属する。通常フェーズの期間は同じ計画内で重ならない（`btree_gist` の除外制約）。フェーズの削除は RPC `delete_phase`、計画の削除は `delete_plan(p_plan_id, p_today)` に限る（最後のフェーズは暗黙のフェーズに戻る／未来の未完了タスクも消える）。
+- **ルーティンタスクの生成ルール。** RPC `generate_routine_tasks(p_date)` が、進行中（`status = 'active'`）の計画で、暗黙のフェーズ、または `p_date` を含むフェーズの、曜日（ISO: 1=月〜7=日）が合うルーティンを `tasks` に作り、作った件数を返す。`p_date` は DB の日付の±1日以内に限る（範囲外は例外）。`tasks (routine_id, scheduled_date)` の部分一意インデックスと `on conflict do nothing` で、何度呼んでも1日1つしか作られない。生成後にルーティンを編集しても作成済みタスクは変わらない。
+- **スキップ記録のトリガー（副作用に注意）。** `routine_id` を持つタスクを削除すると、`tasks_record_routine_skip`（AFTER DELETE）が `routine_skips (routine_id, date)` に1行足し、`generate_routine_tasks` はその日を再生成しない（ADR-0003）。コードから見えない副作用なので、ルーティンタスクの削除処理を変えるときは必ずこのトリガーを確認する。`routine_skips` の行はこのトリガーだけが作る。
+- **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
 
 ## セットアップと検証
