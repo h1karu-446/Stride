@@ -65,6 +65,39 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - テスト（`npm test`）は純粋な関数だけを対象にしており、Supabase への通信は行わない。
 - DB 変更は `supabase/migrations/` に追加し、Supabase CLI で適用する。本番データを使った検証・削除は明示の指示がある場合だけ行う。
 
+### ローカル検証環境（Issue #5）
+
+2026-09-29、Dockerが利用可能になったため、検証用クラウドプロジェクトを作る方針から、Docker上のローカルSupabaseを使う方針へ変更した。本番のDBとは分離し、本番データはコピーしない。
+
+- Docker Engine 28.1.1、Supabase CLI 2.109.1で起動を確認済み。既存migration 0001〜0006を適用し、ローカルのテストユーザーを2人作成した。0007以降は各Issueで扱う。
+- `supabase/config.toml` はローカルサービスとポートの設定。`supabase/migrations/` はDB構造の変更履歴。DockerイメージとコンテナはSupabase CLIが管理する。
+- ローカル用の起動・停止はSupabase CLIで管理する。ローカル環境構築のためにクラウドへ `supabase link` / `supabase db push` は実行しない。
+
+#### 起動とDB権限
+
+1. Docker Desktopを起動し、リポジトリルートで `supabase start`。初回起動時にmigration 0001〜0006が適用される。
+2. `supabase migration list --local` でローカルDBの適用履歴を確認する。ここでの `Remote` 列はDocker上のDBを指す。
+3. `docker exec -i supabase_db_Stride psql -v ON_ERROR_STOP=1 -U postgres -d postgres < scripts/grant_local_supabase.sql` を実行する。既存migrationは古いSupabaseのAPI権限の既定値に依存しており、現在のローカル環境では `authenticated` に `tasks` と `daily_reviews` の権限が付かない。SQLはこの2テーブルに必要な権限だけを付け、既存RLSは維持する。`supabase db reset` 後も再実行する。
+4. `supabase status` でローカルAPI URLとPublishable Keyを確認する。Secret Keyはブラウザへ渡さない。
+
+ローカルAPIは通常 `127.0.0.1:54321`、DBは `127.0.0.1:54322`、Studioは `127.0.0.1:54323`。`supabase stop` でコンテナを停止してもローカルデータは残る。`supabase db reset` はローカルDBを再作成しテストユーザーとタスクを消すため、必要なときだけ実行する。新しいテーブルを追加するmigrationでは、RLSに加えて利用するロールへの明示的な `GRANT` も設計する。
+
+#### 接続先の切り替え
+
+既存の `.env.local` は上書きせず保持する。ローカル用のURLと公開キーは `.env.docker.local`（Git管理外）に次の2変数として設定する。値は `supabase status` で確認し、キーの値を文書へ転記しない。
+
+- `VITE_SUPABASE_URL`: ローカルSupabaseのAPI URL
+- `VITE_SUPABASE_ANON_KEY`: ローカルSupabaseのPublishable Key。変数名は既存コードとの互換のため `ANON_KEY` のまま（service_role / Secret Keyは使用しない）
+
+| 接続先 | 起動コマンド | 設定ファイル |
+| --- | --- | --- |
+| ローカル検証用 | `npm run dev -- --mode docker` | `.env.docker.local` の2変数を使用 |
+| 既存の接続先 | `npm run dev` | `.env.local`（既存のdevelopmentモード） |
+
+切り替え時はdevサーバーを止めて起動し直す。Viteはmode固有の値を優先するが、未設定の変数は `.env.local` から引き継ぐため、ローカル用の2変数を両方設定してから起動する。シェルに同名変数をexportしているとファイルより優先されるため解除する。Viteは5173番が使用中なら5174番などへ移るため、ターミナルが表示したURLを開く。ブラウザのNetworkでAPI接続先がローカルの54321番であることを確認してから検証する。
+
+参考: [Supabaseのローカル開発](https://supabase.com/docs/guides/local-development/cli/getting-started)、[Viteの環境変数とmode](https://vite.dev/guide/env-and-mode)。
+
 ## レビューと例外
 
 - レビュー手順は開発ワークフローの mode 定義に従う。Human review とマージ判断は本人（h1karu-446）が担当する。

@@ -435,7 +435,9 @@ sequenceDiagram
 | 3. 予定と教材 | `0008_materials_and_milestones.sql` | `materials` / `material_phases`、`tasks.is_milestone`、`trg_touch_review_on_task` の差し替え（2.2） |
 | 4. Journey | `0009_wishes_and_achievements.sql` | `wishes`、`achievements` ビュー |
 
-- 適用は `supabase db push`（またはダッシュボードのSQLエディタ）。手順と確認項目はリリース手順書に書く
+- 検証はDocker上のローカルSupabaseへ適用して行う。Issue #5で既存migration 0001〜0006を準備し、0007以降は各Issueで扱う。環境の切り替えは [プロジェクト固有Context](../project-context.md) を参照する
+- 現在のSupabaseでは新しいテーブルがData APIに自動公開されない。新規テーブルを使うロールへの明示的な `GRANT` とRLSを各migrationで設定する。既存2テーブルのローカル権限はIssue #5の専用SQLで補う
+- 本番への適用は `supabase db push`（またはダッシュボードのSQLエディタ）。ローカル検証とは分け、対象プロジェクトと実行許可を確認する。手順と確認項目はリリース手順書に書く
 - どの migration も列やテーブルを追加するだけで、既存の列を変えない。画面側を戻せば、DBを戻さなくても以前の動きになる（新しい列は NULL 可か既定値あり）
 - `delete_plan` がリリース3以降の `is_milestone` などに依存しないよう、関数はリリース2の時点の列だけで書く
 
