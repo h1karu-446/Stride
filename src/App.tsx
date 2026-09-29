@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Today from "@/pages/Today";
-import Calendar from "@/pages/Calendar";
+import Journey from "@/pages/Journey";
 import Plans from "@/pages/Plans";
 import PlanDetail from "@/pages/PlanDetail";
 import Settings from "@/pages/Settings";
@@ -34,7 +34,8 @@ export default function App() {
         <Route path="/day/:date" element={<Today />} />
         <Route path="/plans" element={<Plans />} />
         <Route path="/plans/:id" element={<PlanDetail />} />
-        <Route path="/calendar" element={<Calendar />} />
+        <Route path="/journey" element={<Journey />} />
+        <Route path="/calendar" element={<Navigate to="/journey" replace />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

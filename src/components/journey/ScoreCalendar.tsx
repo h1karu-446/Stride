@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   addMonths,
@@ -10,16 +9,14 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
-import { useReviews } from "@/lib/queries";
+import type { DailyReview } from "@/types";
 import { CLUSTER_META } from "@/types";
 import { todayISO } from "@/lib/date";
 import { ClusterBadge } from "@/components/ClusterBadge";
 
 const DOW = ["月", "火", "水", "木", "金", "土", "日"];
 
-export default function Calendar() {
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const reviews = useReviews().data ?? [];
+export default function ScoreCalendar({ month, setMonth, reviews }: { month: Date; setMonth: (month: Date) => void; reviews: DailyReview[] }) {
 
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
   const end = endOfWeek(endOfMonth(month), { weekStartsOn: 1 });
@@ -30,10 +27,10 @@ export default function Calendar() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Calendar</h1>
-          <p className="text-sm muted">過去のスコアを俯瞰</p>
+          <h2 className="font-semibold">スコアのカレンダー</h2>
+          
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -75,12 +72,15 @@ export default function Calendar() {
               <Link
                 key={iso}
                 to={linkTo}
+                aria-label={`${iso}${r ? ` ${r.total_score}点` : " 記録なし"}`}
+                style={r ? { backgroundColor: `${({ A: "#22c55e", B: "#3b82f6", C: "#f59e0b", D: "#f97316", E: "#ef4444" })[r.cluster]}20` } : undefined}
                 className={
                   "aspect-square sm:aspect-[4/3] rounded-lg border p-2 flex flex-col justify-between transition hover:shadow-sm hover:border-slate-300 dark:hover:border-notion-border-strong " +
                   (inMonth
                     ? "border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel"
                     : "border-transparent bg-slate-50 dark:bg-notion-bg/40 text-slate-400 dark:text-notion-muted") +
-                  (isToday ? " ring-2 ring-notion-blue" : "")
+                  (isToday ? " ring-2 ring-notion-blue" : "") +
+                  (!r ? (iso > today ? " opacity-40" : " !bg-slate-100 dark:!bg-notion-panel-hover") : "")
                 }
               >
                 <div className="flex items-center justify-between text-xs">
