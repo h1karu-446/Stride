@@ -15,6 +15,9 @@ import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 // preview frame.
 const DRAG_ID_TYPE = "application/x-task-id";
 const DRAG_MINUTES_PREFIX = "application/x-task-minutes-";
+// HTML dragover exposes MIME types but not their values. Both panels live on
+// the same page, so keep the active row's title until dragend for the preview.
+let activeUnscheduledDragTitle: string | null = null;
 
 const START_HOUR = 0;
 const END_HOUR = 24;
@@ -165,6 +168,7 @@ export function TimelineView({
   const [dropRange, setDropRange] = useState<{
     start: number;
     end: number;
+    title: string;
   } | null>(null);
   const { data: plans } = usePlans();
   const planColorOf = (t: Task) => {
@@ -437,7 +441,10 @@ export function TimelineView({
               const minutes = minutesType
                 ? Number(minutesType.slice(DRAG_MINUTES_PREFIX.length))
                 : undefined;
-              setDropRange(dropTimes(snap(yToMin(y)), minutes));
+              setDropRange({
+                ...dropTimes(snap(yToMin(y)), minutes),
+                title: activeUnscheduledDragTitle ?? "",
+              });
             }}
             onDragLeave={(e) => {
               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
@@ -601,7 +608,8 @@ export function TimelineView({
                 }}
               >
                 <div className="text-[10px] text-notion-blue px-1.5 py-0.5 tabular-nums">
-                  {toTime(dropRange.start)} - {toTime(dropRange.end)}
+                  <span className="block truncate font-medium">{dropRange.title}</span>
+                  <span className="block">{toTime(dropRange.start)} - {toTime(dropRange.end)}</span>
                 </div>
               </div>
             )}
@@ -888,6 +896,7 @@ export function UnscheduledPanel({
             key={t.id}
             draggable
             onDragStart={(e) => {
+              activeUnscheduledDragTitle = t.title;
               e.dataTransfer.setData(DRAG_ID_TYPE, t.id);
               if (t.planned_minutes) {
                 e.dataTransfer.setData(
@@ -896,6 +905,9 @@ export function UnscheduledPanel({
                 );
               }
               e.dataTransfer.effectAllowed = "move";
+            }}
+            onDragEnd={() => {
+              activeUnscheduledDragTitle = null;
             }}
             className={
               "group flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition cursor-grab active:cursor-grabbing"
