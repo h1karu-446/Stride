@@ -123,7 +123,6 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 ## 未決事項
 
 - `src/types.ts` の `CLUSTER_META.D.min` は 30 だが、実際の判定（`clusterFromScore` と SQL）では 30 点ちょうどは E。表示用の値をどちらに合わせるか未決定。
-- `LICENSE` と、以前の `README.md` の中身が Supabase CLI のものになっていた（commit `cb1b54d`）。README は書き直した。LICENSE をどうするかは未決定。
 - `npm audit` の指摘（メジャー更新なしで直る分は `npm audit fix`、Vite などのメジャー更新は別作業）。
 - デプロイ先、ESLint の導入。
 
