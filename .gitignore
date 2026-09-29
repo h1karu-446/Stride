@@ -17,3 +17,7 @@ CLAUDE.local.md
 # Python helpers from ai-dev-starter
 __pycache__/
 *.py[cod]
+
+# Generated / local tool files
+*.tsbuildinfo
+supabase/.temp/
