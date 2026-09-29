@@ -53,7 +53,7 @@ select 'a1000000-0000-0000-0000-000000000022', auth.uid(), ph.id, 'B routine'
  where ph.plan_id = 'a1000000-0000-0000-0000-000000000012' and ph.is_implicit;
 
 do $$
-declare v_task uuid;
+declare v_task uuid; v_own uuid;
         a_plan uuid := 'a1000000-0000-0000-0000-000000000011';
         a_routine uuid := 'a1000000-0000-0000-0000-000000000021';
 begin
@@ -74,7 +74,15 @@ begin
   values (auth.uid(), 'B manual', '軽', current_date) returning id into v_task;
   insert into public.tasks (user_id, title, importance, scheduled_date, plan_id, routine_id)
   values (auth.uid(), 'B own', '中', current_date + 41,
-          'a1000000-0000-0000-0000-000000000012', 'a1000000-0000-0000-0000-000000000022');
+          'a1000000-0000-0000-0000-000000000012', 'a1000000-0000-0000-0000-000000000022')
+  returning id into v_own;
+
+  -- Clearing plan_id / routine_id back to NULL is allowed
+  update public.tasks set plan_id = null, routine_id = null where id = v_own;
+  if not exists (select 1 from public.tasks
+                  where id = v_own and plan_id is null and routine_id is null) then
+    raise exception 'DB-51: update back to NULL plan_id / routine_id not applied';
+  end if;
 
   -- DB-51 (tasks): another owner's plan_id / routine_id is rejected on update
   begin
