@@ -72,6 +72,18 @@ export function calculateBedScore(
 }
 
 /**
+ * The fulfillment value the UI should show for a stored review. A day without
+ * a review row, or whose row has fulfillment NULL (e.g. only the wake time was
+ * saved), is "not selected" — not 3. calculate_daily_score scores NULL as 0,
+ * so the preview must receive null too to match the stored score.
+ */
+export function storedFulfillment(
+  review: Pick<DailyReview, "fulfillment"> | undefined
+): number | null {
+  return review?.fulfillment ?? null;
+}
+
+/**
  * Mirrors the PostgreSQL calculate_daily_score function defined in
  * supabase/migrations. Kept in TS so the UI can preview scores
  * before the row is persisted.

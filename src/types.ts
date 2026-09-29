@@ -24,7 +24,7 @@ export interface DailyReview {
   id: string;
   user_id: string;
   date: string; // YYYY-MM-DD
-  fulfillment: number; // 1-5
+  fulfillment: number | null; // 1-5, null until the user picks one
   wake_time?: string; // "HH:mm"
   wake_target?: string; // "HH:mm" — per-day override of the account default
   bed_time?: string; // "HH:mm"

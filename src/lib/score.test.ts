@@ -5,6 +5,7 @@ import {
   calculateScore,
   calculateWakeScore,
   clusterFromScore,
+  storedFulfillment,
   streakCount,
 } from "./score";
 
@@ -78,6 +79,28 @@ describe("calculateScore", () => {
     expect(result.completion_score).toBe(0);
     expect(result.total_score).toBe(0);
     expect(result.cluster).toBe("E");
+  });
+});
+
+describe("unsaved fulfillment (Issue #30)", () => {
+  it("treats a missing review or a NULL fulfillment as not selected", () => {
+    expect(storedFulfillment(undefined)).toBeNull();
+    expect(storedFulfillment({ fulfillment: null })).toBeNull();
+    expect(storedFulfillment({ fulfillment: 4 })).toBe(4);
+  });
+
+  it("scores an unsaved fulfillment as 0, like coalesce(p_fulfillment, 0) in calculate_daily_score", () => {
+    // Tasks all done, on time for wake and bed, fulfillment never saved.
+    // The DB stores 80 + 0 + 7.5 + 7.5 = 95 (not 98 as if 3 were selected).
+    const result = calculateScore(
+      [task("重", true), task("軽", true)],
+      storedFulfillment({ fulfillment: null }),
+      "07:00", "07:00",
+      "23:00", "23:00"
+    );
+    expect(result.fulfillment_score).toBe(0);
+    expect(result.total_score).toBe(95);
+    expect(result.cluster).toBe("A");
   });
 });
 
