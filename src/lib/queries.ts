@@ -7,6 +7,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/date";
+import { fetchAllPages } from "@/lib/pagination";
 import {
   DailyReview,
   DEFAULT_BED_TARGET,
@@ -107,13 +108,17 @@ export function useTasks() {
   return useQuery({
     queryKey: TASKS_KEY,
     enabled: !!session,
+    // Every page is needed: Plans/PlanDetail, Today and Settings read all tasks.
     queryFn: async (): Promise<Task[]> => {
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map(rowToTask);
+      const rows = await fetchAllPages<TaskRow>((from, to) =>
+        supabase
+          .from("tasks")
+          .select("*")
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(from, to)
+      );
+      return rows.map(rowToTask);
     },
   });
 }
@@ -123,13 +128,17 @@ export function useReviews() {
   return useQuery({
     queryKey: REVIEWS_KEY,
     enabled: !!session,
+    // Every page is needed: Journey's streak/calendar and Settings read all reviews.
     queryFn: async (): Promise<DailyReview[]> => {
-      const { data, error } = await supabase
-        .from("daily_reviews")
-        .select("*")
-        .order("date", { ascending: false });
-      if (error) throw error;
-      return (data ?? []).map(rowToReview);
+      const rows = await fetchAllPages<ReviewRow>((from, to) =>
+        supabase
+          .from("daily_reviews")
+          .select("*")
+          .order("date", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to)
+      );
+      return rows.map(rowToReview);
     },
   });
 }

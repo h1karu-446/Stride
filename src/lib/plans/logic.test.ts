@@ -295,9 +295,11 @@ describe("UT-20 dropTimes", () => {
     expect(dropTimes(13 * 60)).toEqual({ start: 780, end: 840 });
     expect(dropTimes(13 * 60, null)).toEqual({ start: 780, end: 840 });
   });
-  it("clamps at 24:00 instead of crossing midnight", () => {
-    expect(dropTimes(23 * 60, 90)).toEqual({ start: 1380, end: 1440 });
-    // start is held at 23:00 (as before), so 30 min ends at 23:30
-    expect(dropTimes(23 * 60 + 45, 30)).toEqual({ start: 1380, end: 1410 });
+  it("moves a late start earlier only as much as the duration needs", () => {
+    expect(dropTimes(23 * 60 + 45, 30)).toEqual({ start: 1410, end: 1440 });
+    expect(dropTimes(23 * 60, 90)).toEqual({ start: 1350, end: 1440 });
+    expect(dropTimes(23 * 60 + 45)).toEqual({ start: 1380, end: 1440 });
+    expect(dropTimes(-15, 30)).toEqual({ start: 0, end: 30 });
+    expect(dropTimes(1440, 600)).toEqual({ start: 840, end: 1440 });
   });
 });

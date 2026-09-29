@@ -181,16 +181,17 @@ const DROP_DEFAULT_MIN = 60;
 /**
  * Start / end minutes (from 00:00) for a task dropped on the timeline.
  * The end is start + plannedMinutes (60 when the task has none, as before).
- * Like the existing timeline, the start is kept at least an hour before
- * midnight and the end is clamped to 24:00 instead of wrapping to the next day.
+ * Keep the entire duration within this day. A late drop moves its start
+ * earlier just enough to finish at midnight, as shown by the preview.
  */
 export function dropTimes(
   startMin: number,
   plannedMinutes?: number | null
 ): { start: number; end: number } {
-  const start = Math.max(0, Math.min(DAY_MIN - DROP_DEFAULT_MIN, startMin));
   const dur = plannedMinutes && plannedMinutes > 0 ? plannedMinutes : DROP_DEFAULT_MIN;
-  return { start, end: Math.min(DAY_MIN, start + dur) };
+  const boundedDur = Math.min(DAY_MIN, dur);
+  const start = Math.max(0, Math.min(DAY_MIN - boundedDur, startMin));
+  return { start, end: start + boundedDur };
 }
 
 // --- dates -------------------------------------------------------------

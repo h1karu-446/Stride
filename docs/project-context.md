@@ -24,7 +24,7 @@
 - テンプレートの補助スクリプト: Python 3.10以上（標準ライブラリのみ）。
 - ディレクトリと責務:
   - `src/pages/` 画面（Today・Plans・PlanDetail・Journey・Settings・SignIn。旧 `/calendar` は `/journey` へリダイレクト）、`src/components/` UI（`journey/` など画面別のフォルダを含む）
-  - `src/lib/queries.ts` Supabase への読み書き（TanStack Query の hooks）
+  - `src/lib/queries.ts` Supabase への読み書き（TanStack Query の hooks）。全件が必要な一覧（`useTasks`・`useReviews`・Journey の一覧）は、API の行数上限（`supabase/config.toml` の `max_rows = 1000`）を超えても欠けないよう `src/lib/pagination.ts` の `fetchAllPages` で500件ずつ取得する。並び順には `id` などの一意な副キーを付ける（Issue #27）
   - `src/lib/score.ts` スコア計算、`src/lib/date.ts` 日付処理、`src/lib/auth.tsx` 認証
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
   - `docs/` 運用、`skills/` スキル原本、`scripts/` と `tests/*.py` はテンプレートの補助スクリプトとそのテスト
