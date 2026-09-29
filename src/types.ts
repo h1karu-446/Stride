@@ -70,3 +70,49 @@ export const CLUSTER_META: Record<
 };
 
 export const IMPORTANCE_LIST: Importance[] = ["重", "中", "軽"];
+
+export type PlanStatus = "idea" | "active" | "paused" | "done";
+export type PlanColor =
+  | "pink"
+  | "orange"
+  | "yellow"
+  | "green"
+  | "teal"
+  | "blue"
+  | "purple"
+  | "gray";
+
+export interface Routine {
+  id: string;
+  phase_id: string;
+  title: string;
+  minutes: number;
+  weekdays: number[]; // ISO weekdays, 1 = Mon ... 7 = Sun
+  importance: Importance;
+  menu?: string;
+}
+
+export interface Phase {
+  id: string;
+  plan_id: string;
+  is_implicit: boolean;
+  name?: string;
+  start_date?: string; // YYYY-MM-DD
+  end_date?: string;
+  routines: Routine[];
+}
+
+export interface Plan {
+  id: string;
+  name: string;
+  color: PlanColor;
+  status: PlanStatus;
+  due_date?: string;
+  goal?: string;
+  goal_note?: string;
+  completed_at?: string;
+  overdue_notice_dismissed_for?: string;
+  phases: Phase[];
+  created_at: string;
+  updated_at: string;
+}

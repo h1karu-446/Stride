@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Today from "@/pages/Today";
 import Calendar from "@/pages/Calendar";
+import Plans from "@/pages/Plans";
+import PlanDetail from "@/pages/PlanDetail";
 import Settings from "@/pages/Settings";
 import SignIn from "@/pages/SignIn";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +32,8 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Today />} />
         <Route path="/day/:date" element={<Today />} />
+        <Route path="/plans" element={<Plans />} />
+        <Route path="/plans/:id" element={<PlanDetail />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
