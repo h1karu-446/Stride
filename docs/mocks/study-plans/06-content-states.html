@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>量が多い・少ないとき</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#191919;color:#E6E6E6}
+button{font-family:inherit;cursor:pointer}
+input[type=checkbox]{accent-color:#D15796;width:16px;height:16px;margin:0}
+</style>
+</head>
+<body>
+<div style="width: 1280px; height: 640px; box-sizing: border-box; background: #191919; padding: 48px 64px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; align-items: start">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; color: #7F7E7B">予定が多い</span>
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 14px; font-weight: 600">予定</span>
+<div style="display: flex; flex-direction: column; font-size: 13px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 7px 0"><span aria-label="未完了" style="width: 12px; height: 12px; border-radius: 7px; border: 1.5px solid #5A5A5A; flex-shrink: 0"></span><span style="width: 40px; color: #D9A0BD; flex-shrink: 0">今日</span><span style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">英会話を予約</span></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 7px 0"><span aria-label="未完了" style="width: 12px; height: 12px; border-radius: 7px; border: 1.5px solid #5A5A5A; flex-shrink: 0"></span><span style="width: 40px; color: #9B9A97; flex-shrink: 0">9/30</span><span style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">模試</span></div>
+<div style="display: flex; align-items: center; gap: 10px; padding: 7px 0"><span aria-label="未完了" style="width: 12px; height: 12px; border-radius: 7px; border: 1.5px solid #5A5A5A; flex-shrink: 0"></span><span style="width: 40px; color: #9B9A97; flex-shrink: 0">10/31</span><span style="flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">公式問題集</span></div>
+</div>
+<button style="align-self: flex-start; background: none; border: 0; color: #BDBCB9; font-size: 12px; padding: 4px 0">他 5 件</button>
+<button style="align-self: flex-start; background: none; border: 0; color: #7F7E7B; font-size: 12px; padding: 2px 0">完了 12</button>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; color: #7F7E7B">教材が多い</span>
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between"><span style="font-size: 14px; font-weight: 600">教材</span><span style="font-size: 12px; color: #9B9A97">6 / 13 完了</span></div>
+<div style="display: flex; flex-direction: column; font-size: 13px">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 7px 0"><span>6 Minute English</span><span style="font-size: 11px; background: #3A2330; color: #F0B6D3; border-radius: 999px; padding: 3px 10px">使用中</span></div>
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 7px 0"><span>Cambridge 18</span><span style="font-size: 11px; background: #3A2330; color: #F0B6D3; border-radius: 999px; padding: 3px 10px">使用中</span></div>
+</div>
+<button style="align-self: flex-start; background: none; border: 0; color: #BDBCB9; font-size: 12px; padding: 4px 0">未着手 5</button>
+<button style="align-self: flex-start; background: none; border: 0; color: #8FD3C5; font-size: 12px; padding: 2px 0; display: flex; align-items: center; gap: 4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>完了 6</button>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; color: #7F7E7B">メニューが長い</span>
+<section style="background: #1C1C1C; border: 1px solid #2F2F2F; border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 6px; align-items: center"><span style="font-size: 14px; font-weight: 600; margin-right: 4px">ルーティン</span><span style="font-size: 12px; background: #2A2A2A; border-radius: 999px; padding: 3px 10px">90分</span></div>
+<div style="position: relative; font-size: 13px; line-height: 1.8; color: #BDBCB9; white-space: pre-line; height: 94px; overflow: hidden">シャドーイング 30分
+英語日記 20分
+フレーズ暗記 15分
+Speaking 録音 15分
+多読 10分</div>
+<div style="height: 1px"></div>
+<button style="align-self: flex-start; background: none; border: 0; color: #9B9A97; font-size: 12px; padding: 0">続きを表示</button>
+</section>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; color: #7F7E7B">作ったばかり</span>
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px">
+<button style="border: 1px dashed #3A3A3A; background: none; border-radius: 10px; color: #9B9A97; font-size: 13px; padding: 18px; min-height: 60px">＋ ルーティンを追加</button>
+<button style="border: 1px dashed #3A3A3A; background: none; border-radius: 10px; color: #9B9A97; font-size: 13px; padding: 14px">＋ 予定を追加</button>
+<button style="border: 1px dashed #3A3A3A; background: none; border-radius: 10px; color: #9B9A97; font-size: 13px; padding: 14px">＋ 教材を追加</button>
+</section>
+</div>
+
+</div>
+</body>
+</html>

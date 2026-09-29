@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Today — リスト表示</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#191919;color:#E6E6E6}
+a{color:#E6E6E6;text-decoration:none}a:hover{color:#ffffff}
+button{font-family:inherit;cursor:pointer}
+input[type=checkbox]{accent-color:#2383E2;width:16px;height:16px;margin:0;flex-shrink:0}
+</style>
+</head>
+<body>
+<div style="width: 1280px; height: 860px; box-sizing: border-box; background: #191919; display: flex; flex-direction: column">
+
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2F2F2F; display: flex; align-items: center; justify-content: space-between; padding: 0 64px; box-sizing: border-box">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em">Stride</span><span style="font-size: 12px; color: #9B9A97">Daily Task Scoring</span></div>
+<nav style="display: flex; gap: 4px; font-size: 14px">
+<a href="03-today-list.html" style="padding: 6px 12px; border-radius: 6px; background: #2A2A2A; color: #E6E6E6">Today</a>
+<a href="01-plans.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Plans</a>
+<a href="05-journey.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Journey</a>
+</nav>
+<div style="display: flex; gap: 12px; align-items: center; font-size: 12px; color: #E6E6E6"><span>ログアウト</span></div>
+</header>
+
+<main style="padding: 40px 64px; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; justify-content: space-between; align-items: flex-end">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em">Today</h1>
+<span style="font-size: 14px; color: #9B9A97">2026年9月29日 (Tue)</span>
+</div>
+<div style="display: flex; gap: 6px">
+<button aria-label="前日" style="background: #202020; border: 1px solid #2F2F2F; color: #E6E6E6; border-radius: 6px; padding: 8px 12px; font-size: 14px">←</button>
+<button style="background: #202020; border: 1px solid #2F2F2F; color: #6F6E6B; border-radius: 6px; padding: 8px 12px; font-size: 14px">今日</button>
+<button aria-label="翌日" style="background: #202020; border: 1px solid #2F2F2F; color: #E6E6E6; border-radius: 6px; padding: 8px 12px; font-size: 14px">→</button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: stretch">
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column">
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid #2F2F2F">
+<div style="display: flex; align-items: center; gap: 12px">
+<h2 style="margin: 0; font-size: 16px; font-weight: 600">タスク</h2>
+<div style="display: flex; border: 1px solid #2F2F2F; border-radius: 6px; padding: 2px; background: #242424; font-size: 12px">
+<button style="background: #202020; border: 0; color: #E6E6E6; border-radius: 4px; padding: 4px 10px">リスト</button>
+<button style="background: none; border: 0; color: #9B9A97; border-radius: 4px; padding: 4px 10px">タイムライン</button>
+</div>
+</div>
+<span style="font-size: 14px; color: #9B9A97"><b style="color: #E6E6E6">1</b> / 5</span>
+</div>
+<div style="padding: 16px 20px; border-bottom: 1px solid #2F2F2F; background: #242424; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 8px; border: 1px solid #2F2F2F; background: #202020; border-radius: 6px; padding: 8px 12px">
+<span style="color: #2383E2; font-size: 16px; line-height: 1">+</span>
+<span style="flex-grow: 1; font-size: 14px; color: #9B9A97">新しいタスクを追加...</span>
+<button style="background: #1E4F80; color: #BFD9F2; border: 0; border-radius: 6px; padding: 4px 12px; font-size: 12px">追加</button>
+</div>
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="font-size: 11px; letter-spacing: 0.04em; color: #9B9A97">重要度</span>
+<button style="display: flex; align-items: center; gap: 6px; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 4px 10px; font-size: 12px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F43F5E"></span>重<span style="font-size: 10px; opacity: 0.7">3pt</span></button>
+<button style="display: flex; align-items: center; gap: 6px; border: 1px solid #FBBF24; background: rgba(245,158,11,0.2); color: #FDE68A; border-radius: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B"></span>中<span style="font-size: 10px; opacity: 0.7">2pt</span></button>
+<button style="display: flex; align-items: center; gap: 6px; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 4px 10px; font-size: 12px"><span style="width: 8px; height: 8px; border-radius: 4px; background: #9B9A97"></span>軽<span style="font-size: 10px; opacity: 0.7">1pt</span></button>
+</div>
+</div>
+<div style="display: flex; flex-direction: column">
+
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid #2F2F2F">
+<input type="checkbox" aria-label="完了">
+<span style="flex-grow: 1; font-size: 14px">ミライビルド定例</span>
+<span style="display: flex; align-items: center; gap: 6px; border: 1px solid #FBBF24; background: rgba(245,158,11,0.15); color: #FCD34D; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B"></span>中</span>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #2F2F2F">
+<input type="checkbox" aria-label="完了" style="margin-top: 2px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0">
+<span style="font-size: 14px">英語 60分</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9B9A97; min-width: 0">
+<a href="02-plan-detail.html" style="display: flex; align-items: center; gap: 5px; color: #F0B6D3; flex-shrink: 0"><span style="width: 7px; height: 7px; border-radius: 4px; background: #D15796"></span>英語</a>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">リスニング 20分 / スピーキング 20分 / リーディング 10分 / 単語 10分</span>
+</div>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; border: 1px solid #FBBF24; background: rgba(245,158,11,0.15); color: #FCD34D; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F59E0B"></span>中</span>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #2F2F2F">
+<input type="checkbox" aria-label="完了" style="margin-top: 2px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0">
+<span style="font-size: 14px">応用情報 90分</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #9B9A97; min-width: 0">
+<span style="display: flex; align-items: center; gap: 5px; color: #F2B77A; flex-shrink: 0"><span style="width: 7px; height: 7px; border-radius: 4px; background: #D9730D"></span>応用情報</span>
+<span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">午後問題 過去問 1年分 → 間違いノート</span>
+</div>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; border: 1px solid #FB7185; background: rgba(244,63,94,0.15); color: #FDA4AF; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #F43F5E"></span>重</span>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #2F2F2F">
+<input type="checkbox" aria-label="完了" style="margin-top: 2px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0">
+<span style="font-size: 14px">オンライン英会話の体験を予約</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px"><span style="display: flex; align-items: center; gap: 5px; color: #F0B6D3"><span style="width: 7px; height: 7px; border-radius: 4px; background: #D15796"></span>英語</span></div>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; border: 1px solid #373737; background: #2A2A2A; color: #E6E6E6; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #9B9A97"></span>軽</span>
+</div>
+
+<div style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 20px">
+<input type="checkbox" checked aria-label="完了" style="margin-top: 2px">
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0">
+<span style="font-size: 14px; color: #9B9A97; text-decoration: line-through">web技術 30分</span>
+<div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6F6E6B"><span style="display: flex; align-items: center; gap: 5px; color: #6FA89C"><span style="width: 7px; height: 7px; border-radius: 4px; background: #4DAB9A"></span>web技術</span><span>Docker 公式チュートリアル</span></div>
+</div>
+<span style="display: flex; align-items: center; gap: 6px; border: 1px solid #373737; background: #2A2A2A; color: #E6E6E6; border-radius: 6px; padding: 2px 10px; font-size: 12px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #9B9A97"></span>軽</span>
+</div>
+
+</div>
+</section>
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 18px">
+<div style="display: flex; justify-content: space-between; align-items: center"><span style="font-size: 14px; color: #9B9A97">スコア</span><span style="font-size: 11px; color: #6F6E6B">自動保存</span></div>
+<div style="display: flex; align-items: center; gap: 18px">
+<svg width="116" height="116" viewBox="0 0 150 150" style="flex-shrink: 0"><circle cx="75" cy="75" r="64" fill="none" stroke="#2F2F2F" stroke-width="12"></circle><circle cx="75" cy="75" r="64" fill="none" stroke="#ef4444" stroke-width="12" stroke-linecap="round" stroke-dasharray="402" stroke-dashoffset="330" transform="rotate(-90 75 75)"></circle><text x="75" y="84" text-anchor="middle" font-size="40" font-weight="700" fill="#E6E6E6">18<tspan font-size="18" fill="#9B9A97">%</tspan></text></svg>
+<div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1">
+<span style="align-self: flex-start; font-size: 13px; font-weight: 600; background: rgba(239,68,68,0.15); color: #FCA5A5; border-radius: 999px; padding: 4px 12px">E · Worst Day</span>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px">
+<div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">完了 (80)</span><span style="font-size: 12px; font-weight: 700">11%</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">充実 (5)</span><span style="font-size: 12px; font-weight: 700">3 / 5</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">起床 (7.5)</span><span style="font-size: 12px; font-weight: 700">— / 7.5</span></div><div style="background: #2A2A2A; border-radius: 8px; padding: 8px 4px; display: flex; flex-direction: column; gap: 2px; text-align: center"><span style="font-size: 11px; color: #9B9A97">就寝 (7.5)</span><span style="font-size: 12px; font-weight: 700">— / 7.5</span></div>
+</div>
+</div>
+</div>
+<div style="border-top: 1px solid #2F2F2F; padding-top: 16px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>充実度</span><span style="color: #9B9A97">普通</span></div>
+<div style="display: flex; gap: 6px"><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">1</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">2</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #FBBF24; background: rgba(245,158,11,0.2); color: #FDE68A; border-radius: 6px; padding: 7px 0; font-size: 13px; font-weight: 700">3</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">4</button><button style="flex-grow: 1; flex-basis: 0; border: 1px solid #2F2F2F; background: none; color: #9B9A97; border-radius: 6px; padding: 7px 0; font-size: 13px">5</button></div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>起床</span><span style="color: #9B9A97">目標 06:00</span></div>
+<div style="border: 1px solid #2F2F2F; border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 700; color: #9B9A97; display: flex; justify-content: space-between; align-items: center"><span>--:--</span><span style="font-size: 11px; font-weight: 500; color: #2383E2">今すぐ</span></div>
+</div><div style="display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; font-size: 12px"><span>就寝</span><span style="color: #9B9A97">目標 23:00</span></div>
+<div style="border: 1px solid #2F2F2F; border-radius: 8px; padding: 9px 12px; font-size: 15px; font-weight: 700; color: #9B9A97; display: flex; justify-content: space-between; align-items: center"><span>--:--</span><span style="font-size: 11px; font-weight: 500; color: #2383E2">今すぐ</span></div>
+</div>
+</div>
+<div style="border-top: 1px solid #2F2F2F; padding-top: 16px; display: flex; flex-direction: column; gap: 12px">
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 0.04em; color: #9B9A97">今日のハイライト</span><span style="border: 1px solid #2F2F2F; background: #202020; border-radius: 6px; padding: 9px 12px; font-size: 14px; color: #6F6E6B">今日一番良かったこと</span></label>
+<label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 11px; letter-spacing: 0.04em; color: #9B9A97">明日の意図</span><span style="border: 1px solid #2F2F2F; background: #202020; border-radius: 6px; padding: 9px 12px; font-size: 14px; color: #6F6E6B">明日意識したいこと</span></label>
+</div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; color: #9B9A97; border-top: 1px solid #2F2F2F; padding-top: 14px"><span>A/B 連続日数</span><span style="color: #E6E6E6; font-weight: 700">0 日</span></div>
+</section>
+</div>
+</main>
+</div>
+</body>
+</html>

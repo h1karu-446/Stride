@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>Journey</title>
+<style>
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;background:#191919;color:#E6E6E6}
+a{color:#9B9A97;text-decoration:none}a:hover{color:#E6E6E6}
+button{font-family:inherit;cursor:pointer}
+</style>
+</head>
+<body>
+<div style="width: 1280px; height: 900px; box-sizing: border-box; background: #191919; display: flex; flex-direction: column">
+
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2F2F2F; display: flex; align-items: center; justify-content: space-between; padding: 0 64px; box-sizing: border-box">
+<div style="display: flex; align-items: baseline; gap: 8px"><span style="font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: #E6E6E6">Stride</span><span style="font-size: 12px; color: #9B9A97">Daily Task Scoring</span></div>
+<nav style="display: flex; gap: 4px; font-size: 14px">
+<a href="03-today-list.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Today</a>
+<a href="01-plans.html" style="padding: 6px 12px; border-radius: 6px; color: #9B9A97">Plans</a>
+<a href="05-journey.html" style="padding: 6px 12px; border-radius: 6px; background: #2A2A2A; color: #E6E6E6">Journey</a>
+</nav>
+<div style="display: flex; gap: 12px; align-items: center; font-size: 12px; color: #9B9A97"><span>ログアウト</span></div>
+</header>
+
+<main style="padding: 40px 64px; display: flex; flex-direction: column; gap: 32px">
+
+<div style="display: flex; justify-content: space-between; align-items: flex-end">
+<h1 style="margin: 0; font-size: 28px; font-weight: 700">Journey</h1>
+<div style="display: flex; gap: 36px">
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span style="font-size: 24px; font-weight: 700">4<span style="font-size: 13px; font-weight: 500; color: #9B9A97"> 日</span></span><span style="font-size: 12px; color: #9B9A97">A/B 連続</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span style="font-size: 24px; font-weight: 700">72<span style="font-size: 13px; font-weight: 500; color: #9B9A97"> 点</span></span><span style="font-size: 12px; color: #9B9A97">9月の平均</span></div>
+<div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px"><span style="font-size: 24px; font-weight: 700">9</span><span style="font-size: 12px; color: #9B9A97">2026年の達成</span></div>
+</div>
+</div>
+
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start">
+
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-size: 14px; font-weight: 600">スコア</span>
+<div style="display: flex; align-items: center; gap: 6px; font-size: 13px">
+<button aria-label="前の月" style="background: none; border: 0; color: #9B9A97; padding: 4px; display: flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+<span>2026年9月</span>
+<button aria-label="次の月" style="background: none; border: 0; color: #9B9A97; padding: 4px; display: flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; font-size: 11px; color: #7F7E7B; text-align: center">
+<span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px">
+<div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: transparent;"></div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">1</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f59e0b; color: rgba(0,0,0,0.6); font-weight: 600;">2</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">3</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">4</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">5</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f97316; color: rgba(0,0,0,0.6); font-weight: 600;">6</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f59e0b; color: rgba(0,0,0,0.6); font-weight: 600;">7</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">8</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">9</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">10</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">11</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f59e0b; color: rgba(0,0,0,0.6); font-weight: 600;">12</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">13</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #ef4444; color: rgba(0,0,0,0.6); font-weight: 600;">14</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">15</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">16</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f59e0b; color: rgba(0,0,0,0.6); font-weight: 600;">17</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">18</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">19</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">20</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">21</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f59e0b; color: rgba(0,0,0,0.6); font-weight: 600;">22</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #f97316; color: rgba(0,0,0,0.6); font-weight: 600;">23</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">24</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">25</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">26</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600;">27</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #3b82f6; color: rgba(0,0,0,0.6); font-weight: 600;">28</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #22c55e; color: rgba(0,0,0,0.6); font-weight: 600; outline: 2px solid #E6E6E6; outline-offset: -2px;">29</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: #262626; color: #6F6E6B;">30</div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: transparent;"></div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: transparent;"></div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: transparent;"></div><div style="height: 40px; border-radius: 6px; font-size: 11px; display: flex; align-items: flex-start; justify-content: flex-end; padding: 4px 6px; box-sizing: border-box; background: transparent;"></div>
+</div>
+<div style="display: flex; gap: 12px; font-size: 11px; color: #9B9A97; justify-content: flex-end">
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #22c55e"></span>A</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #3b82f6"></span>B</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #f59e0b"></span>C</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #f97316"></span>D</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #ef4444"></span>E</span>
+</div>
+</section>
+
+<section style="background: #202020; border: 1px solid #2F2F2F; border-radius: 12px; padding: 20px 22px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; justify-content: space-between; align-items: center">
+<span style="font-size: 14px; font-weight: 600">やりたいこと</span>
+<button aria-label="やりたいことを追加" style="background: none; border: 0; color: #9B9A97; font-size: 18px; padding: 0 6px">＋</button>
+</div>
+<div style="display: flex; flex-direction: column; font-size: 14px">
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #262626"><button aria-label="叶った" style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #5A5A5A; background: none; padding: 0; flex-shrink: 0"></button><span>田舎で1カ月暮らす</span><span style="font-size: 12px; color: #7F7E7B">短期バイト・地域活動</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #262626"><button aria-label="叶った" style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #5A5A5A; background: none; padding: 0; flex-shrink: 0"></button><span>ベンチプレス [N]kg</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #262626"><button aria-label="叶った" style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #5A5A5A; background: none; padding: 0; flex-shrink: 0"></button><span>海外ドラマを字幕なしで観る</span><span style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #D9A0BD"><span style="width: 6px; height: 6px; border-radius: 3px; background: #D15796"></span>英語</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 10px 0"><button aria-label="叶った" style="width: 18px; height: 18px; border-radius: 9px; border: 1.5px solid #5A5A5A; background: none; padding: 0; flex-shrink: 0"></button><span>個人アプリをストアに出す</span></div>
+</div>
+</section>
+
+</div>
+
+<section style="display: flex; flex-direction: column; gap: 14px">
+<h2 style="margin: 0; font-size: 14px; font-weight: 600">達成の記録</h2>
+<div style="display: grid; grid-template-columns: 80px minmax(0, 1fr); row-gap: 4px; column-gap: 20px">
+<span style="font-size: 13px; color: #9B9A97; padding-top: 12px">9月</span>
+<div style="display: flex; flex-direction: column; border-left: 1px solid #2F2F2F; padding-left: 20px">
+<div style="display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 7px"><span style="width: 16px; display: flex; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9B9A97" stroke-width="2.5" stroke-linejoin="round"><polygon points="12 2 22 12 12 22 2 12"></polygon></svg></span><span style="flex-grow: 1; font-size: 13px; color: #BDBCB9">TOEIC 受験</span><span style="font-size: 12px; color: #7F7E7B">英語 · 9/27</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 7px"><span style="width: 16px; display: flex; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9B9A97" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span><span style="flex-grow: 1; font-size: 13px; color: #BDBCB9">金のフレーズ</span><span style="font-size: 12px; color: #7F7E7B">英語 · 9/12</span></div>
+</div>
+<span style="font-size: 13px; color: #9B9A97; padding-top: 12px">8月</span>
+<div style="display: flex; flex-direction: column; border-left: 1px solid #2F2F2F; padding-left: 20px">
+<div style="display: flex; align-items: center; gap: 12px; padding: 11px 0"><span style="width: 30px; height: 30px; border-radius: 15px; background: #3A3118; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="15" height="15" viewBox="0 0 24 24" fill="#E8B85C" stroke="#E8B85C" stroke-width="1.5" stroke-linejoin="round"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"></polygon></svg></span><span style="flex-grow: 1; font-size: 15px; font-weight: 700; color: #F2D48A">名大院 合格</span><span style="font-size: 12px; color: #9B9A97">やりたいこと · 8月</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 11px 0"><span style="width: 30px; height: 30px; border-radius: 15px; background: #1F2A3C; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#8DB8F0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3"></path><path d="M7 5H4v2a3 3 0 0 0 3 3"></path></svg></span><span style="flex-grow: 1; font-size: 15px; font-weight: 700; color: #A9C8F2">院試対策</span><span style="font-size: 12px; color: #9B9A97">計画を完了 · 4月 – 8月</span></div>
+<div style="display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 7px"><span style="width: 16px; display: flex; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9B9A97" stroke-width="2.5" stroke-linejoin="round"><polygon points="12 2 22 12 12 22 2 12"></polygon></svg></span><span style="flex-grow: 1; font-size: 13px; color: #BDBCB9">院試 本番</span><span style="font-size: 12px; color: #7F7E7B">院試対策 · 8月</span></div>
+</div>
+<span style="font-size: 13px; color: #9B9A97; padding-top: 12px">7月</span>
+<div style="display: flex; flex-direction: column; border-left: 1px solid #2F2F2F; padding-left: 20px">
+<div style="display: flex; align-items: center; gap: 12px; padding: 7px 0 7px 7px"><span style="width: 16px; display: flex; justify-content: center; flex-shrink: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9B9A97" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg></span><span style="flex-grow: 1; font-size: 13px; color: #BDBCB9">過去問 5年分</span><span style="font-size: 12px; color: #7F7E7B">院試対策 · 7月</span></div>
+</div>
+</div>
+<button style="align-self: flex-start; margin-left: 100px; background: none; border: 0; color: #7F7E7B; font-size: 12px; padding: 4px 0">もっと見る</button>
+</section>
+
+</main>
+</div>
+</body>
+</html>
