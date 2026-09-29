@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -470,4 +471,38 @@ export function useDeleteRoutine() {
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
   });
+}
+
+// --- routine generation (ADR-0002, design 6.1) --------------------------
+
+/**
+ * Calls generate_routine_tasks for `date` when it is the device's today, once
+ * per date. Runs in the background: the task list is never blocked on it, and
+ * a failure only goes to the console (it is retried on the next open).
+ * Past / future dates never generate (BR-02).
+ */
+export function useEnsureRoutineTasks(date: string) {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  const calledFor = useRef<string | null>(null);
+  const isToday = date === todayISO();
+  const signedIn = !!session;
+
+  useEffect(() => {
+    if (!signedIn || !isToday) return;
+    if (calledFor.current === date) return;
+    calledFor.current = date;
+    supabase
+      .rpc("generate_routine_tasks", { p_date: date })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("generate_routine_tasks failed", error);
+          return;
+        }
+        if (typeof data === "number" && data > 0) {
+          qc.invalidateQueries({ queryKey: ["tasks"] });
+          qc.invalidateQueries({ queryKey: ["reviews"] });
+        }
+      });
+  }, [date, isToday, signedIn, qc]);
 }

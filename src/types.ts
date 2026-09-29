@@ -131,3 +131,28 @@ export interface Plan {
   created_at: string;
   updated_at: string;
 }
+
+export interface Wish {
+  id: string;
+  user_id: string;
+  title: string;
+  note: string | null;
+  achieved_at: string | null; // YYYY-MM-DD in the user's timezone
+  created_at: string;
+  updated_at: string;
+}
+
+export type AchievementKind = "wish" | "plan" | "milestone" | "material";
+
+/** Read-only projection; (kind, id) identifies a row across source tables. */
+export interface Achievement {
+  kind: AchievementKind;
+  id: string;
+  user_id: string;
+  title: string;
+  achieved_on: string;
+  plan_id: string | null;
+  plan_name: string | null;
+  plan_color: PlanColor | null;
+  started_on: string | null;
+}

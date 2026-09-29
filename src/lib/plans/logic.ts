@@ -163,6 +163,36 @@ export function executionCells(
   return { cells, done, target };
 }
 
+// --- Today: task rows and timeline (spec 4.3) ---------------------------
+
+/** One-line summary of a memo: line breaks become " / ", blank lines dropped. */
+export function memoOneLine(memo?: string | null): string {
+  if (!memo) return "";
+  return memo
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0)
+    .join(" / ");
+}
+
+const DAY_MIN = 24 * 60;
+const DROP_DEFAULT_MIN = 60;
+
+/**
+ * Start / end minutes (from 00:00) for a task dropped on the timeline.
+ * The end is start + plannedMinutes (60 when the task has none, as before).
+ * Like the existing timeline, the start is kept at least an hour before
+ * midnight and the end is clamped to 24:00 instead of wrapping to the next day.
+ */
+export function dropTimes(
+  startMin: number,
+  plannedMinutes?: number | null
+): { start: number; end: number } {
+  const start = Math.max(0, Math.min(DAY_MIN - DROP_DEFAULT_MIN, startMin));
+  const dur = plannedMinutes && plannedMinutes > 0 ? plannedMinutes : DROP_DEFAULT_MIN;
+  return { start, end: Math.min(DAY_MIN, start + dur) };
+}
+
 // --- dates -------------------------------------------------------------
 
 export function formatDateLabel(date: string, today: string): string {
