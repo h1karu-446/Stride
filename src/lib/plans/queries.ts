@@ -361,8 +361,12 @@ export function useSaveMaterial() {
       }
     },
     // Invalidate on failure too: a partial save (row saved, links not) must
-    // not leave the cache showing the old state.
-    onSettled: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+    // not leave the cache showing the old state. Completed materials appear
+    // in the achievements view (Journey).
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }
 
@@ -373,7 +377,10 @@ export function useDeleteMaterial() {
       const { error } = await supabase.from("materials").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }
 
@@ -410,7 +417,10 @@ export function useSetMaterialStatus() {
     onError: (_e, _v, ctx) => {
       if (ctx?.previous) qc.setQueryData(PLANS_KEY, ctx.previous);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }
 
