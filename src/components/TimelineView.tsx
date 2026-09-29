@@ -5,7 +5,16 @@ import {
   useToggleTask,
   useUpdateTask,
 } from "@/lib/queries";
+import { usePlans } from "@/lib/plans/queries";
+import { dropTimes, formatMinutes } from "@/lib/plans/logic";
+import { planHex } from "@/lib/plans/colors";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
+
+// While dragging, dataTransfer values cannot be read (only the types can), so
+// the duration of the dragged task is carried in the type name to size the
+// preview frame.
+const DRAG_ID_TYPE = "application/x-task-id";
+const DRAG_MINUTES_PREFIX = "application/x-task-minutes-";
 
 const START_HOUR = 0;
 const END_HOUR = 24;
@@ -153,7 +162,15 @@ export function TimelineView({
   } | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftImportance, setDraftImportance] = useState<Importance>("中");
-  const [dropMin, setDropMin] = useState<number | null>(null);
+  const [dropRange, setDropRange] = useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const { data: plans } = usePlans();
+  const planColorOf = (t: Task) => {
+    const plan = t.plan_id ? plans?.find((p) => p.id === t.plan_id) : undefined;
+    return plan ? planHex(plan.color) : undefined;
+  };
   const [editing, setEditing] = useState<Task | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editImportance, setEditImportance] = useState<Importance>("中");
@@ -409,37 +426,42 @@ export function TimelineView({
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
             onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes("application/x-task-id")) return;
+              if (!e.dataTransfer.types.includes(DRAG_ID_TYPE)) return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
               const rect = gridRef.current!.getBoundingClientRect();
               const y = e.clientY - rect.top;
-              const startMin = Math.max(
-                START_HOUR * 60,
-                Math.min(END_HOUR * 60 - 60, snap(yToMin(y)))
+              const minutesType = e.dataTransfer.types.find((t) =>
+                t.startsWith(DRAG_MINUTES_PREFIX)
               );
-              setDropMin(startMin);
+              const minutes = minutesType
+                ? Number(minutesType.slice(DRAG_MINUTES_PREFIX.length))
+                : undefined;
+              setDropRange(dropTimes(snap(yToMin(y)), minutes));
             }}
             onDragLeave={(e) => {
               if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-              setDropMin(null);
+              setDropRange(null);
             }}
             onDrop={(e) => {
               e.preventDefault();
-              const id = e.dataTransfer.getData("application/x-task-id");
-              setDropMin(null);
+              const id = e.dataTransfer.getData(DRAG_ID_TYPE);
+              setDropRange(null);
               if (!id) return;
               const rect = gridRef.current!.getBoundingClientRect();
               const y = e.clientY - rect.top;
-              const startMin = Math.max(
-                START_HOUR * 60,
-                Math.min(END_HOUR * 60 - 60, snap(yToMin(y)))
+              // A task with a duration (routine tasks) gets a frame of that
+              // length; others keep the previous 60 minutes.
+              const dropped = tasks.find((t) => t.id === id);
+              const { start, end } = dropTimes(
+                snap(yToMin(y)),
+                dropped?.planned_minutes
               );
               updateTaskMut.mutate({
                 id,
                 patch: {
-                  start_time: toTime(startMin),
-                  end_time: toTime(startMin + 60),
+                  start_time: toTime(start),
+                  end_time: toTime(end),
                 },
               });
             }}
@@ -500,6 +522,7 @@ export function TimelineView({
                   <TimelineBlock
                     key={t.id}
                     task={t}
+                    planColor={planColorOf(t)}
                     top={minToY(start)}
                     height={Math.max(HOUR_PX / 4, minToY(end) - minToY(start))}
                     leftPct={leftPct}
@@ -569,16 +592,16 @@ export function TimelineView({
                 </div>
               )}
 
-            {dropMin != null && (
+            {dropRange != null && (
               <div
                 className="absolute left-1 right-1 rounded border-2 border-dashed border-notion-blue bg-notion-blue/10 pointer-events-none"
                 style={{
-                  top: minToY(dropMin),
-                  height: minToY(dropMin + 60) - minToY(dropMin),
+                  top: minToY(dropRange.start),
+                  height: minToY(dropRange.end) - minToY(dropRange.start),
                 }}
               >
                 <div className="text-[10px] text-notion-blue px-1.5 py-0.5 tabular-nums">
-                  {toTime(dropMin)} - {toTime(dropMin + 60)}
+                  {toTime(dropRange.start)} - {toTime(dropRange.end)}
                 </div>
               </div>
             )}
@@ -734,6 +757,7 @@ export function TimelineView({
 
 function TimelineBlock({
   task,
+  planColor,
   top,
   height,
   leftPct,
@@ -746,6 +770,7 @@ function TimelineBlock({
   onDelete,
 }: {
   task: Task;
+  planColor?: string;
   top: number;
   height: number;
   leftPct: number;
@@ -771,6 +796,9 @@ function TimelineBlock({
         height,
         left: `calc(${leftPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
+        ...(planColor
+          ? { borderLeftColor: planColor, borderLeftWidth: 3 }
+          : {}),
       }}
       onPointerDown={onMoveStart}
     >
@@ -860,7 +888,13 @@ export function UnscheduledPanel({
             key={t.id}
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.setData("application/x-task-id", t.id);
+              e.dataTransfer.setData(DRAG_ID_TYPE, t.id);
+              if (t.planned_minutes) {
+                e.dataTransfer.setData(
+                  DRAG_MINUTES_PREFIX + t.planned_minutes,
+                  ""
+                );
+              }
               e.dataTransfer.effectAllowed = "move";
             }}
             className={
@@ -899,6 +933,11 @@ export function UnscheduledPanel({
             >
               {t.title}
             </span>
+            {t.planned_minutes ? (
+              <span className="text-[11px] muted tabular-nums flex-shrink-0">
+                {formatMinutes(t.planned_minutes)}
+              </span>
+            ) : null}
             <button
               type="button"
               className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-xs"
