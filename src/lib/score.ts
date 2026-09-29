@@ -9,7 +9,7 @@ export function clusterFromScore(total: number): Cluster {
   if (total >= 85) return "A";
   if (total >= 70) return "B";
   if (total >= 50) return "C";
-  if (total > 30) return "D";
+  if (total >= 30) return "D";
   return "E";
 }
 

@@ -41,6 +41,7 @@
 - **教材とマイルストーン（migration 0008）。** `materials.status` が `done` 以外なら `completed_at` は NULL、`done` で未指定なら `current_date`（UTC）で補う（`plans` と同じ。画面は端末の日付を送ること）。教材とフェーズの紐づけは `material_phases`（フェーズを消すと紐づけも消える）。`tasks.is_milestone` は予定のマイルストーンの印。子テーブルのRLSは、親の計画・教材・フェーズも本人のものであることを要求する。
 - **tasks の親の所有（migration 0010、Issue #23）。** `tasks_owner_all` の `with check` は、`plan_id` / `routine_id` があればその計画・ルーティンも本人のものであることを要求する（`using` は従来どおり）。検証SQLは `supabase/tests/0010_tasks_parent_ownership.sql`。
 - **`delete_plan` の修正（migration 0011、Issue #28）。** 残すタスクの `plan_id` / `routine_id` を、計画を削除する前に明示的に null にする。`on delete set null` に任せると、同じトランザクション内で作成・更新したタスクで `tasks_routine_id_fkey` 違反になるため。残す・消すタスクの扱い（BR-08）は同じ。検証SQLは `supabase/tests/0011_fix_delete_plan.sql`。
+- **ランクの境界（migration 0013、Issue #35）。** 30点ちょうどは D（`CLUSTER_META.D.min = 30` と同じ）。`calculate_daily_score` の最新定義は 0013（0006 から D の条件だけ `>= 30` に変更）。保存済みの `total_score = 30` の行は、`trg_update_scores` を一時的に無効化して `cluster` だけ D に直した。検証SQLは `supabase/tests/0013_cluster_d_boundary.sql`。
 - **日付変更とスコア再計算（migration 0008）。** `touch_daily_review_after_task_change`（`trg_touch_review_on_task` から呼ばれる）は、タスクの `scheduled_date` が変わったとき、新しい日に加えて元の日の `daily_reviews` も更新して再計算させる（「今日に移す」で元の日のスコアが古いまま残る不具合の修正）。関数本体だけを差し替えており、トリガー定義は 0001 のまま。
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
@@ -122,7 +123,6 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 
 ## 未決事項
 
-- `src/types.ts` の `CLUSTER_META.D.min` は 30 だが、実際の判定（`clusterFromScore` と SQL）では 30 点ちょうどは E。表示用の値をどちらに合わせるか未決定。
 - `LICENSE` と、以前の `README.md` の中身が Supabase CLI のものになっていた（commit `cb1b54d`）。README は書き直した。LICENSE をどうするかは未決定。
 - `npm audit` の指摘（メジャー更新なしで直る分は `npm audit fix`、Vite などのメジャー更新は別作業）。
 - デプロイ先、ESLint の導入。

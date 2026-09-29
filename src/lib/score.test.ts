@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CLUSTER_META } from "@/types";
 import type { DailyReview, Importance, Task } from "@/types";
 import {
   calculateBedScore,
@@ -18,9 +19,14 @@ const review = (date: string, cluster: DailyReview["cluster"]) =>
 describe("clusterFromScore", () => {
   it.each([
     [100, "A"], [85, "A"], [84.9, "B"], [70, "B"], [69.9, "C"],
-    [50, "C"], [49.9, "D"], [30.1, "D"], [30, "E"], [0, "E"],
+    [50, "C"], [49.9, "D"], [30.1, "D"], [30, "D"], [29.9, "E"], [0, "E"],
   ] as const)("%s → %s", (score, cluster) => {
     expect(clusterFromScore(score)).toBe(cluster);
+  });
+
+  it("puts exactly 30 in D, matching CLUSTER_META.D.min (Issue #35)", () => {
+    expect(clusterFromScore(CLUSTER_META.D.min)).toBe("D");
+    expect(clusterFromScore(CLUSTER_META.D.min - 0.1)).toBe("E");
   });
 });
 
