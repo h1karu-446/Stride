@@ -332,13 +332,19 @@ export interface Material {
   status: MaterialStatus; completed_at?: string; phase_ids: string[];
   created_at: string;
 }
-export interface Wish { id: string; title: string; note?: string; achieved_at?: string; created_at: string }
+export interface Wish {
+  id: string; user_id: string; title: string; note: string | null;
+  achieved_at: string | null; created_at: string; updated_at: string;
+}
 export interface Achievement {
   kind: "wish" | "plan" | "milestone" | "material";
-  id: string; title: string; achieved_on: string;
-  plan_id?: string; plan_name?: string; plan_color?: PlanColor; started_at?: string;
+  id: string; user_id: string; title: string; achieved_on: string;
+  plan_id: string | null; plan_name: string | null; plan_color: PlanColor | null;
+  started_at: string | null;
 }
 ```
+
+`Wish` と `Achievement` は、DB の行（`wishes` テーブル、`achievements` ビュー）と同じ形にする。値がない列は、Supabase が返すとおり `null` で表し、`user_id` も含める。これにより、取得した行を変換せずにそのまま使える（2026-09-30 に本人が決定。実装に合わせて設計を更新）。上の `Plan` などの既存の型は `?:` のまま残っているが、今後追加する型は DB の行と同じ形に寄せる。
 
 `Task` に `plan_id?`、`routine_id?`、`planned_minutes?`、`is_milestone: boolean` を追加し、`queries.ts` の `TaskRow` / `rowToTask` も合わせて変える。
 
