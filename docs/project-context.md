@@ -29,7 +29,7 @@
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
   - `docs/` 運用、`skills/` スキル原本、`scripts/` と `tests/*.py` はテンプレートの補助スクリプトとそのテスト
 - パスの別名: `@/` → `src/`（`vite.config.ts` と `tsconfig.json`）。
-- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`、学習計画機能の `plans` / `phases` / `routines` / `routine_skips`（migration 0007。設計は `docs/design/study-plans.md`）。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
+- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`、学習計画機能の `plans` / `phases` / `routines` / `routine_skips`（migration 0007）と `materials` / `material_phases`（migration 0008）。設計は `docs/design/study-plans.md`。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
 - デプロイ先: 未設定（リポジトリ内にデプロイ設定なし）。
 
 ### 守るべき制約
@@ -38,6 +38,8 @@
 - **計画・フェーズ・ルーティン（migration 0007）。** 計画を作ると、期間を持たない暗黙のフェーズ（`phases.is_implicit`）が自動で1つできる（ADR-0004）。ルーティンは必ずフェーズに属する。通常フェーズの期間は同じ計画内で重ならない（`btree_gist` の除外制約）。フェーズの削除は RPC `delete_phase`、計画の削除は `delete_plan(p_plan_id, p_today)` に限る（最後のフェーズは暗黙のフェーズに戻る／未来の未完了タスクも消える）。
 - **ルーティンタスクの生成ルール。** RPC `generate_routine_tasks(p_date)` が、進行中（`status = 'active'`）の計画で、暗黙のフェーズ、または `p_date` を含むフェーズの、曜日（ISO: 1=月〜7=日）が合うルーティンを `tasks` に作り、作った件数を返す。`p_date` は DB の日付の±1日以内に限る（範囲外は例外）。`tasks (routine_id, scheduled_date)` の部分一意インデックスと `on conflict do nothing` で、何度呼んでも1日1つしか作られない。生成後にルーティンを編集しても作成済みタスクは変わらない。
 - **スキップ記録のトリガー（副作用に注意）。** `routine_id` を持つタスクを削除すると、`tasks_record_routine_skip`（AFTER DELETE）が `routine_skips (routine_id, date)` に1行足し、`generate_routine_tasks` はその日を再生成しない（ADR-0003）。コードから見えない副作用なので、ルーティンタスクの削除処理を変えるときは必ずこのトリガーを確認する。`routine_skips` の行はこのトリガーだけが作る。
+- **教材とマイルストーン（migration 0008）。** `materials.status` が `done` 以外なら `completed_at` は NULL、`done` で未指定なら `current_date`（UTC）で補う（`plans` と同じ。画面は端末の日付を送ること）。教材とフェーズの紐づけは `material_phases`（フェーズを消すと紐づけも消える）。`tasks.is_milestone` は予定のマイルストーンの印。子テーブルのRLSは、親の計画・教材・フェーズも本人のものであることを要求する。
+- **日付変更とスコア再計算（migration 0008）。** `touch_daily_review_after_task_change`（`trg_touch_review_on_task` から呼ばれる）は、タスクの `scheduled_date` が変わったとき、新しい日に加えて元の日の `daily_reviews` も更新して再計算させる（「今日に移す」で元の日のスコアが古いまま残る不具合の修正）。関数本体だけを差し替えており、トリガー定義は 0001 のまま。
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
 
@@ -73,7 +75,7 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 
 2026-09-29、Dockerが利用可能になったため、検証用クラウドプロジェクトを作る方針から、Docker上のローカルSupabaseを使う方針へ変更した。本番のDBとは分離し、本番データはコピーしない。
 
-- Docker Engine 28.1.1、Supabase CLI 2.109.1で起動を確認済み。既存migration 0001〜0006を適用し、ローカルのテストユーザーを2人作成した。0007以降は各Issueで扱う。
+- Docker Engine 28.1.1、Supabase CLI 2.109.1で起動を確認済み。既存migration 0001〜0006（その後 0007・0008 も適用）を適用し、ローカルのテストユーザーを2人作成した。0007以降は各Issueで扱う。新しいmigrationは共有DBに対して `docker exec -i supabase_db_Stride psql -v ON_ERROR_STOP=1 -U postgres -d postgres < 該当ファイル` で適用し、`supabase_migrations.schema_migrations` に版を記録する（`supabase db reset` は共有DBを消すため使わない）。0007以降の新テーブルのGRANTはmigration自身に含むので、`scripts/grant_local_supabase.sql` は変更不要。
 - `supabase/config.toml` はローカルサービスとポートの設定。`supabase/migrations/` はDB構造の変更履歴。DockerイメージとコンテナはSupabase CLIが管理する。
 - ローカル用の起動・停止はSupabase CLIで管理する。ローカル環境構築のためにクラウドへ `supabase link` / `supabase db push` は実行しない。
 
