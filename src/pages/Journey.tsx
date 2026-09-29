@@ -7,7 +7,7 @@ import { SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { useReviews } from "@/lib/queries";
 import { planHex } from "@/lib/plans/colors";
-import { formatDateLabel } from "@/lib/plans/logic";
+import { formatDateLabel, spanLabel } from "@/lib/plans/logic";
 import { ACHIEVEMENT_STYLE, achievementRange, groupAchievements, journeyStreak, monthlyAverage } from "@/lib/journey/logic";
 import { useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWishes } from "@/lib/journey/queries";
 import type { WishInput } from "@/lib/journey/queries";
@@ -75,7 +75,7 @@ export default function Journey() {
         {rows.map((row) => <div key={`${row.kind}-${row.id}`} className={`group flex flex-wrap items-center gap-3 py-2 text-sm ${ACHIEVEMENT_STYLE[row.kind].className}`}>
           <span className="min-w-10 shrink-0 text-xs font-normal tabular-nums">{formatDateLabel(row.achieved_on, today)}</span>
           <span aria-hidden>{ACHIEVEMENT_STYLE[row.kind].icon}</span><span className="min-w-0 flex-1 break-words">{row.title}</span>
-          {row.kind === "plan" && row.started_on && <span className="text-xs font-normal muted">{row.started_on.slice(0, 7).replace("-", "/")} – {row.achieved_on.slice(0, 7).replace("-", "/")}</span>}
+          {row.kind === "plan" && row.started_at && <span className="text-xs font-normal muted">{spanLabel(row.started_at, row.achieved_on)}</span>}
           {row.plan_id && row.plan_name && row.kind !== "plan" && <Link className="text-xs font-normal hover:underline" style={{ color: planHex(row.plan_color ?? "gray") }} to={`/plans/${row.plan_id}`}>{row.plan_name}</Link>}
           {row.kind === "wish" && <button disabled={mutation.isPending} onClick={() => restore(row.id)} className="text-xs font-normal muted opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline focus-visible:outline-2">未達成に戻す</button>}
         </div>)}
