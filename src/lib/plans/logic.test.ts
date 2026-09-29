@@ -43,7 +43,7 @@ const plan = (over: Partial<Plan> = {}): Plan => ({
 const task = (date: string, completed: boolean, over: Partial<Task> = {}): Task => ({
   id: `${date}-${Math.random()}`, user_id: "u", title: "t", importance: "中",
   scheduled_date: date, completed, plan_id: "p1", routine_id: "r1",
-  created_at: "", updated_at: "", ...over,
+  is_milestone: false, created_at: "", updated_at: "", ...over,
 });
 
 describe("UT-01 phaseForDate", () => {

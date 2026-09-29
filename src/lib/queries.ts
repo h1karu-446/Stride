@@ -31,6 +31,7 @@ interface TaskRow {
   plan_id: string | null;
   routine_id: string | null;
   planned_minutes: number | null;
+  is_milestone: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -71,6 +72,7 @@ function rowToTask(r: TaskRow): Task {
     plan_id: r.plan_id ?? undefined,
     routine_id: r.routine_id ?? undefined,
     planned_minutes: r.planned_minutes ?? undefined,
+    is_milestone: r.is_milestone ?? false,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
