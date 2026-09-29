@@ -139,4 +139,4 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - `Wish` / `Achievement` はDB行のNULLをそのまま扱う型（`user_id`付き）を採用する。既存のPlan等のoptional型とは異なり、変換時の取りこぼしを避ける。
 - 年の達成はフィードの表示月とは独立したexact count。フィード・未達成wishはAPIの行数制限を超えても取得できるようページングする。
 - 計画・タスクの作成/更新/削除時には達成キャッシュも無効化する。教材mutationも同じキー `["achievements"]` を無効化すること。
-- `achievements.started_on` は設計に従いDBの作成日時をUTC日付へ変換したもの。日本時間0〜9時の作成は前日（毎月1日は前月）として期間に表示される既知の制約。完了/達成日は端末の日付を送る。
+- `achievements.started_at`（migration 0012、Issue #34）は計画の `created_at` を timestamptz のまま返す。0009 の `started_on`（UTC 日付）は廃止した。現地の日付への変換は画面側で行い、Journey の期間は Plans と同じ `spanLabel`（`src/lib/plans/logic.ts`、`planSpanLabel` の本体）で表示する。完了/達成日は端末の日付を送る。ビューの列を変えるときは `create or replace view` では名前・型を変えられないため drop → create し、`security_invoker = true` と GRANT（authenticated の select のみ）を付け直す。検証SQLは `supabase/tests/0012_achievements_started_at.sql`。
