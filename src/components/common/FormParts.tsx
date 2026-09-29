@@ -2,21 +2,29 @@ import type { ReactNode } from "react";
 
 export const SAVE_ERROR_MESSAGE = "保存できませんでした。もう一度お試しください";
 
+/** `group` is for controls made of several buttons (colors, weekdays). */
 export function Field({
   label,
   error,
+  group,
   children,
 }: {
   label: string;
   error?: string;
+  group?: boolean;
   children: ReactNode;
 }) {
-  return (
-    <div>
-      <label className="label">{label}</label>
+  const body = (
+    <>
+      <span className="label">{label}</span>
       {children}
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-    </div>
+    </>
+  );
+  return group ? (
+    <div role="group" aria-label={label}>{body}</div>
+  ) : (
+    <label className="block">{body}</label>
   );
 }
 

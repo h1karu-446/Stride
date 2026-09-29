@@ -60,7 +60,7 @@ export default function RoutineForm({
           <input type="number" step={5} min={5} max={600} className="input"
             value={minutesText} onChange={(e) => setMinutesText(e.target.value)} />
         </Field>
-        <Field label="重要度">
+        <Field group label="重要度">
           <div className="flex gap-1.5">
             {IMPORTANCES.map((i) => (
               <button key={i} type="button" onClick={() => setV({ ...v, importance: i })}
@@ -74,7 +74,7 @@ export default function RoutineForm({
           </div>
         </Field>
       </div>
-      <Field label="曜日" error={errors.weekdays}>
+      <Field group label="曜日" error={errors.weekdays}>
         <div className="flex gap-1.5">
           {DAYS.map((label, idx) => {
             const d = idx + 1;

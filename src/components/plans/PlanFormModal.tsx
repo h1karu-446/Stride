@@ -45,7 +45,7 @@ export default function PlanFormModal({
             onChange={(e) => setV({ ...v, name: e.target.value })}
           />
         </Field>
-        <Field label="色">
+        <Field group label="色">
           <div className="flex flex-wrap gap-2">
             {PLAN_COLORS.map((c) => (
               <button
