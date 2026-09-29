@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { CLUSTER_META } from "@/types";
 import type { DailyReview, Importance, Task } from "@/types";
 import {
   calculateBedScore,
   calculateScore,
   calculateWakeScore,
   clusterFromScore,
+  roundTotalScore,
   storedFulfillment,
   streakCount,
 } from "./score";
@@ -18,9 +20,35 @@ const review = (date: string, cluster: DailyReview["cluster"]) =>
 describe("clusterFromScore", () => {
   it.each([
     [100, "A"], [85, "A"], [84.9, "B"], [70, "B"], [69.9, "C"],
-    [50, "C"], [49.9, "D"], [30.1, "D"], [30, "E"], [0, "E"],
+    [50, "C"], [49.9, "D"], [30.1, "D"], [30, "D"], [29.9, "E"], [0, "E"],
   ] as const)("%s → %s", (score, cluster) => {
     expect(clusterFromScore(score)).toBe(cluster);
+  });
+
+  it("puts exactly 30 in D, matching CLUSTER_META.D.min (Issue #35)", () => {
+    expect(clusterFromScore(CLUSTER_META.D.min)).toBe("D");
+    expect(clusterFromScore(CLUSTER_META.D.min - 0.1)).toBe("E");
+  });
+
+  // Decided on the total rounded to 2 decimals, like the stored total_score
+  // and calculate_daily_score (Issue #35).
+  it.each([
+    [29.995, "D"], [29.994, "E"], [29.99, "E"],
+    [29.999999999999996, "D"], [30.000000000000004, "D"],
+    [49.995, "C"], [49.994, "D"],
+    [69.995, "B"], [69.994, "C"],
+    [84.995, "A"], [84.994, "B"],
+  ] as const)("rounds %s to 2 decimals → %s", (score, cluster) => {
+    expect(clusterFromScore(score)).toBe(cluster);
+  });
+});
+
+describe("roundTotalScore", () => {
+  it.each([
+    [29.995, 30], [29.994, 29.99], [29.999999999999996, 30],
+    [49.995, 50], [1.005, 1.01], [72.345, 72.35], [100, 100], [0, 0],
+  ] as const)("%s → %s (like numeric(5,2))", (score, rounded) => {
+    expect(roundTotalScore(score)).toBe(rounded);
   });
 });
 
@@ -72,6 +100,18 @@ describe("calculateScore", () => {
       total_score: 72.3,
       cluster: "B",
     });
+  });
+
+  it("ranks a day stored as 30.00 as D even when the float sum is just under 30", () => {
+    // 重要度 3/16 完了 (15) + 充実度 5 + 起床 100 分遅れ (2.5) + 就寝どおり (7.5).
+    // calculate_daily_score computes 29.999…975 here; both sides round first.
+    const tasks = [
+      task("重", true), task("重", false), task("重", false),
+      task("重", false), task("重", false), task("軽", false),
+    ];
+    const result = calculateScore(tasks, 5, "08:40", "07:00", "23:00", "23:00");
+    expect(result.total_score).toBe(30);
+    expect(result.cluster).toBe("D");
   });
 
   it("scores 0 completion when there are no tasks", () => {
