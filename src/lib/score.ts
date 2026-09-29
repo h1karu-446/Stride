@@ -5,11 +5,31 @@ import {
   Task,
 } from "@/types";
 
+/**
+ * Rounds a total score the way the DB stores it: numeric(5,2), i.e. to 2
+ * decimals with halves away from zero (PostgreSQL `round(x, 2)`).
+ *
+ * The value is first cut to 9 decimals so that float noise (e.g.
+ * 29.999999999999996, or 29.995 held as 29.99499…) cannot flip the result.
+ * calculate_daily_score does the same: `round(round(v_total, 9), 2)`.
+ */
+export function roundTotalScore(total: number): number {
+  const [int, frac] = Math.abs(total).toFixed(9).split(".");
+  const hundredths =
+    Number(int) * 100 + Number(frac.slice(0, 2)) + (Number(frac[2]) >= 5 ? 1 : 0);
+  return (Math.sign(total) * hundredths) / 100;
+}
+
+/**
+ * Cluster of a total score. Decided on the value rounded like the stored
+ * total_score (Issue #35), so a day stored as 30.00 is always D.
+ */
 export function clusterFromScore(total: number): Cluster {
-  if (total >= 85) return "A";
-  if (total >= 70) return "B";
-  if (total >= 50) return "C";
-  if (total >= 30) return "D";
+  const t = roundTotalScore(total);
+  if (t >= 85) return "A";
+  if (t >= 70) return "B";
+  if (t >= 50) return "C";
+  if (t >= 30) return "D";
   return "E";
 }
 

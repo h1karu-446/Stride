@@ -1,14 +1,20 @@
--- Stride: a total of exactly 30 is cluster D, not E (Issue #35)
+-- Stride: rank boundaries on the stored (rounded) total; exactly 30 is D (Issue #35)
 -- - CLUSTER_META.D.min is 30, but calculate_daily_score (and clusterFromScore
 --   in src/lib/score.ts) used `> 30`, so exactly 30 was E.
--- - Replaces calculate_daily_score from 0006 with the D condition changed to
---   `>= 30`. Everything else is identical to 0006.
--- - Fixes stored daily_reviews with total_score = 30. Only cluster is changed:
---   trg_update_scores (BEFORE UPDATE) would otherwise recompute every score,
---   and days whose wake/bed target is NULL would pick up the user's current
---   default targets. The trigger is disabled only for that update.
+-- - The rank was also decided on the unrounded total while total_score is
+--   stored as numeric(5,2), so a day stored as 30.00 could be E
+--   (29.999…975). The same applied to the 50 / 70 / 85 boundaries.
+-- - Replaces calculate_daily_score from 0006. Only two things change:
+--   v_total is rounded (round(round(v_total, 9), 2)) before the rank is
+--   decided, and the D condition is `>= 30`.
+-- - Fixes stored daily_reviews whose cluster does not match the rank of their
+--   stored total_score. Scores are not recomputed; only cluster changes.
+--   trg_update_scores (BEFORE UPDATE) is disabled for that update, since it
+--   would recompute every score (and days whose wake/bed target is NULL would
+--   pick up the user's current default targets). Disable, update and enable
+--   are in one DO block, so they are atomic even when run in autocommit mode.
 -- - Idempotent: create or replace, and the update touches only rows whose
---   cluster is not D yet.
+--   cluster is wrong.
 
 create or replace function public.calculate_daily_score(
   p_user_id uuid,
@@ -122,6 +128,11 @@ begin
   end if;
 
   v_total := v_completion_score + v_fulfillment_score + v_wake_score + v_bed_score;
+  -- Rank the value that is stored (total_score is numeric(5,2)). Cut numeric
+  -- noise at 9 decimals first (e.g. 7.5 * (1 - 100/150.0) = 2.4999…975),
+  -- then round to 2 like the column does. Same as roundTotalScore in
+  -- src/lib/score.ts.
+  v_total := round(round(v_total, 9), 2);
 
   if v_total >= 85 then v_cluster := 'A';
   elsif v_total >= 70 then v_cluster := 'B';
@@ -134,11 +145,31 @@ begin
 end;
 $$ language plpgsql stable security definer;
 
-alter table public.daily_reviews disable trigger trg_update_scores;
+do $$
+declare
+  v_fixed int;
+begin
+  alter table public.daily_reviews disable trigger trg_update_scores;
 
-update public.daily_reviews
-   set cluster = 'D'
- where total_score = 30
-   and cluster is distinct from 'D';
+  update public.daily_reviews r
+     set cluster = x.rank
+    from (
+      select id,
+             case
+               when total_score >= 85 then 'A'
+               when total_score >= 70 then 'B'
+               when total_score >= 50 then 'C'
+               when total_score >= 30 then 'D'
+               else 'E'
+             end as rank
+        from public.daily_reviews
+       where total_score is not null
+    ) x
+   where r.id = x.id
+     and r.cluster is distinct from x.rank;
+  get diagnostics v_fixed = row_count;
 
-alter table public.daily_reviews enable trigger trg_update_scores;
+  alter table public.daily_reviews enable trigger trg_update_scores;
+
+  raise notice '0013: fixed cluster of % daily_reviews rows', v_fixed;
+end $$;
