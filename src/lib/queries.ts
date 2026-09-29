@@ -41,7 +41,7 @@ interface ReviewRow {
   id: string;
   user_id: string;
   date: string;
-  fulfillment: number;
+  fulfillment: number | null;
   wake_time: string | null;
   wake_target: string | null;
   bed_time: string | null;

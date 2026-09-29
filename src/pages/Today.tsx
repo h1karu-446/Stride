@@ -19,7 +19,12 @@ import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
 import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
 import { memoOneLine } from "@/lib/plans/logic";
 import { planHex } from "@/lib/plans/colors";
-import { calculateScore, normalizeLateNight, streakCount } from "@/lib/score";
+import {
+  calculateScore,
+  normalizeLateNight,
+  storedFulfillment,
+  streakCount,
+} from "@/lib/score";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
@@ -69,7 +74,9 @@ export default function Today() {
 
   const globalWakeTarget = useWakeTarget();
   const globalBedTarget = useBedTarget();
-  const [fulfillment, setFulfillment] = useState(review?.fulfillment ?? 3);
+  const [fulfillment, setFulfillment] = useState<number | null>(
+    storedFulfillment(review)
+  );
   const [wakeTime, setWakeTime] = useState(review?.wake_time ?? "");
   const [wakeTargetOverride, setWakeTargetOverride] = useState(
     review?.wake_target ?? ""
@@ -82,7 +89,7 @@ export default function Today() {
   const [intention, setIntention] = useState(review?.tomorrow_intention ?? "");
 
   useEffect(() => {
-    setFulfillment(review?.fulfillment ?? 3);
+    setFulfillment(storedFulfillment(review));
     setWakeTime(review?.wake_time ?? "");
     setWakeTargetOverride(review?.wake_target ?? "");
     setBedTime(review?.bed_time ?? "");
@@ -275,7 +282,7 @@ export default function Today() {
         />
         <div className="flex flex-col gap-4 min-h-0">
           <SummaryPanel
-            fulfillment={preview.fulfillment_score}
+            fulfillment={fulfillment == null ? null : preview.fulfillment_score}
             completedWeight={preview.completed_weight}
             scheduledWeight={preview.scheduled_weight}
             wakeScore={preview.wake_score}
@@ -1084,7 +1091,7 @@ function SummaryPanel({
   onIntentionChange,
   saveState,
 }: {
-  fulfillment: number;
+  fulfillment: number | null;
   completedWeight: number;
   scheduledWeight: number;
   wakeScore: number;
@@ -1104,7 +1111,7 @@ function SummaryPanel({
   totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
-  fulfillmentValue: number;
+  fulfillmentValue: number | null;
   onFulfillmentChange: (n: number) => void;
   highlight: string;
   onHighlightChange: (s: string) => void;
@@ -1146,7 +1153,9 @@ function SummaryPanel({
         </div>
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
           <div className="muted">充実 (5)</div>
-          <div className="font-semibold tabular-nums">{fulfillment} / 5</div>
+          <div className="font-semibold tabular-nums">
+            {fulfillment == null ? "—" : fulfillment} / 5
+          </div>
         </div>
         <div className="rounded-md bg-slate-50 dark:bg-notion-panel-hover p-2">
           <div className="muted">起床 (7.5)</div>
@@ -1312,7 +1321,7 @@ function FulfillmentPicker({
   value,
   onChange,
 }: {
-  value: number;
+  value: number | null;
   onChange: (n: number) => void;
 }) {
   const current = FULFILLMENT_OPTIONS.find((o) => o.value === value);
@@ -1320,12 +1329,16 @@ function FulfillmentPicker({
     <div>
       <div className="flex items-baseline justify-between mb-2">
         <span className="label !mb-0">充実度</span>
-        <span className="text-xs muted">
-          <span className="text-slate-900 dark:text-notion-fg font-semibold tabular-nums">
-            {value}
-          </span>{" "}
-          / 5 · {current?.label ?? ""}
-        </span>
+        {current ? (
+          <span className="text-xs muted">
+            <span className="text-slate-900 dark:text-notion-fg font-semibold tabular-nums">
+              {current.value}
+            </span>{" "}
+            / 5 · {current.label}
+          </span>
+        ) : (
+          <span className="text-xs muted">未選択</span>
+        )}
       </div>
       <div className="grid grid-cols-5 gap-2">
         {FULFILLMENT_OPTIONS.map((o) => {
