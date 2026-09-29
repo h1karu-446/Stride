@@ -146,6 +146,8 @@ export type AddTaskInput = {
   start_time?: string;
   end_time?: string;
   memo?: string;
+  plan_id?: string; // plan schedules (予定)
+  is_milestone?: boolean;
 };
 
 export function useAddTask() {
@@ -162,6 +164,8 @@ export function useAddTask() {
         start_time: input.start_time ?? null,
         end_time: input.end_time ?? null,
         memo: input.memo ?? null,
+        plan_id: input.plan_id ?? null,
+        is_milestone: input.is_milestone ?? false,
       };
       const { data, error } = await supabase
         .from("tasks")

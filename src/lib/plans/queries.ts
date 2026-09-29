@@ -2,8 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/date";
+import { linkablePhaseIds } from "@/lib/plans/logic";
 import type {
   Importance,
+  Material,
+  MaterialStatus,
   Phase,
   Plan,
   PlanColor,
@@ -45,6 +48,30 @@ interface PlanRow {
   created_at: string;
   updated_at: string;
   phases: PhaseRow[] | null;
+  materials: MaterialRow[] | null;
+}
+interface MaterialRow {
+  id: string;
+  plan_id: string;
+  title: string;
+  url: string | null;
+  status: MaterialStatus;
+  completed_at: string | null;
+  created_at: string;
+  material_phases: { phase_id: string }[] | null;
+}
+
+function rowToMaterial(r: MaterialRow): Material {
+  return {
+    id: r.id,
+    plan_id: r.plan_id,
+    title: r.title,
+    url: r.url ?? undefined,
+    status: r.status,
+    completed_at: r.completed_at ?? undefined,
+    phase_ids: (r.material_phases ?? []).map((mp) => mp.phase_id),
+    created_at: r.created_at,
+  };
 }
 
 function rowToRoutine(r: RoutineRow): Routine {
@@ -85,6 +112,7 @@ function rowToPlan(r: PlanRow): Plan {
     completed_at: r.completed_at ?? undefined,
     overdue_notice_dismissed_for: r.overdue_notice_dismissed_for ?? undefined,
     phases: (r.phases ?? []).map(rowToPhase),
+    materials: (r.materials ?? []).map(rowToMaterial),
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -98,7 +126,7 @@ export function usePlans() {
     queryFn: async (): Promise<Plan[]> => {
       const { data, error } = await supabase
         .from("plans")
-        .select("*, phases(*, routines(*))");
+        .select("*, phases(*, routines(*)), materials(*, material_phases(phase_id))");
       if (error) throw error;
       return ((data ?? []) as PlanRow[]).map(rowToPlan);
     },
@@ -250,6 +278,138 @@ export function useDeletePhase() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+// --- materials (BR-05) ---------------------------------------------------
+
+export type MaterialInput = {
+  title: string;
+  url?: string;
+  status: MaterialStatus;
+  phase_ids: string[];
+};
+
+/**
+ * Inserts or updates a material and syncs its material_phases rows.
+ * `phases` are the plan's phases: links to any other phase are dropped, since
+ * the DB only checks ownership, not that the phase is in the same plan.
+ */
+export function useSaveMaterial() {
+  const qc = useQueryClient();
+  const { session } = useAuth();
+  return useMutation({
+    mutationFn: async ({
+      planId,
+      material,
+      phases,
+      input,
+    }: {
+      planId: string;
+      material?: Material; // the saved row when editing
+      phases: Phase[];
+      input: MaterialInput;
+    }) => {
+      if (!session) throw new Error("Not signed in");
+      const body: Record<string, unknown> = {
+        title: input.title.trim(),
+        url: input.url?.trim() || null,
+        status: input.status,
+      };
+      // The client sends its local date so completed_at is not shifted by UTC.
+      // Keep the stored date when an already-done material is saved again.
+      if (input.status === "done" && material?.status !== "done") {
+        body.completed_at = todayISO();
+      }
+      let id = material?.id;
+      if (id) {
+        const { error } = await supabase.from("materials").update(body).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase
+          .from("materials")
+          .insert({ ...body, user_id: session.user.id, plan_id: planId })
+          .select("id")
+          .single();
+        if (error) throw error;
+        id = (data as { id: string }).id;
+      }
+
+      const phaseIds = linkablePhaseIds(input.phase_ids, phases);
+      const before = material?.phase_ids ?? [];
+      const removed = before.filter((p) => !phaseIds.includes(p));
+      const added = phaseIds.filter((p) => !before.includes(p));
+      if (removed.length > 0) {
+        const { error } = await supabase
+          .from("material_phases")
+          .delete()
+          .eq("material_id", id)
+          .in("phase_id", removed);
+        if (error) throw error;
+      }
+      if (added.length > 0) {
+        const { error } = await supabase.from("material_phases").upsert(
+          added.map((phase_id) => ({
+            material_id: id,
+            phase_id,
+            user_id: session.user.id,
+          })),
+          { onConflict: "material_id,phase_id", ignoreDuplicates: true }
+        );
+        if (error) throw error;
+      }
+    },
+    // Invalidate on failure too: a partial save (row saved, links not) must
+    // not leave the cache showing the old state.
+    onSettled: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+export function useDeleteMaterial() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("materials").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+/** The status badge: saves on click, updating the cache first (design 5.4). */
+export function useSetMaterialStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: MaterialStatus }) => {
+      const { error } = await supabase
+        .from("materials")
+        .update({ status, completed_at: status === "done" ? todayISO() : null })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: PLANS_KEY });
+      const previous = qc.getQueryData<Plan[]>(PLANS_KEY);
+      qc.setQueryData<Plan[]>(PLANS_KEY, (plans) =>
+        plans?.map((p) => ({
+          ...p,
+          materials: p.materials.map((m) =>
+            m.id === id
+              ? {
+                  ...m,
+                  status,
+                  completed_at: status === "done" ? todayISO() : undefined,
+                }
+              : m
+          ),
+        }))
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous) qc.setQueryData(PLANS_KEY, ctx.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
   });
 }
 

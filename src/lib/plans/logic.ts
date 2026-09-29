@@ -1,6 +1,15 @@
 import { getISODay, parseISO, differenceInCalendarDays, format } from "date-fns";
 import { addDaysISO } from "@/lib/date";
-import type { Phase, Plan, PlanColor, PlanStatus, Routine, Task } from "@/types";
+import type {
+  Material,
+  MaterialStatus,
+  Phase,
+  Plan,
+  PlanColor,
+  PlanStatus,
+  Routine,
+  Task,
+} from "@/types";
 import { PLAN_COLORS } from "./colors";
 
 // Pure helpers for the plan screens. No Supabase access here so they can be
@@ -288,3 +297,157 @@ export function validateRoutine(v: {
 }
 
 export const hasErrors = (e: object) => Object.keys(e).length > 0;
+
+// --- schedules (予定, spec 4.2 / BR-04) --------------------------------
+
+/** A plan's schedules are its tasks that were not generated from a routine. */
+export function planSchedules(tasks: Task[], planId: string): Task[] {
+  return tasks.filter((t) => t.plan_id === planId && !t.routine_id);
+}
+
+export function isOverdue(task: Task, today: string): boolean {
+  return !task.completed && task.scheduled_date < today;
+}
+
+export const SCHEDULE_LIMIT = 3;
+
+export interface ScheduleGroups {
+  /** Open schedules to show: overdue (oldest first) -> today -> future. */
+  visible: Task[];
+  /** Open schedules folded into "他 N件". */
+  hidden: Task[];
+  /** Completed schedules, newest date first ("完了 N"). */
+  done: Task[];
+}
+
+const byDateThenCreated = (a: Task, b: Task) =>
+  a.scheduled_date.localeCompare(b.scheduled_date) ||
+  a.created_at.localeCompare(b.created_at);
+
+/**
+ * Open schedules sorted by date ascending, which is exactly overdue (oldest
+ * first), today, then future (nearest first). The first `limit` are visible.
+ * A schedule's completion date is its own date (BR-04).
+ */
+export function scheduleGroups(
+  tasks: Task[],
+  planId: string,
+  limit = SCHEDULE_LIMIT
+): ScheduleGroups {
+  const all = planSchedules(tasks, planId);
+  const open = all.filter((t) => !t.completed).sort(byDateThenCreated);
+  const done = all
+    .filter((t) => t.completed)
+    .sort((a, b) => byDateThenCreated(b, a));
+  return { visible: open.slice(0, limit), hidden: open.slice(limit), done };
+}
+
+/**
+ * The schedule shown on a plan card (spec 4.1): the oldest overdue one, else
+ * the nearest open one. undefined means "予定なし".
+ */
+export function nextSchedule(
+  tasks: Task[],
+  planId: string,
+  today: string
+): { task: Task; overdue: boolean } | undefined {
+  const first = scheduleGroups(tasks, planId, 1).visible[0];
+  return first ? { task: first, overdue: isOverdue(first, today) } : undefined;
+}
+
+// --- materials (教材, spec 4.2 / BR-05) --------------------------------
+
+export const MATERIAL_STATUS_LABEL: Record<MaterialStatus, string> = {
+  todo: "未着手",
+  in_progress: "使用中",
+  done: "完了",
+};
+
+/** todo -> in_progress -> done -> todo (BR-05). */
+export function nextMaterialStatus(s: MaterialStatus): MaterialStatus {
+  return s === "todo" ? "in_progress" : s === "in_progress" ? "done" : "todo";
+}
+
+export interface MaterialGroups {
+  /** Linked to the selected phase or to no phase: in use -> todo -> added. */
+  main: Material[];
+  /** Not done, linked only to other phases ("他のフェーズ N"). */
+  otherPhases: Material[];
+  /** Done, most recently completed first ("完了 N"). */
+  done: Material[];
+}
+
+/**
+ * `selectedPhaseId` is the phase selected on the detail screen. Pass undefined
+ * when the plan only has the implicit phase: every open material is then main.
+ */
+export function materialGroups(
+  materials: Material[],
+  selectedPhaseId: string | undefined
+): MaterialGroups {
+  const rank = (m: Material) => (m.status === "in_progress" ? 0 : 1);
+  const open = materials
+    .filter((m) => m.status !== "done")
+    .sort((a, b) => rank(a) - rank(b) || a.created_at.localeCompare(b.created_at));
+  const isMain = (m: Material) =>
+    m.phase_ids.length === 0 ||
+    !selectedPhaseId ||
+    m.phase_ids.includes(selectedPhaseId);
+  const done = materials
+    .filter((m) => m.status === "done")
+    .sort(
+      (a, b) =>
+        (b.completed_at ?? "").localeCompare(a.completed_at ?? "") ||
+        b.created_at.localeCompare(a.created_at)
+    );
+  return {
+    main: open.filter(isMain),
+    otherPhases: open.filter((m) => !isMain(m)),
+    done,
+  };
+}
+
+/**
+ * Phases a material may be linked to: the plan's own non-implicit phases.
+ * Any other id is dropped (the DB does not enforce the same-plan rule).
+ */
+export function linkablePhaseIds(ids: string[], phases: Phase[]): string[] {
+  const allowed = new Set(phases.filter((p) => !p.is_implicit).map((p) => p.id));
+  return [...new Set(ids)].filter((id) => allowed.has(id));
+}
+
+// --- validation: schedules and materials (spec 6) ----------------------
+
+/**
+ * `originalDate` is the saved date when editing: keeping it is allowed even if
+ * it is already past (an overdue schedule can be renamed without moving it),
+ * but a new past date cannot be chosen (BR-04).
+ */
+export function validateSchedule(
+  v: { title: string; scheduled_date: string },
+  today: string,
+  originalDate?: string
+): Errors<"title" | "scheduled_date"> {
+  const e: Errors<"title" | "scheduled_date"> = {};
+  if (len(v.title) < 1) e.title = "タイトルを入力してください";
+  else if (len(v.title) > 100) e.title = "タイトルは100文字までです";
+  if (!v.scheduled_date) e.scheduled_date = "日付を入力してください";
+  else if (v.scheduled_date < today && v.scheduled_date !== originalDate) {
+    e.scheduled_date = "今日以降の日付を選んでください";
+  }
+  return e;
+}
+
+export function validateMaterial(v: {
+  title: string;
+  url?: string;
+}): Errors<"title" | "url"> {
+  const e: Errors<"title" | "url"> = {};
+  if (len(v.title) < 1) e.title = "タイトルを入力してください";
+  else if (len(v.title) > 100) e.title = "タイトルは100文字までです";
+  const url = (v.url ?? "").trim();
+  if (url && !/^https?:\/\/\S+$/.test(url)) {
+    e.url = "http:// か https:// で始まるURLを入力してください";
+  }
+  return e;
+}
