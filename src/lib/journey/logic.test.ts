@@ -1,0 +1,35 @@
+import { describe, expect, it } from "vitest";
+import type { Achievement, DailyReview } from "@/types";
+import { ACHIEVEMENT_STYLE, achievementRange, annualAchievementCount, groupAchievements, journeyStreak, monthlyAverage } from "./logic";
+const achievement = (id: string, kind: Achievement["kind"], achieved_on: string): Achievement => ({ id, kind, achieved_on, user_id: "owner", title: id, plan_id: null, plan_name: null, plan_color: null, started_on: null });
+const review = (date: string, total_score: number, cluster: DailyReview["cluster"] = "A") => ({ date, total_score, cluster } as DailyReview);
+
+describe("UT-17 achievement groups", () => {
+  it("orders months and days newest first without mutating the source", () => {
+    const rows = [achievement("old", "wish", "2025-12-31"), achievement("first", "material", "2026-01-01"), achievement("last", "plan", "2026-01-31")];
+    expect(groupAchievements(rows).map(([month, values]) => [month, values.map((r) => r.id)])).toEqual([["2026-01", ["last", "first"]], ["2025-12", ["old"]]]);
+    expect(rows[0].id).toBe("old");
+    expect(groupAchievements([])).toEqual([]);
+  });
+  it("emphasizes only wishes and plans", () => {
+    expect(Object.entries(ACHIEVEMENT_STYLE).filter(([, style]) => style.prominent).map(([kind]) => kind)).toEqual(["wish", "plan"]);
+  });
+  it("extends calendar month windows by three, including across years", () => {
+    expect(achievementRange("2026-01-31", 3)).toEqual({ from: "2025-11-01", to: "2026-02-01" });
+    expect(achievementRange("2026-01-31", 6)).toEqual({ from: "2025-08-01", to: "2026-02-01" });
+  });
+});
+describe("UT-18 Journey statistics", () => {
+  it("averages recorded days of the selected month and floors decimals, retaining zero", () => {
+    const rows = [review("2026-09-01", 0), review("2026-09-30", 85.9), review("2026-08-31", 100)];
+    expect(monthlyAverage(rows, "2026-09")).toBe(42);
+    expect(monthlyAverage(rows, "2026-07")).toBeNull();
+    expect(monthlyAverage([], "2026-09")).toBeNull();
+  });
+  it("counts only this year's plans and wishes, independent of the visible quarter", () => {
+    expect(annualAchievementCount([achievement("1", "wish", "2026-01-01"), achievement("2", "plan", "2026-09-30"), achievement("3", "material", "2026-09-30"), achievement("4", "milestone", "2026-09-30"), achievement("5", "plan", "2025-12-31")], "2026")).toBe(2);
+  });
+  it("preserves Today's A/B calculation and excludes future/out-of-window reviews", () => {
+    expect(journeyStreak([review("2026-09-30", 90), review("2026-09-29", 90), review("2026-09-28", 75, "B"), review("2026-09-27", 60, "C"), review("2026-07-01", 95)], "2026-09-29")).toBe(2);
+  });
+});

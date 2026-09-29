@@ -23,7 +23,7 @@
 - パッケージマネージャー / ロックファイル: npm / `package-lock.json`。Node 24（ローカルで確認済み、CI も同じ）。
 - テンプレートの補助スクリプト: Python 3.10以上（標準ライブラリのみ）。
 - ディレクトリと責務:
-  - `src/pages/` 画面（Today・Calendar・Settings・SignIn）、`src/components/` 共通UI
+  - `src/pages/` 画面（Today・Plans・PlanDetail・Journey・Settings・SignIn。旧 `/calendar` は `/journey` へリダイレクト）、`src/components/` UI（`journey/` など画面別のフォルダを含む）
   - `src/lib/queries.ts` Supabase への読み書き（TanStack Query の hooks）
   - `src/lib/score.ts` スコア計算、`src/lib/date.ts` 日付処理、`src/lib/auth.tsx` 認証
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
@@ -133,3 +133,11 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - `achievements` は `security_invoker = true` の読み取り専用ビュー。達成済みのやりたいこと、完了した計画、完了したマイルストーン、完了した教材をまとめ、元テーブルのRLSを適用する。識別子は `kind` と `id` の組。
 - 未ログインの `wishes` / `achievements` へのアクセスは権限エラーで拒否する（情報を返さない）。DB-53の「0件」と同じ非公開要件をより厳しく満たす。
 - 計画削除後も残る完了マイルストーンは、計画情報なしで達成の記録に残る。スコア・既存タスクの変更はない。
+
+### Journey 画面（Issue #12）
+
+- `/journey` が Calendar を置き換える。旧 `/calendar` はリダイレクトする。やりたいことの即時取り消しは5秒、達成の記録からの取り消しは常時可能。
+- `Wish` / `Achievement` はDB行のNULLをそのまま扱う型（`user_id`付き）を採用する。既存のPlan等のoptional型とは異なり、変換時の取りこぼしを避ける。
+- 年の達成はフィードの表示月とは独立したexact count。フィード・未達成wishはAPIの行数制限を超えても取得できるようページングする。
+- 計画・タスクの作成/更新/削除時には達成キャッシュも無効化する。教材mutationも同じキー `["achievements"]` を無効化すること。
+- `achievements.started_on` は設計に従いDBの作成日時をUTC日付へ変換したもの。日本時間0〜9時の作成は前日（毎月1日は前月）として期間に表示される既知の制約。完了/達成日は端末の日付を送る。

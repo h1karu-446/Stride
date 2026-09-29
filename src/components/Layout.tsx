@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth";
 const NAV = [
   { to: "/", label: "Today", end: true },
   { to: "/plans", label: "Plans" },
-  { to: "/calendar", label: "Calendar" },
+  { to: "/journey", label: "Journey" },
 ];
 
 export default function Layout() {

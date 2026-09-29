@@ -463,3 +463,7 @@ sequenceDiagram
 | 日付 | 内容 |
 | --- | --- |
 | 2026-09-29 | 初版作成、承認 |
+
+### 実装上の型の補足（Issue #12）
+
+`Wish` と `Achievement` はRESTで返るDB行をそのまま扱い、nullable列をoptionalではなく `| null` とし、RLS検証やデータ対応を追えるよう `user_id` を含める。フィードの識別子は `(kind, id)`。他の画面の既存型への変更は不要。
