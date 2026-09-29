@@ -10,9 +10,13 @@ export function useWishes() {
   return useQuery({
     queryKey: ["wishes", session?.user.id], enabled: !!session,
     queryFn: async (): Promise<Wish[]> => {
-      const { data, error } = await supabase.from("wishes").select("*").order("created_at").order("id");
-      if (error) throw error;
-      return data ?? [];
+      const rows: Wish[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await supabase.from("wishes").select("*").is("achieved_at", null).order("created_at").order("id").range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data ?? []));
+        if (!data || data.length < 500) return rows;
+      }
     },
   });
 }
@@ -23,9 +27,14 @@ export function useAchievements(months: number, today: string) {
   return useQuery({
     queryKey: ["achievements", session?.user.id, from, to], enabled: !!session,
     queryFn: async (): Promise<Achievement[]> => {
-      const { data, error } = await supabase.from("achievements").select("*").gte("achieved_on", from).lt("achieved_on", to).order("achieved_on", { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as Achievement[];
+      const rows: Achievement[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await supabase.from("achievements").select("*").gte("achieved_on", from).lt("achieved_on", to)
+          .order("achieved_on", { ascending: false }).order("kind").order("id").range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...((data ?? []) as Achievement[]));
+        if (!data || data.length < 500) return rows;
+      }
     },
   });
 }

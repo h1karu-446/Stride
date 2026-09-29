@@ -135,6 +135,7 @@ export function useReviews() {
 }
 
 function invalidateAll(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["achievements"] });
   qc.invalidateQueries({ queryKey: TASKS_KEY });
   qc.invalidateQueries({ queryKey: REVIEWS_KEY });
 }
