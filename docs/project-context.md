@@ -39,6 +39,7 @@
 - **ルーティンタスクの生成ルール。** RPC `generate_routine_tasks(p_date)` が、進行中（`status = 'active'`）の計画で、暗黙のフェーズ、または `p_date` を含むフェーズの、曜日（ISO: 1=月〜7=日）が合うルーティンを `tasks` に作り、作った件数を返す。`p_date` は DB の日付の±1日以内に限る（範囲外は例外）。`tasks (routine_id, scheduled_date)` の部分一意インデックスと `on conflict do nothing` で、何度呼んでも1日1つしか作られない。生成後にルーティンを編集しても作成済みタスクは変わらない。
 - **スキップ記録のトリガー（副作用に注意）。** `routine_id` を持つタスクを削除すると、`tasks_record_routine_skip`（AFTER DELETE）が `routine_skips (routine_id, date)` に1行足し、`generate_routine_tasks` はその日を再生成しない（ADR-0003）。コードから見えない副作用なので、ルーティンタスクの削除処理を変えるときは必ずこのトリガーを確認する。`routine_skips` の行はこのトリガーだけが作る。
 - **教材とマイルストーン（migration 0008）。** `materials.status` が `done` 以外なら `completed_at` は NULL、`done` で未指定なら `current_date`（UTC）で補う（`plans` と同じ。画面は端末の日付を送ること）。教材とフェーズの紐づけは `material_phases`（フェーズを消すと紐づけも消える）。`tasks.is_milestone` は予定のマイルストーンの印。子テーブルのRLSは、親の計画・教材・フェーズも本人のものであることを要求する。
+- **tasks の親の所有（migration 0010、Issue #23）。** `tasks_owner_all` の `with check` は、`plan_id` / `routine_id` があればその計画・ルーティンも本人のものであることを要求する（`using` は従来どおり）。検証SQLは `supabase/tests/0010_tasks_parent_ownership.sql`。
 - **日付変更とスコア再計算（migration 0008）。** `touch_daily_review_after_task_change`（`trg_touch_review_on_task` から呼ばれる）は、タスクの `scheduled_date` が変わったとき、新しい日に加えて元の日の `daily_reviews` も更新して再計算させる（「今日に移す」で元の日のスコアが古いまま残る不具合の修正）。関数本体だけを差し替えており、トリガー定義は 0001 のまま。
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
