@@ -218,36 +218,31 @@ export function useDeleteTask() {
   });
 }
 
-export type UpsertReviewInput = {
+export type UpdateReviewFieldsInput = {
   date: string;
-  fulfillment: number;
-  wake_time?: string;
-  wake_target?: string;
-  bed_time?: string;
-  bed_target?: string;
+  fulfillment?: number;
   highlight?: string;
   tomorrow_intention?: string;
-  memo?: string;
 };
 
-export function useUpsertReview() {
+// Autosaves fulfillment/highlight/tomorrow_intention. Only the keys present in
+// the input are written, so untouched columns — including the legacy `memo`,
+// which the UI no longer edits — keep their stored values on upsert.
+export function useUpdateReviewFields() {
   const qc = useQueryClient();
   const { session } = useAuth();
   return useMutation({
-    mutationFn: async (input: UpsertReviewInput): Promise<DailyReview> => {
+    mutationFn: async (input: UpdateReviewFieldsInput): Promise<DailyReview> => {
       if (!session) throw new Error("Not signed in");
-      const payload = {
+      const payload: Record<string, unknown> = {
         user_id: session.user.id,
         date: input.date,
-        fulfillment: input.fulfillment,
-        wake_time: input.wake_time ?? null,
-        wake_target: input.wake_target ?? null,
-        bed_time: input.bed_time ?? null,
-        bed_target: input.bed_target ?? null,
-        highlight: input.highlight ?? null,
-        tomorrow_intention: input.tomorrow_intention ?? null,
-        memo: input.memo ?? null,
       };
+      if (input.fulfillment !== undefined) payload.fulfillment = input.fulfillment;
+      if (input.highlight !== undefined) payload.highlight = input.highlight || null;
+      if (input.tomorrow_intention !== undefined) {
+        payload.tomorrow_intention = input.tomorrow_intention || null;
+      }
       const { data, error } = await supabase
         .from("daily_reviews")
         .upsert(payload, { onConflict: "user_id,date" })
@@ -267,8 +262,7 @@ export type UpdateWakeFieldsInput = {
 };
 
 // Saves only wake_time/wake_target, leaving fulfillment/highlight/memo on the
-// row untouched — lets the wake fields autosave independently of the "save
-// review" button.
+// row untouched — lets the wake fields autosave independently.
 export function useUpdateWakeFields() {
   const qc = useQueryClient();
   const { session } = useAuth();

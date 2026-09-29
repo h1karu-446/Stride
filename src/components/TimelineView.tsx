@@ -846,15 +846,13 @@ export function UnscheduledPanel({
   if (unscheduled.length === 0) return null;
 
   return (
-    <aside className={"card !p-0 overflow-hidden flex flex-col " + className}>
+    <aside className={"flex flex-col " + className}>
       <header className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-notion-border flex-shrink-0">
         <div>
           <div className="text-xs uppercase tracking-wide muted">時刻未設定</div>
-          <div className="text-sm font-semibold mt-0.5">
-            タイムラインへドラッグ
-          </div>
+          <div className="text-[11px] muted mt-0.5">タイムラインへドラッグ</div>
         </div>
-        <span className="text-xs muted tabular-nums">{unscheduled.length} 件</span>
+        <span className="text-xs muted tabular-nums">{unscheduled.length}</span>
       </header>
       <ul className="divide-y divide-slate-100 dark:divide-notion-border overflow-y-auto flex-1 min-h-0">
         {unscheduled.map((t) => (
