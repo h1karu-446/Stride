@@ -251,8 +251,17 @@ export function sortInactivePlans(plans: Plan[], status: PlanStatus): Plan[] {
 
 /** "2026/4 – 8" style span from creation month to completion month. */
 export function planSpanLabel(plan: Plan): string {
-  const s = parseISO(plan.created_at);
-  const e = plan.completed_at ? parseISO(plan.completed_at) : undefined;
+  return spanLabel(plan.created_at, plan.completed_at);
+}
+
+/**
+ * Shared by Plans and Journey so both show the same span. `startedAt` is a
+ * timestamptz string read in the device's time zone (not its UTC date);
+ * `completedOn` is a yyyy-MM-dd date.
+ */
+export function spanLabel(startedAt: string, completedOn?: string | null): string {
+  const s = parseISO(startedAt);
+  const e = completedOn ? parseISO(completedOn) : undefined;
   if (!e) return format(s, "yyyy/M");
   if (s.getFullYear() === e.getFullYear()) {
     return s.getMonth() === e.getMonth()

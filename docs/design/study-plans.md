@@ -223,7 +223,7 @@ create policy "<table>_owner_all" on public.<table> for all
 | title | やりたいことのタイトル、計画名、予定のタイトル、教材のタイトル |
 | achieved_on | 達成した日（`achieved_at`、`completed_at`、`scheduled_date`、`completed_at`） |
 | plan_id / plan_name / plan_color | 紐づく計画（`wish` では NULL） |
-| started_on | 計画の完了で期間を出すための作成日（`plan` のみ） |
+| started_at | 計画の完了で期間を出すための作成日時（timestamptz、`plan` のみ）。画面で端末の日付に変換する。0009 の `started_on`（UTC 日付）を migration 0012 で置き換えた（Issue #34） |
 
 画面側は `achieved_on` の降順で3か月分ずつ取得する（`gte` / `lt` で月の範囲を指定）。
 
@@ -336,7 +336,7 @@ export interface Wish { id: string; title: string; note?: string; achieved_at?: 
 export interface Achievement {
   kind: "wish" | "plan" | "milestone" | "material";
   id: string; title: string; achieved_on: string;
-  plan_id?: string; plan_name?: string; plan_color?: PlanColor; started_on?: string;
+  plan_id?: string; plan_name?: string; plan_color?: PlanColor; started_at?: string;
 }
 ```
 
