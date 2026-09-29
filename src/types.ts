@@ -127,6 +127,7 @@ export interface Plan {
   completed_at?: string;
   overdue_notice_dismissed_for?: string;
   phases: Phase[];
+  materials: Material[];
   created_at: string;
   updated_at: string;
 }

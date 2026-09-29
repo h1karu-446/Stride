@@ -4,6 +4,8 @@ import { planHex } from "@/lib/plans/colors";
 import {
   daysLeftLabel,
   executionCells,
+  formatDateLabel,
+  nextSchedule,
   phaseForDate,
   phaseProgress,
   weekdaysLabel,
@@ -36,7 +38,17 @@ export default function PlanCard({
     ) : (
       <div className="text-sm muted">フェーズ期間外</div>
     );
+  } else if (plan.materials.length > 0) {
+    // No phases: show material progress instead (spec 4.1).
+    const doneCount = plan.materials.filter((m) => m.status === "done").length;
+    middle = (
+      <div className="space-y-1.5">
+        <div className="text-sm muted">教材 {doneCount} / {plan.materials.length}</div>
+        <Bar ratio={doneCount / plan.materials.length} color={color} />
+      </div>
+    );
   }
+  const next = nextSchedule(tasks, plan.id, today);
 
   let routineLine: React.ReactNode;
   if (explicit.length > 0 && !phase) {
@@ -74,8 +86,18 @@ export default function PlanCard({
         {routineLine}
         <ExecutionSquares cells={exec.cells} color={color} today={today} />
       </div>
-      <div className="mt-auto border-t border-slate-200 dark:border-notion-border pt-3 text-sm muted">
-        予定なし
+      <div className="mt-auto border-t border-slate-200 dark:border-notion-border pt-3 text-sm flex gap-2 min-w-0">
+        {next ? (
+          <>
+            <span className="shrink-0"
+              style={{ color: next.overdue ? "#F2994A" : next.task.scheduled_date === today ? color : undefined }}>
+              {next.overdue ? "期限切れ" : formatDateLabel(next.task.scheduled_date, today)}
+            </span>
+            <span className="truncate">{next.task.title}</span>
+          </>
+        ) : (
+          <span className="muted">予定なし</span>
+        )}
       </div>
     </Link>
   );

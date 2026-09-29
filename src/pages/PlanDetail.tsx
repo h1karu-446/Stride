@@ -4,11 +4,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import ExecutionSquares from "@/components/plans/ExecutionSquares";
 import GoalPanel from "@/components/plans/GoalPanel";
+import MaterialList from "@/components/plans/MaterialList";
 import PhaseBar from "@/components/plans/PhaseBar";
 import PhaseForm from "@/components/plans/PhaseForm";
 import PlanFormModal from "@/components/plans/PlanFormModal";
 import RoutineCard from "@/components/plans/RoutineCard";
 import RoutineForm from "@/components/plans/RoutineForm";
+import ScheduleList from "@/components/plans/ScheduleList";
 import StatusMenu from "@/components/plans/StatusMenu";
 import { addDaysISO, todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
@@ -36,6 +38,8 @@ type Editing =
   | { kind: "phase-edit" }
   | { kind: "routine-add" }
   | { kind: "routine-edit"; id: string }
+  | { kind: "schedule"; id: string } // task id, or "new"
+  | { kind: "material"; id: string } // material id, or "new"
   | null;
 
 export default function PlanDetail() {
@@ -282,6 +286,28 @@ export default function PlanDetail() {
           </div>
         </div>
       </section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <ScheduleList
+          planId={plan.id}
+          color={color}
+          tasks={tasks}
+          today={today}
+          editing={editing?.kind === "schedule" ? editing.id : null}
+          onEdit={(target) => setEditing({ kind: "schedule", id: target })}
+          onClose={closeEditing}
+        />
+        <MaterialList
+          plan={plan}
+          color={color}
+          phases={explicit}
+          selectedPhaseId={hasPhases ? selected.id : undefined}
+          today={today}
+          editing={editing?.kind === "material" ? editing.id : null}
+          onEdit={(target) => setEditing({ kind: "material", id: target })}
+          onClose={closeEditing}
+        />
+      </div>
 
       {planModal && (
         <PlanFormModal
