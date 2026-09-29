@@ -124,3 +124,10 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - `LICENSE` と、以前の `README.md` の中身が Supabase CLI のものになっていた（commit `cb1b54d`）。README は書き直した。LICENSE をどうするかは未決定。
 - `npm audit` の指摘（メジャー更新なしで直る分は `npm audit fix`、Vite などのメジャー更新は別作業）。
 - デプロイ先、ESLint の導入。
+
+### Journey のデータ（Issue #11）
+
+- migration `0009_wishes_and_achievements.sql` は0008適用後に実行する。`wishes` は本人のみ読み書き可能。`achieved_at` は画面から端末の日付を送信し、NULLに戻すと未達成になる。
+- `achievements` は `security_invoker = true` の読み取り専用ビュー。達成済みのやりたいこと、完了した計画、完了したマイルストーン、完了した教材をまとめ、元テーブルのRLSを適用する。識別子は `kind` と `id` の組。
+- 未ログインの `wishes` / `achievements` へのアクセスは権限エラーで拒否する（情報を返さない）。DB-53の「0件」と同じ非公開要件をより厳しく満たす。
+- 計画削除後も残る完了マイルストーンは、計画情報なしで達成の記録に残る。スコア・既存タスクの変更はない。
