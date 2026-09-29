@@ -179,7 +179,7 @@ rollback;  -- 確認だけで変更を残さない場合
 | ID | 前提・操作 | 期待結果 | 対応 |
 | --- | --- | --- | --- |
 | DB-50 | ユーザー2として、新しいテーブルと `achievements` ビューを select | ユーザー1の行は1件も返らない | NFR-05 |
-| DB-51 | ユーザー2として、ユーザー1の計画の `id` を `plan_id` にしたフェーズ・教材を insert | RLS のエラー | NFR-05 |
+| DB-51 | ユーザー2として、ユーザー1の計画の `id` を `plan_id` にしたフェーズ・教材・タスクを insert（タスクは `routine_id` と update も。migration 0010） | RLS のエラー | NFR-05 |
 | DB-52 | ユーザー2として、ユーザー1の計画に `generate_routine_tasks` / `delete_plan` を実行 | ユーザー1のデータは作られず、消えない | NFR-05 |
 | DB-53 | 未ログイン（`anon`）で新しいテーブルを select | 0件 | NFR-05 |
 
