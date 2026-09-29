@@ -168,7 +168,10 @@ export function useCreatePlan() {
       if (error) throw error;
       return (data as { id: string }).id;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }
 
@@ -190,7 +193,10 @@ export function useUpdatePlan() {
       const { error } = await supabase.from("plans").update(db).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
+    },
   });
 }
 
@@ -206,6 +212,7 @@ export function useDeletePlan() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: PLANS_KEY });
+      qc.invalidateQueries({ queryKey: ["achievements"] });
       qc.invalidateQueries({ queryKey: ["tasks"] });
       qc.invalidateQueries({ queryKey: ["reviews"] });
     },

@@ -23,7 +23,7 @@
 - パッケージマネージャー / ロックファイル: npm / `package-lock.json`。Node 24（ローカルで確認済み、CI も同じ）。
 - テンプレートの補助スクリプト: Python 3.10以上（標準ライブラリのみ）。
 - ディレクトリと責務:
-  - `src/pages/` 画面（Today・Calendar・Settings・SignIn）、`src/components/` 共通UI
+  - `src/pages/` 画面（Today・Plans・PlanDetail・Journey・Settings・SignIn。旧 `/calendar` は `/journey` へリダイレクト）、`src/components/` UI（`journey/` など画面別のフォルダを含む）
   - `src/lib/queries.ts` Supabase への読み書き（TanStack Query の hooks）
   - `src/lib/score.ts` スコア計算、`src/lib/date.ts` 日付処理、`src/lib/auth.tsx` 認証
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
@@ -40,6 +40,7 @@
 - **スキップ記録のトリガー（副作用に注意）。** `routine_id` を持つタスクを削除すると、`tasks_record_routine_skip`（AFTER DELETE）が `routine_skips (routine_id, date)` に1行足し、`generate_routine_tasks` はその日を再生成しない（ADR-0003）。コードから見えない副作用なので、ルーティンタスクの削除処理を変えるときは必ずこのトリガーを確認する。`routine_skips` の行はこのトリガーだけが作る。
 - **教材とマイルストーン（migration 0008）。** `materials.status` が `done` 以外なら `completed_at` は NULL、`done` で未指定なら `current_date`（UTC）で補う（`plans` と同じ。画面は端末の日付を送ること）。教材とフェーズの紐づけは `material_phases`（フェーズを消すと紐づけも消える）。`tasks.is_milestone` は予定のマイルストーンの印。子テーブルのRLSは、親の計画・教材・フェーズも本人のものであることを要求する。
 - **tasks の親の所有（migration 0010、Issue #23）。** `tasks_owner_all` の `with check` は、`plan_id` / `routine_id` があればその計画・ルーティンも本人のものであることを要求する（`using` は従来どおり）。検証SQLは `supabase/tests/0010_tasks_parent_ownership.sql`。
+- **`delete_plan` の修正（migration 0011、Issue #28）。** 残すタスクの `plan_id` / `routine_id` を、計画を削除する前に明示的に null にする。`on delete set null` に任せると、同じトランザクション内で作成・更新したタスクで `tasks_routine_id_fkey` 違反になるため。残す・消すタスクの扱い（BR-08）は同じ。検証SQLは `supabase/tests/0011_fix_delete_plan.sql`。
 - **日付変更とスコア再計算（migration 0008）。** `touch_daily_review_after_task_change`（`trg_touch_review_on_task` から呼ばれる）は、タスクの `scheduled_date` が変わったとき、新しい日に加えて元の日の `daily_reviews` も更新して再計算させる（「今日に移す」で元の日のスコアが古いまま残る不具合の修正）。関数本体だけを差し替えており、トリガー定義は 0001 のまま。
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
@@ -132,3 +133,11 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 - `achievements` は `security_invoker = true` の読み取り専用ビュー。達成済みのやりたいこと、完了した計画、完了したマイルストーン、完了した教材をまとめ、元テーブルのRLSを適用する。識別子は `kind` と `id` の組。
 - 未ログインの `wishes` / `achievements` へのアクセスは権限エラーで拒否する（情報を返さない）。DB-53の「0件」と同じ非公開要件をより厳しく満たす。
 - 計画削除後も残る完了マイルストーンは、計画情報なしで達成の記録に残る。スコア・既存タスクの変更はない。
+
+### Journey 画面（Issue #12）
+
+- `/journey` が Calendar を置き換える。旧 `/calendar` はリダイレクトする。やりたいことの即時取り消しは5秒、達成の記録からの取り消しは常時可能。
+- `Wish` / `Achievement` はDB行のNULLをそのまま扱う型（`user_id`付き）を採用する。既存のPlan等のoptional型とは異なり、変換時の取りこぼしを避ける。
+- 年の達成はフィードの表示月とは独立したexact count。フィード・未達成wishはAPIの行数制限を超えても取得できるようページングする。
+- 計画・タスクの作成/更新/削除時には達成キャッシュも無効化する。教材mutationも同じキー `["achievements"]` を無効化すること。
+- `achievements.started_on` は設計に従いDBの作成日時をUTC日付へ変換したもの。日本時間0〜9時の作成は前日（毎月1日は前月）として期間に表示される既知の制約。完了/達成日は端末の日付を送る。
