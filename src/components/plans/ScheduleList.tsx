@@ -2,7 +2,16 @@ import { useState } from "react";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { FoldButton, SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import ScheduleForm, { type ScheduleInput } from "./ScheduleForm";
-import { formatDateLabel, isOverdue, scheduleGroups } from "@/lib/plans/logic";
+import {
+  canCarryOver,
+  carriedIds,
+  carryOverInput,
+  formatDateLabel,
+  isLockedSchedule,
+  isOverdue,
+  planScheduleSave,
+  scheduleGroups,
+} from "@/lib/plans/logic";
 import { useAddTask, useDeleteTask, useUpdateTask } from "@/lib/queries";
 import type { Task } from "@/types";
 
@@ -10,7 +19,9 @@ const OVERDUE = "#F2994A";
 
 /**
  * 予定 on the plan detail screen (spec 4.2, BR-04). Schedules are tasks with
- * plan_id set; completing them only happens on Today.
+ * plan_id set; completing them only happens on Today. Carrying an overdue one
+ * over inserts a copy; the original stays on its day and is listed with the
+ * closed ones as "持ち越し".
  * `editing` is the open form: a task id, "new", or null. The page keeps it so
  * only one form is open across the whole screen (spec 3.6).
  */
@@ -25,6 +36,7 @@ export default function ScheduleList({
 }: {
   planId: string;
   color: string;
+  /** Every task (not only this plan's), to find carried-over originals. */
   tasks: Task[];
   today: string;
   editing: string | null;
@@ -34,11 +46,13 @@ export default function ScheduleList({
   const add = useAddTask();
   const update = useUpdateTask();
   const del = useDeleteTask();
-  const move = useUpdateTask();
+  const carry = useAddTask();
   const [showHidden, setShowHidden] = useState(false);
   const [showDone, setShowDone] = useState(false);
-  const groups = scheduleGroups(tasks, planId);
+  const carried = carriedIds(tasks);
+  const groups = scheduleGroups(tasks, planId, undefined, carried);
   const total = groups.visible.length + groups.hidden.length + groups.done.length;
+  const doneCount = groups.done.length - groups.carriedCount;
 
   const open = (target: string) => {
     add.reset();
@@ -47,11 +61,20 @@ export default function ScheduleList({
     onEdit(target);
   };
 
-  const submit = (v: ScheduleInput, task?: Task) => {
-    if (task) {
-      update.mutate({ id: task.id, patch: v }, { onSuccess: onClose });
-    } else {
-      add.mutate({ ...v, plan_id: planId }, { onSuccess: onClose });
+  // A past schedule only sends its title; a new date copies it (BR-04). The
+  // title goes first so a failed copy can be retried from the same form.
+  const submit = async (v: ScheduleInput, task?: Task) => {
+    try {
+      if (!task) {
+        await add.mutateAsync({ ...v, plan_id: planId });
+      } else {
+        const { patch, copy } = planScheduleSave(task, v, today, carried);
+        if (patch) await update.mutateAsync({ id: task.id, patch });
+        if (copy) await add.mutateAsync(copy);
+      }
+      onClose();
+    } catch {
+      // The form stays open and shows the error (spec 3.5).
     }
   };
 
@@ -70,6 +93,9 @@ export default function ScheduleList({
       }
       originalDate={task?.scheduled_date}
       today={today}
+      lock={task && isLockedSchedule(task, today)
+        ? { carry: canCarryOver(task, today, carried) }
+        : undefined}
       saving={add.isPending || update.isPending || del.isPending}
       failed={add.isError || update.isError || del.isError}
       onCancel={onClose}
@@ -80,30 +106,34 @@ export default function ScheduleList({
 
   const row = (t: Task) => {
     if (editing === t.id) return form(t);
-    const overdue = isOverdue(t, today);
+    const overdue = isOverdue(t, today, carried);
+    const wasCarried = carried.has(t.id) && !t.completed;
     const dateColor = overdue ? OVERDUE : t.scheduled_date === today ? color : undefined;
     return (
       <div key={t.id} className="flex items-center gap-2.5 py-1.5 text-sm">
         {t.completed ? (
           <span aria-label="完了" className="w-3 shrink-0 text-center text-teal-500">✓</span>
+        ) : wasCarried ? (
+          <span aria-label="持ち越し済み" className="w-3 shrink-0 text-center muted">→</span>
         ) : (
           <span aria-label="未完了" className="w-3 h-3 shrink-0 rounded-full border-[1.5px]"
             style={{ borderColor: overdue ? OVERDUE : "#8A8985" }} />
         )}
         <button type="button" onClick={() => open(t.id)}
           className="flex flex-1 min-w-0 items-center gap-2.5 text-left hover:opacity-80">
-          <span className={t.completed || !dateColor ? "w-12 shrink-0 muted" : "w-12 shrink-0"}
-            style={t.completed ? undefined : { color: dateColor }}>
+          <span className={t.completed || wasCarried || !dateColor ? "w-12 shrink-0 muted" : "w-12 shrink-0"}
+            style={t.completed || wasCarried ? undefined : { color: dateColor }}>
             {formatDateLabel(t.scheduled_date, today)}
           </span>
-          <span className={t.completed ? "truncate muted" : "truncate"}>{t.title}</span>
+          <span className={t.completed || wasCarried ? "truncate muted" : "truncate"}>{t.title}</span>
           {t.is_milestone && (
             <span aria-label="マイルストーン" className="shrink-0" style={{ color }}>◇</span>
           )}
+          {wasCarried && <span className="shrink-0 text-xs muted">持ち越し</span>}
         </button>
         {overdue && (
-          <button type="button" disabled={move.isPending}
-            onClick={() => move.mutate({ id: t.id, patch: { scheduled_date: today } })}
+          <button type="button" disabled={carry.isPending}
+            onClick={() => carry.mutate(carryOverInput(t, today))}
             className="shrink-0 rounded-md border px-2.5 py-0.5 text-xs hover:bg-orange-500/10"
             style={{ borderColor: `${OVERDUE}80`, color: OVERDUE }}>
             今日に移す
@@ -133,7 +163,7 @@ export default function ScheduleList({
         <button type="button" aria-label="予定を追加" onClick={() => open("new")}
           className="btn-ghost !px-2 !py-0.5 text-lg leading-none muted">＋</button>
       </div>
-      {move.isError && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
+      {carry.isError && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
       <div className="flex flex-col">
         {editing === "new" && form()}
         {groups.visible.map(row)}
@@ -146,7 +176,10 @@ export default function ScheduleList({
       {groups.done.length > 0 && (
         <>
           <div className="flex flex-col">{shown(groups.done, showDone).map(row)}</div>
-          <FoldButton open={showDone} label={`完了 ${groups.done.length}`}
+          <FoldButton open={showDone}
+            label={groups.carriedCount > 0
+              ? `完了 ${doneCount} · 持ち越し ${groups.carriedCount}`
+              : `完了 ${doneCount}`}
             onToggle={() => setShowDone(!showDone)} />
         </>
       )}

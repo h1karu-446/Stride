@@ -44,6 +44,7 @@
 - **日付変更とスコア再計算（migration 0008）。** `touch_daily_review_after_task_change`（`trg_touch_review_on_task` から呼ばれる）は、タスクの `scheduled_date` が変わったとき、新しい日に加えて元の日の `daily_reviews` も更新して再計算させる（「今日に移す」で元の日のスコアが古いまま残る不具合の修正）。関数本体だけを差し替えており、トリガー定義は 0001 のまま。
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
+- **持ち越しは複製（migration 0014、Issue #36）。** 期限切れの予定の「今日に移す」は、`carried_from` に元の id を入れた新しいタスクを insert する（元の予定は動かさない。元の日のスコアを変えないため）。`carried_from` は `on delete set null`、部分一意インデックスで1つの予定の複製は1つだけ。`tasks_owner_all` の `with check` は複製元も本人のタスクであることを要求する。ポリシーの中で `tasks` を直接参照すると再帰エラーになるため、`security definer` の `is_own_task(uuid)` を使う（`tasks` のポリシーを変えるときも同じ）。過去の日付の予定はタイトルだけ変更できる（`src/lib/plans/logic.ts` の `isLockedSchedule` / `planScheduleSave`）。検証SQLは `supabase/tests/0014_task_carry_over.sql`。
 
 ## セットアップと検証
 
