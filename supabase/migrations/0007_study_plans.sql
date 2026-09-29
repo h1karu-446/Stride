@@ -111,6 +111,14 @@ create unique index if not exists tasks_routine_date_uniq
 create index if not exists tasks_plan_idx
   on public.tasks (plan_id) where plan_id is not null;
 
+-- Grants ---------------------------------------------------------------
+-- Newer Supabase stacks no longer grant API roles on new tables by default,
+-- so grant explicitly. RLS below still restricts every row to its owner.
+
+grant select, insert, update, delete on
+  public.plans, public.phases, public.routines, public.routine_skips
+  to authenticated;
+
 -- RLS ------------------------------------------------------------------
 
 alter table public.plans enable row level security;
