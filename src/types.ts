@@ -10,6 +10,9 @@ export interface Task {
   end_time?: string; // "HH:mm"
   completed: boolean;
   memo?: string;
+  plan_id?: string; // set on plan schedules and routine tasks
+  routine_id?: string; // set only on tasks generated from a routine
+  planned_minutes?: number; // duration, used by routine tasks
   created_at: string;
   updated_at: string;
 }

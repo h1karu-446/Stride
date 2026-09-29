@@ -28,6 +28,9 @@ interface TaskRow {
   end_time: string | null;
   completed: boolean;
   memo: string | null;
+  plan_id: string | null;
+  routine_id: string | null;
+  planned_minutes: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -65,6 +68,9 @@ function rowToTask(r: TaskRow): Task {
     end_time: r.end_time ? r.end_time.slice(0, 5) : undefined,
     completed: r.completed,
     memo: r.memo ?? undefined,
+    plan_id: r.plan_id ?? undefined,
+    routine_id: r.routine_id ?? undefined,
+    planned_minutes: r.planned_minutes ?? undefined,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
