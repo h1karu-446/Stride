@@ -23,7 +23,7 @@
 - パッケージマネージャー / ロックファイル: npm / `package-lock.json`。Node 24（ローカルで確認済み、CI も同じ）。
 - テンプレートの補助スクリプト: Python 3.10以上（標準ライブラリのみ）。
 - ディレクトリと責務:
-  - `src/pages/` 画面（Today・Calendar・Settings・SignIn）、`src/components/` 共通UI
+  - `src/pages/` 画面（Today・Plans・PlanDetail・Journey・Settings・SignIn。旧 `/calendar` は `/journey` へリダイレクト）、`src/components/` UI（`journey/` など画面別のフォルダを含む）
   - `src/lib/queries.ts` Supabase への読み書き（TanStack Query の hooks）
   - `src/lib/score.ts` スコア計算、`src/lib/date.ts` 日付処理、`src/lib/auth.tsx` 認証
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数

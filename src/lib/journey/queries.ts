@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { todayISO } from "@/lib/date";
@@ -26,6 +26,8 @@ export function useAchievements(months: number, today: string) {
   const { from, to } = achievementRange(today, months);
   return useQuery({
     queryKey: ["achievements", session?.user.id, from, to], enabled: !!session,
+    // Keep the current feed on screen while "もっと見る" loads the wider range.
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<Achievement[]> => {
       const rows: Achievement[] = [];
       for (let offset = 0; ; offset += 500) {
@@ -35,6 +37,20 @@ export function useAchievements(months: number, today: string) {
         rows.push(...((data ?? []) as Achievement[]));
         if (!data || data.length < 500) return rows;
       }
+    },
+  });
+}
+
+// The oldest record date decides between "no records at all" and "none in this range",
+// and whether "もっと見る" can reach anything older.
+export function useOldestAchievement() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["achievements", session?.user.id, "oldest"], enabled: !!session,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase.from("achievements").select("achieved_on").order("achieved_on").limit(1);
+      if (error) throw error;
+      return (data?.[0] as { achieved_on: string } | undefined)?.achieved_on ?? null;
     },
   });
 }

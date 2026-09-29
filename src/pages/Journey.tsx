@@ -7,8 +7,9 @@ import { SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { useReviews } from "@/lib/queries";
 import { planHex } from "@/lib/plans/colors";
-import { ACHIEVEMENT_STYLE, groupAchievements, journeyStreak, monthlyAverage } from "@/lib/journey/logic";
-import { useAchievements, useAnnualAchievements, useMutateWish, useWishes } from "@/lib/journey/queries";
+import { formatDateLabel } from "@/lib/plans/logic";
+import { ACHIEVEMENT_STYLE, achievementRange, groupAchievements, journeyStreak, monthlyAverage } from "@/lib/journey/logic";
+import { useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWishes } from "@/lib/journey/queries";
 import type { WishInput } from "@/lib/journey/queries";
 
 export default function Journey() {
@@ -21,7 +22,10 @@ export default function Journey() {
   const reviews = useReviews();
   const wishes = useWishes();
   const achievements = useAchievements(months, today);
+  const oldest = useOldestAchievement();
   const annual = useAnnualAchievements(today.slice(0, 4));
+  const feedFrom = achievementRange(today, months).from;
+  const hasOlder = !!oldest.data && oldest.data < feedFrom;
   const mutation = useMutateWish();
   const pending = (wishes.data ?? []).filter((wish) => !wish.achieved_at);
   const average = monthlyAverage(reviews.data ?? [], format(month, "yyyy-MM"));
@@ -32,7 +36,7 @@ export default function Journey() {
   }, [undo]);
   const edit = (id: string | null) => { if (!mutation.isPending) { mutation.reset(); setEditing(id); } };
   const save = (input: WishInput) => mutation.mutate({ type: "save", id: editing === "new" ? undefined : editing ?? undefined, input }, { onSuccess: () => setEditing(null) });
-  const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo(null) });
+  const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo((current) => (current?.id === id ? null : current)) });
   const form = (id: string, initial: WishInput) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
     onDelete={id === "new" ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
 
@@ -45,7 +49,7 @@ export default function Journey() {
         <div><dt className="text-xs muted">年の達成</dt><dd className="text-xl font-semibold">{annual.isPending || annual.isError ? "—" : annual.data} <span className="text-xs">件</span></dd></div>
       </dl>
     </div>
-    {(reviews.isError || wishes.isError || achievements.isError || annual.isError) && <div role="alert" className="card text-sm text-red-500">読み込めませんでした。<button className="underline ml-2" onClick={() => { void reviews.refetch(); void wishes.refetch(); void achievements.refetch(); void annual.refetch(); }}>再試行</button></div>}
+    {(reviews.isError || wishes.isError || achievements.isError || oldest.isError || annual.isError) && <div role="alert" className="card text-sm text-red-500">読み込めませんでした。<button className="underline ml-2" onClick={() => { void reviews.refetch(); void wishes.refetch(); void achievements.refetch(); void oldest.refetch(); void annual.refetch(); }}>再試行</button></div>}
     <div className="grid lg:grid-cols-2 gap-6 items-stretch">
       <section className="card"><ScoreCalendar month={month} setMonth={setMonth} reviews={reviews.data ?? []} /></section>
       <section className="card space-y-3" aria-label="やりたいこと">
@@ -65,18 +69,18 @@ export default function Journey() {
     <section className="card space-y-5" aria-label="達成の記録">
       <h2 className="font-semibold">達成の記録</h2>
       {achievements.isPending && <p className="text-sm muted">読み込み中…</p>}
-      {!achievements.isPending && !achievements.isError && !achievements.data?.length && <p className="text-sm muted">達成したことがここに並びます</p>}
+      {!achievements.isPending && !achievements.isError && !oldest.isPending && !oldest.isError && !achievements.data?.length && <p className="text-sm muted">{hasOlder ? `直近${months}か月の記録はありません` : "達成したことがここに並びます"}</p>}
       {groupAchievements(achievements.data ?? []).map(([key, rows]) => <div key={key} className="space-y-2">
         <h3 className="text-xs muted border-b border-slate-200 dark:border-notion-border pb-2">{Number(key.slice(0, 4))}年{Number(key.slice(5))}月</h3>
         {rows.map((row) => <div key={`${row.kind}-${row.id}`} className={`group flex flex-wrap items-center gap-3 py-2 text-sm ${ACHIEVEMENT_STYLE[row.kind].className}`}>
-          <span className="w-10 shrink-0 text-xs font-normal tabular-nums">{Number(row.achieved_on.slice(5, 7))}/{Number(row.achieved_on.slice(8))}</span>
+          <span className="min-w-10 shrink-0 text-xs font-normal tabular-nums">{formatDateLabel(row.achieved_on, today)}</span>
           <span aria-hidden>{ACHIEVEMENT_STYLE[row.kind].icon}</span><span className="min-w-0 flex-1 break-words">{row.title}</span>
           {row.kind === "plan" && row.started_on && <span className="text-xs font-normal muted">{row.started_on.slice(0, 7).replace("-", "/")} – {row.achieved_on.slice(0, 7).replace("-", "/")}</span>}
           {row.plan_id && row.plan_name && row.kind !== "plan" && <Link className="text-xs font-normal hover:underline" style={{ color: planHex(row.plan_color ?? "gray") }} to={`/plans/${row.plan_id}`}>{row.plan_name}</Link>}
           {row.kind === "wish" && <button disabled={mutation.isPending} onClick={() => restore(row.id)} className="text-xs font-normal muted opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline focus-visible:outline-2">未達成に戻す</button>}
         </div>)}
       </div>)}
-      <button className="btn-outline text-sm" disabled={achievements.isFetching} onClick={() => setMonths(months + 3)}>もっと見る</button>
+      {hasOlder && <button className="btn-outline text-sm" disabled={achievements.isFetching} onClick={() => setMonths(months + 3)}>もっと見る</button>}
     </section>
   </div>;
 }

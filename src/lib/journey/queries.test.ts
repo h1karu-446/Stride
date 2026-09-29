@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ from: vi.fn(), invalidateQueries: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from } }));
 vi.mock("@/lib/auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
-vi.mock("@tanstack/react-query", () => ({ useQuery: (options: unknown) => options, useMutation: (options: unknown) => options, useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
-import { useAchievements, useAnnualAchievements, useWishes } from "./queries";
+vi.mock("@tanstack/react-query", () => ({ keepPreviousData: "keep-previous", useQuery: (options: unknown) => options, useMutation: (options: unknown) => options, useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
+import { useAchievements, useAnnualAchievements, useOldestAchievement, useWishes } from "./queries";
 import { useCreatePlan, useUpdatePlan, useDeletePlan } from "@/lib/plans/queries";
 import { useAddTask, useUpdateTask, useDeleteTask } from "@/lib/queries";
 
@@ -24,6 +24,21 @@ describe("Journey API pagination", () => {
     expect(q.range.mock.calls).toEqual([[0, 499], [500, 999], [1000, 1499]]);
     expect(q.order).toHaveBeenCalledWith("kind");
     expect(q.order).toHaveBeenCalledWith("id");
+  });
+  it("keeps the current feed visible while a wider range loads", () => {
+    expect((useAchievements(6, "2026-09-29") as unknown as { placeholderData: unknown }).placeholderData).toBe("keep-previous");
+  });
+  it("reads only the oldest record date, or null when there is none", async () => {
+    const q = { select: vi.fn(), order: vi.fn(), limit: vi.fn() };
+    q.select.mockReturnValue(q); q.order.mockReturnValue(q);
+    q.limit.mockResolvedValueOnce({ data: [{ achieved_on: "2025-01-02" }], error: null }).mockResolvedValueOnce({ data: [], error: null });
+    mocks.from.mockReturnValue(q);
+    const hook = useOldestAchievement() as unknown as { queryKey: unknown[]; queryFn: () => Promise<string | null> };
+    expect(hook.queryKey[0]).toBe("achievements");
+    expect(await hook.queryFn()).toBe("2025-01-02");
+    expect(await hook.queryFn()).toBeNull();
+    expect(q.order).toHaveBeenCalledWith("achieved_on");
+    expect(q.limit).toHaveBeenCalledWith(1);
   });
   it("filters completed wishes on the server before fetching every page", async () => {
     const q = queryMock(501);
