@@ -6,7 +6,9 @@ import {
   executionCells,
   formatDateLabel,
   formatMinutes,
+  dropTimes,
   initialPhase,
+  memoOneLine,
   phaseForDate,
   phaseProgress,
   routinesForDate,
@@ -266,5 +268,36 @@ describe("UT-19 validation", () => {
     expect(validateRoutine({ ...ok, minutes: 600 })).toEqual({});
     expect(validateRoutine({ ...ok, weekdays: [] }).weekdays).toBeDefined();
     expect(validateRoutine({ ...ok, title: "a".repeat(41) }).title).toBeDefined();
+  });
+});
+
+describe("UT-14 memoOneLine", () => {
+  it("joins lines with ' / ' and drops blank lines", () => {
+    expect(memoOneLine("リスニング 20分\nスピーキング 20分")).toBe(
+      "リスニング 20分 / スピーキング 20分"
+    );
+    expect(memoOneLine("a\n\n  \nb\r\nc")).toBe("a / b / c");
+  });
+  it("is empty without a memo", () => {
+    expect(memoOneLine(undefined)).toBe("");
+    expect(memoOneLine(null)).toBe("");
+    expect(memoOneLine("")).toBe("");
+    expect(memoOneLine("\n \n")).toBe("");
+  });
+});
+
+describe("UT-20 dropTimes", () => {
+  it("ends at start + planned minutes (13:00 + 60 = 14:00)", () => {
+    expect(dropTimes(13 * 60, 60)).toEqual({ start: 780, end: 840 });
+    expect(dropTimes(9 * 60, 90)).toEqual({ start: 540, end: 630 });
+  });
+  it("keeps the existing 60 minutes when there is no duration", () => {
+    expect(dropTimes(13 * 60)).toEqual({ start: 780, end: 840 });
+    expect(dropTimes(13 * 60, null)).toEqual({ start: 780, end: 840 });
+  });
+  it("clamps at 24:00 instead of crossing midnight", () => {
+    expect(dropTimes(23 * 60, 90)).toEqual({ start: 1380, end: 1440 });
+    // start is held at 23:00 (as before), so 30 min ends at 23:30
+    expect(dropTimes(23 * 60 + 45, 30)).toEqual({ start: 1380, end: 1410 });
   });
 });

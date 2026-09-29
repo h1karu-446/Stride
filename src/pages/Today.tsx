@@ -16,6 +16,9 @@ import {
   useWakeTarget,
 } from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
+import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
+import { memoOneLine } from "@/lib/plans/logic";
+import { planHex } from "@/lib/plans/colors";
 import { calculateScore, normalizeLateNight, streakCount } from "@/lib/score";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
@@ -30,6 +33,11 @@ export default function Today() {
   const today = todayISO();
   const date = paramDate ?? today;
   const isToday = date === today;
+
+  // Adds today's routine tasks in the background (ADR-0002). Only when the
+  // displayed date is today; past / future days never generate.
+  useEnsureRoutineTasks(date);
+  usePlans(); // start loading plan names / colors together with the tasks
 
   const tasksQuery = useTasks();
   const reviewsQuery = useReviews();
@@ -648,6 +656,11 @@ function TaskRow({ task }: { task: Task }) {
   const toggleTask = useToggleTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const { data: plans } = usePlans();
+  const plan = task.plan_id
+    ? plans?.find((p) => p.id === task.plan_id)
+    : undefined;
+  const memoLine = plan ? memoOneLine(task.memo) : "";
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
 
@@ -698,6 +711,27 @@ function TaskRow({ task }: { task: Task }) {
           >
             {task.title}
           </button>
+        )}
+        {plan && (
+          <div className="mt-1 flex items-center gap-2 text-xs muted min-w-0">
+            <Link
+              to={`/plans/${plan.id}`}
+              className="flex items-center gap-1.5 flex-shrink-0 hover:underline"
+              style={{ color: planHex(plan.color) }}
+            >
+              <span
+                className="size-[7px] rounded-full"
+                style={{ background: planHex(plan.color) }}
+                aria-hidden
+              />
+              {plan.name}
+            </Link>
+            {memoLine && (
+              <span className="truncate" title={task.memo}>
+                {memoLine}
+              </span>
+            )}
+          </div>
         )}
       </div>
       <ImportanceMenu
