@@ -60,6 +60,9 @@ export default function AchievementReel() {
   const listRef = useRef<HTMLOListElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
 
+  // Start at the intro every time; scrolling down walks from the oldest record to today.
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, []);
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") navigate("/journey"); };
     window.addEventListener("keydown", close);
@@ -83,6 +86,9 @@ export default function AchievementReel() {
       const labels = [...marquee.querySelectorAll<HTMLElement>("[data-reel-label]")];
       const centreOn = (i: number) => window.innerWidth / 2 - (labels[i].offsetLeft + labels[i].offsetWidth / 2);
       gsap.set(marquee, { x: centreOn(0) });
+      const band = marquee.parentElement!;
+      gsap.fromTo(band, { autoAlpha: 0 }, { autoAlpha: 1, ease: "none", scrollTrigger: { trigger: list, start: "top 85%", end: "top 45%", scrub: true } });
+      gsap.to(band, { autoAlpha: 0, ease: "none", immediateRender: false, scrollTrigger: { trigger: list, start: "bottom 55%", end: "bottom 15%", scrub: true } });
       const tl = gsap.timeline({ scrollTrigger: { trigger: list, start: "top center", end: "bottom center", scrub: 0.8, invalidateOnRefresh: true } });
       // A month's label is centred when the middle of its cards reaches the centre of the
       // screen; between two months the label glides over (half of each group's height).
@@ -92,13 +98,7 @@ export default function AchievementReel() {
       });
       tl.to({}, { duration: groups[groups.length - 1].offsetHeight / 2 });
     });
-    // Open at the latest month (the reel reads oldest → today).
-    const last = list.querySelector<HTMLElement>("[data-reel-month]:last-child");
     ScrollTrigger.refresh();
-    if (last) {
-      const rect = last.getBoundingClientRect();
-      window.scrollTo({ top: rect.top + window.scrollY + rect.height / 2 - window.innerHeight / 2 });
-    }
     return () => mm.revert();
   }, [ready, months.length]);
 
