@@ -11,7 +11,8 @@ const md = (d: string) => `${parseISO(d).getMonth() + 1}/${parseISO(d).getDate()
 type Dates = { start_date: string; end_date: string };
 type Drag = { id: string; pointerId: number; x: number; edge: PhaseDragEdge;
   start: string; end: string };
-type CreateDrag = { pointerId: number; startDay: number };
+/** row: the lane index where the drag started, or -1 for the bottom "add" row. */
+type CreateDrag = { pointerId: number; startDay: number; row: number };
 
 /** A shared date axis keeps adjacent, empty, and overlapping periods honest. */
 export default function PhaseBar({ phases, color, selectedId, today, onSelect, onAdd, onAdjustDates }: {
@@ -37,7 +38,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   const createDrag = useRef<CreateDrag | null>(null);
   const ignoreClickUntil = useRef(0);
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
-  const [createPreview, setCreatePreview] = useState<Dates | null>(null);
+  const [createPreview, setCreatePreview] = useState<(Dates & { row: number }) | null>(null);
   const hex = planHex(color);
 
   // Month dividers make the axis readable at a glance.
@@ -111,18 +112,20 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
     };
   }
 
-  function createPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (event.button !== 0) return;
+  // Dragging on empty space in any row selects the period of a new phase;
+  // a drag that starts on a phase bar moves or resizes that phase instead.
+  function createPointerDown(event: PointerEvent<HTMLDivElement>, row: number) {
+    if (event.button !== 0 || event.target !== event.currentTarget) return;
     const startDay = dayAt(event.clientX, event.currentTarget);
     event.currentTarget.setPointerCapture(event.pointerId);
-    createDrag.current = { pointerId: event.pointerId, startDay };
-    setCreatePreview(selectedDates(startDay, startDay));
+    createDrag.current = { pointerId: event.pointerId, startDay, row };
+    setCreatePreview({ ...selectedDates(startDay, startDay), row });
   }
 
   function createPointerMove(event: PointerEvent<HTMLDivElement>) {
     const active = createDrag.current;
     if (active?.pointerId !== event.pointerId) return;
-    setCreatePreview(selectedDates(active.startDay, dayAt(event.clientX, event.currentTarget)));
+    setCreatePreview({ ...selectedDates(active.startDay, dayAt(event.clientX, event.currentTarget)), row: active.row });
   }
 
   function createPointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -134,6 +137,24 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
     onAdd(dates);
   }
 
+  const createEvents = (row: number) => ({
+    onPointerDown: (event: PointerEvent<HTMLDivElement>) => createPointerDown(event, row),
+    onPointerMove: createPointerMove,
+    onPointerUp: createPointerUp,
+    onPointerCancel: () => { createDrag.current = null; setCreatePreview(null); },
+  });
+
+  const createOverlay = (row: number) => createPreview?.row === row && <>
+    <div aria-hidden="true"
+      className="pointer-events-none absolute top-1.5 h-9 rounded-md border border-dashed"
+      style={{ left: xFor(createPreview.start_date),
+        width: (differenceInCalendarDays(parseISO(createPreview.end_date), parseISO(createPreview.start_date)) + 1) * dayWidth,
+        borderColor: hex, background: `${hex}38` }} />
+    <span className="pointer-events-none absolute right-2 top-3 z-10 rounded bg-white/90 px-1.5 text-xs tabular-nums dark:bg-notion-panel-hover">
+      {md(createPreview.start_date)}–{md(createPreview.end_date)}
+    </span>
+  </>;
+
   const dragEvents = {
     onPointerMove: pointerMove,
     onPointerUp: pointerUp,
@@ -143,7 +164,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   return <section aria-label="フェーズの期間" className="space-y-2">
     <div className="flex items-end justify-between gap-3">
       <h2 className="section-title">フェーズ</h2>
-      <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整</p>
+      <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整・空いている所をドラッグで追加</p>
     </div>
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
       <div className="relative" style={{ width }}>
@@ -154,7 +175,10 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
         {gaps.map((gap) => <div key={gap.start} aria-hidden="true"
           className="pointer-events-none absolute bottom-0 top-7 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
           style={{ left: xFor(gap.start), width: gap.days * dayWidth }} />)}
-        {lanes.map((lane, laneIndex) => <div key={laneIndex} className="relative h-12 border-b border-slate-100 dark:border-notion-border/60">
+        {lanes.map((lane, laneIndex) => <div key={laneIndex} title="空いている所をドラッグして新しいフェーズの期間を選択"
+          className="relative h-12 cursor-crosshair touch-none border-b border-slate-100 dark:border-notion-border/60"
+          {...createEvents(laneIndex)}>
+          {createOverlay(laneIndex)}
           {lane.map((phase) => {
           const dates = preview?.id === phase.id ? preview.dates : {
               start_date: phase.start_date!, end_date: phase.end_date!,
@@ -189,23 +213,14 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
         </div>)}
         <div title="ドラッグして新しいフェーズの期間を選択"
           className="relative h-12 cursor-crosshair touch-none border-t border-slate-200/70 bg-slate-50/60 dark:border-notion-border dark:bg-notion-panel-hover/40"
-          onPointerDown={createPointerDown} onPointerMove={createPointerMove}
-          onPointerUp={createPointerUp}
-          onPointerCancel={() => { createDrag.current = null; setCreatePreview(null); }}>
-          {createPreview && <div aria-hidden="true"
-            className="pointer-events-none absolute top-1.5 h-9 rounded-md border border-dashed"
-            style={{ left: xFor(createPreview.start_date),
-              width: (differenceInCalendarDays(parseISO(createPreview.end_date), parseISO(createPreview.start_date)) + 1) * dayWidth,
-              borderColor: hex, background: `${hex}38` }} />}
+          {...createEvents(-1)}>
+          {createOverlay(-1)}
           <button type="button" onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onAdd()}
             className="sticky left-2 z-10 ml-2 mt-2 rounded-full border border-dashed border-slate-300 bg-white/95 px-3 py-1 text-xs font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
             ＋ フェーズを追加
           </button>
-          {!createPreview && <span className="pointer-events-none sticky left-40 ml-3 text-[11px] muted">またはドラッグして期間を選ぶ</span>}
-          {createPreview && <span className="pointer-events-none absolute right-2 top-3 z-10 rounded bg-white/90 px-1.5 text-xs tabular-nums dark:bg-notion-panel-hover">
-            {md(createPreview.start_date)}–{md(createPreview.end_date)}
-          </span>}
+          {createPreview?.row !== -1 && <span className="pointer-events-none sticky left-40 ml-3 text-[11px] muted">またはドラッグして期間を選ぶ</span>}
         </div>
         {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
           <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
