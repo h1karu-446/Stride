@@ -215,6 +215,7 @@ export default function PlanDetail() {
               end_date: editing.initialDates?.end_date ?? selected.end_date ?? "",
             }}
             selfId={selected.id}
+            showMenus={false}
             existingRoutines={settingsRoutines}
             startWithNewRoutine={editing.addRoutine}
             initialDirty={!!editing.initialDates}

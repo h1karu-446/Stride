@@ -16,7 +16,7 @@ const blankRoutine = (): Draft => ({
 });
 
 export default function PhaseSettings({ initial, selfId, existingRoutines, startWithNewRoutine,
-  initialDirty,
+  initialDirty, showMenus = true,
   openRoutineId, saving,
   failed, onSave, onCancel, onDelete, onDirtyChange }: {
   initial: PhaseInput;
@@ -31,6 +31,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   onCancel: () => void;
   onDelete?: () => void;
   onDirtyChange: (dirty: boolean) => void;
+  /** False: only the phase name and dates are editable; menus are saved unchanged. */
+  showMenus?: boolean;
 }) {
   const [phase, setPhase] = useState(initial);
   const [routines, setRoutines] = useState<Draft[]>(() => {
@@ -47,7 +49,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   const today = todayISO();
   const phaseErrors = validatePhase(phase);
   const routineErrors = routines.map(({ input }) => validateRoutine(input));
-  const canSave = !hasErrors(phaseErrors) && routineErrors.every((errors) => !hasErrors(errors));
+  const canSave = !hasErrors(phaseErrors) && (!showMenus || routineErrors.every((errors) => !hasErrors(errors)));
 
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
   useEffect(() => {
@@ -110,6 +112,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
       }}>
       <div>
         <h2 className="text-lg font-semibold">{selfId ? "フェーズを設定" : "新しいフェーズ"}</h2>
+        {!showMenus && <p className="mt-1 text-xs muted">名前と期間を変更します。メニューは各メニューの ✎ から編集できます。</p>}
       </div>
       <Field label="フェーズ名" error={attempted ? phaseErrors.name : undefined}>
         <input autoFocus className="input text-lg font-semibold" maxLength={30}
@@ -137,7 +140,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
           <p className="text-xs muted">保存すると明日からこのメニューは生成されません。次のフェーズの開始日は変わりません。</p>
         )}
       </div>
-      <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-notion-border">
+      {showMenus && <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-notion-border">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-semibold">メニュー</h3>
@@ -239,7 +242,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
             </div>;
           })}
         </div>
-      </div>
+      </div>}
       {/* Keep the actions reachable on a long form. */}
       <div className={`sticky bottom-0 -mx-5 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur dark:border-notion-border dark:bg-notion-panel/95 ${selfId ? "" : "-mb-5 rounded-b-xl"}`}>
         {attempted && !canSave && <p role="alert" className="mb-2 text-xs text-rose-600">未入力の項目があります</p>}
