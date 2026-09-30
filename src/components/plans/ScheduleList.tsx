@@ -10,7 +10,8 @@ import {
   formatDateLabel,
   isLockedSchedule,
   isOverdue,
-  isUniqueViolation,
+  carryOverOnce,
+  withId,
   planScheduleSave,
   scheduleGroups,
 } from "@/lib/plans/logic";
@@ -54,6 +55,8 @@ export default function ScheduleList({
   // yet. The button stays off until the refreshed list closes the row, so a
   // second click cannot hit the one-copy index (tasks_carried_from_uniq).
   const [carrying, setCarrying] = useState<ReadonlySet<string>>(new Set());
+  // Rows whose last carry-over failed (shown as the save error).
+  const [carryFailed, setCarryFailed] = useState<ReadonlySet<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const carried = carriedIds(tasks);
@@ -61,26 +64,19 @@ export default function ScheduleList({
   const total = groups.visible.length + groups.hidden.length + groups.done.length;
   const doneCount = groups.done.length - groups.carriedCount;
 
+  // Each click has its own promise: mutate() callbacks of an earlier click are
+  // dropped when another row is clicked (TanStack Query v5), so neither the
+  // pending ids nor the error rely on them or on carry.isError.
   const carryOver = (t: Task) => {
     if (carrying.has(t.id)) return;
-    carry.reset();
-    setCarrying((s) => new Set(s).add(t.id));
-    const done = async () => {
-      await qc.invalidateQueries({ queryKey: ["tasks"] });
-      setCarrying((s) => {
-        const next = new Set(s);
-        next.delete(t.id);
-        return next;
-      });
-    };
-    carry.mutate(carryOverInput(t, today), {
-      onSuccess: done,
-      onError: (e) => {
-        // Already carried (another tab, or a click before the list refreshed):
-        // the copy exists, so this is not a failure; just reload the list.
-        if (isUniqueViolation(e)) carry.reset();
-        void done();
-      },
+    setCarrying((s) => withId(s, t.id, true));
+    setCarryFailed((s) => withId(s, t.id, false));
+    void carryOverOnce(
+      () => carry.mutateAsync(carryOverInput(t, today)),
+      () => qc.invalidateQueries({ queryKey: ["tasks"] })
+    ).then(({ failed }) => {
+      if (failed) setCarryFailed((s) => withId(s, t.id, true));
+      setCarrying((s) => withId(s, t.id, false));
     });
   };
 
@@ -193,7 +189,7 @@ export default function ScheduleList({
         <button type="button" aria-label="予定を追加" onClick={() => open("new")}
           className="btn-ghost !px-2 !py-0.5 text-lg leading-none muted">＋</button>
       </div>
-      {carry.isError && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
+      {carryFailed.size > 0 && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
       <div className="flex flex-col">
         {editing === "new" && form()}
         {groups.visible.map(row)}

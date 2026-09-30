@@ -6,7 +6,9 @@ import {
   carryOverInput,
   isLockedSchedule,
   isOverdue,
-  isUniqueViolation,
+  carryOverOnce,
+  isAlreadyCarried,
+  withId,
   nextSchedule,
   planScheduleSave,
   scheduleGroups,
@@ -108,12 +110,59 @@ describe("UT-21 carried originals in the lists", () => {
   });
 });
 
-describe("UT-21 isUniqueViolation", () => {
-  it("recognizes only the Postgres unique violation code", () => {
-    expect(isUniqueViolation({ code: "23505", message: "duplicate key" })).toBe(true);
-    expect(isUniqueViolation({ code: "42501" })).toBe(false);
-    expect(isUniqueViolation(new Error("network"))).toBe(false);
-    expect(isUniqueViolation(null)).toBe(false);
+describe("UT-21 isAlreadyCarried", () => {
+  const dup = 'duplicate key value violates unique constraint "tasks_carried_from_uniq"';
+  it("is only the unique violation of tasks_carried_from_uniq", () => {
+    expect(isAlreadyCarried({ code: "23505", message: dup })).toBe(true);
+    expect(isAlreadyCarried({ code: "23505", message: "x", details: dup })).toBe(true);
+    expect(isAlreadyCarried({ code: "23505", message: 'violates unique constraint "tasks_pkey"' })).toBe(false);
+    expect(isAlreadyCarried({ code: "42501", message: dup })).toBe(false);
+    expect(isAlreadyCarried(new Error("network"))).toBe(false);
+    expect(isAlreadyCarried(null)).toBe(false);
+  });
+});
+
+describe("UT-21 carryOverOnce", () => {
+  const deferred = () => {
+    let resolve!: () => void;
+    let reject!: (e: unknown) => void;
+    const promise = new Promise<void>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
+  };
+
+  it("settles each click on its own when two rows are clicked together", async () => {
+    const a = deferred();
+    const b = deferred();
+    const refresh = () => Promise.resolve();
+    const ra = carryOverOnce(() => a.promise, refresh);
+    const rb = carryOverOnce(() => b.promise, refresh);
+    b.resolve();
+    a.reject({ code: "42501", message: "permission denied" });
+    expect(await ra).toEqual({ failed: true });
+    expect(await rb).toEqual({ failed: false });
+  });
+
+  it("treats an existing copy as done and always reloads the list", async () => {
+    const order: string[] = [];
+    const r = await carryOverOnce(
+      () => { order.push("insert"); return Promise.reject({ code: "23505", message: "tasks_carried_from_uniq" }); },
+      async () => { order.push("refresh"); }
+    );
+    expect(r).toEqual({ failed: false });
+    expect(order).toEqual(["insert", "refresh"]);
+  });
+
+  it("does not reject when the reload fails", async () => {
+    await expect(carryOverOnce(() => Promise.resolve(), () => Promise.reject(new Error("x"))))
+      .resolves.toEqual({ failed: false });
+  });
+});
+
+describe("withId", () => {
+  it("adds and removes without touching other ids", () => {
+    const s = withId(withId(new Set<string>(), "a", true), "b", true);
+    expect([...withId(s, "a", false)]).toEqual(["b"]);
+    expect(withId(s, "a", true)).toBe(s);
   });
 });
 

@@ -402,11 +402,50 @@ export function carryOverInput(task: Task, date: string): AddTaskInput {
 }
 
 /**
- * A Postgres unique violation (23505) from Supabase. Carrying over hits it
- * when the original already has a copy (tasks_carried_from_uniq).
+ * The original already has a copy: a unique violation (23505) of
+ * tasks_carried_from_uniq. Other unique violations are real failures.
  */
-export function isUniqueViolation(e: unknown): boolean {
-  return typeof e === "object" && e !== null && (e as { code?: unknown }).code === "23505";
+export function isAlreadyCarried(e: unknown): boolean {
+  if (typeof e !== "object" || e === null) return false;
+  const { code, message, details } = e as {
+    code?: unknown; message?: unknown; details?: unknown;
+  };
+  if (code !== "23505") return false;
+  return [message, details].some(
+    (s) => typeof s === "string" && s.includes("tasks_carried_from_uniq")
+  );
+}
+
+/**
+ * One carry-over click: insert the copy, then reload the list (awaited, so
+ * the row is closed before its button comes back). `failed` is false when
+ * the copy already existed (isAlreadyCarried). Never rejects.
+ */
+export async function carryOverOnce(
+  insert: () => Promise<unknown>,
+  refresh: () => Promise<unknown>
+): Promise<{ failed: boolean }> {
+  let failed = false;
+  try {
+    await insert();
+  } catch (e) {
+    failed = !isAlreadyCarried(e);
+  }
+  try {
+    await refresh();
+  } catch {
+    // A failed reload leaves the list as it was; the next load fixes it.
+  }
+  return { failed };
+}
+
+/** A copy of `set` with `id` added (`on`) or removed. */
+export function withId(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  if (set.has(id) === on) return set;
+  const next = new Set(set);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
 }
 
 export interface ScheduleValues {

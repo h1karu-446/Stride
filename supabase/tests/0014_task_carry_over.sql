@@ -1,4 +1,4 @@
--- Run with psql -v ON_ERROR_STOP=1 after migrations 0001..0011 and 0014 (Issue #36).
+-- Run with psql -v ON_ERROR_STOP=1 after migrations 0001..0014 (Issue #36).
 -- All fixtures and mutations are rolled back; existing users are untouched.
 -- A = ...0001 carries an overdue schedule over. B = ...0002 tries to point at A's task.
 begin;
