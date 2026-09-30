@@ -10,6 +10,7 @@ import type {
   Routine,
   Task,
 } from "@/types";
+import type { AddTaskInput } from "@/lib/queries";
 import { PLAN_COLORS } from "./colors";
 
 // Pure helpers for the plan screens. No Supabase access here so they can be
@@ -345,8 +346,154 @@ export function planSchedules(tasks: Task[], planId: string): Task[] {
   return tasks.filter((t) => t.plan_id === planId && !t.routine_id);
 }
 
-export function isOverdue(task: Task, today: string): boolean {
-  return !task.completed && task.scheduled_date < today;
+/**
+ * Ids of tasks that have been carried over: some task was copied from them
+ * (tasks.carried_from, BR-04). Pass every task, not just one plan's.
+ */
+export function carriedIds(tasks: Task[]): Set<string> {
+  const ids = new Set<string>();
+  for (const t of tasks) if (t.carried_from) ids.add(t.carried_from);
+  return ids;
+}
+
+/** Past and open, and not carried over yet (a carried one is handled). */
+export function isOverdue(
+  task: Task,
+  today: string,
+  carried: Set<string> = new Set()
+): boolean {
+  return !task.completed && task.scheduled_date < today && !carried.has(task.id);
+}
+
+/**
+ * A schedule dated before today. Only its title can change: importance,
+ * date, milestone, completion and deletion would change that day's score or
+ * record (BR-04). Routine tasks and manual tasks are not schedules.
+ */
+export function isLockedSchedule(task: Task, today: string): boolean {
+  return !!task.plan_id && !task.routine_id && task.scheduled_date < today;
+}
+
+/** An overdue schedule that can still be carried over (once per original). */
+export function canCarryOver(
+  task: Task,
+  today: string,
+  carried: Set<string> = new Set()
+): boolean {
+  return isLockedSchedule(task, today) && isOverdue(task, today, carried);
+}
+
+/**
+ * A new open task on `date` with the same content as `task` (BR-04: carrying
+ * over copies; the original stays on its day). Times are not copied because
+ * they belonged to the original day.
+ */
+export function carryOverInput(task: Task, date: string): AddTaskInput {
+  return {
+    title: task.title,
+    importance: task.importance,
+    scheduled_date: date,
+    memo: task.memo,
+    plan_id: task.plan_id,
+    is_milestone: task.is_milestone,
+    planned_minutes: task.planned_minutes,
+    carried_from: task.id,
+  };
+}
+
+/**
+ * The original already has a copy: a unique violation (23505) of
+ * tasks_carried_from_uniq. Other unique violations are real failures.
+ */
+export function isAlreadyCarried(e: unknown): boolean {
+  if (typeof e !== "object" || e === null) return false;
+  const { code, message, details } = e as {
+    code?: unknown; message?: unknown; details?: unknown;
+  };
+  if (code !== "23505") return false;
+  return [message, details].some(
+    (s) => typeof s === "string" && s.includes("tasks_carried_from_uniq")
+  );
+}
+
+/**
+ * One carry-over click: insert the copy, then reload the list (awaited, so
+ * the row is closed before its button comes back). `failed` is false when
+ * the copy already existed (isAlreadyCarried). Never rejects.
+ */
+export async function carryOverOnce(
+  insert: () => Promise<unknown>,
+  refresh: () => Promise<unknown>
+): Promise<{ failed: boolean }> {
+  let failed = false;
+  try {
+    await insert();
+  } catch (e) {
+    failed = !isAlreadyCarried(e);
+  }
+  try {
+    await refresh();
+  } catch {
+    // A failed reload leaves the list as it was; the next load fixes it.
+  }
+  return { failed };
+}
+
+/** A copy of `set` with `id` added (`on`) or removed. */
+export function withId(set: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  if (set.has(id) === on) return set;
+  const next = new Set(set);
+  if (on) next.add(id);
+  else next.delete(id);
+  return next;
+}
+
+export interface ScheduleValues {
+  title: string;
+  scheduled_date: string;
+  importance: Task["importance"];
+  is_milestone: boolean;
+}
+
+export interface ScheduleSave {
+  /** Update of the saved task. Absent when nothing may or did change. */
+  patch?: Partial<Task>;
+  /** A carried-over copy to insert. */
+  copy?: AddTaskInput;
+}
+
+/**
+ * What saving the edit form of an existing schedule writes. A locked (past)
+ * schedule only ever sends its title. For an overdue one that has not been
+ * carried yet, choosing a date from today on makes a copy on that date
+ * instead of moving it (BR-04).
+ */
+export function planScheduleSave(
+  task: Task,
+  v: ScheduleValues,
+  today: string,
+  carried: Set<string> = new Set()
+): ScheduleSave {
+  if (!isLockedSchedule(task, today)) {
+    return {
+      patch: {
+        title: v.title,
+        scheduled_date: v.scheduled_date,
+        importance: v.importance,
+        is_milestone: v.is_milestone,
+      },
+    };
+  }
+  const out: ScheduleSave = {};
+  if (v.title !== task.title) out.patch = { title: v.title };
+  if (
+    canCarryOver(task, today, carried) &&
+    v.scheduled_date !== task.scheduled_date &&
+    v.scheduled_date >= today
+  ) {
+    out.copy = carryOverInput({ ...task, title: v.title }, v.scheduled_date);
+  }
+  return out;
 }
 
 export const SCHEDULE_LIMIT = 3;
@@ -356,8 +503,13 @@ export interface ScheduleGroups {
   visible: Task[];
   /** Open schedules folded into "他 N件". */
   hidden: Task[];
-  /** Completed schedules, newest date first ("完了 N"). */
+  /**
+   * Closed schedules, newest date first: completed ones and past ones that
+   * were carried over ("完了 N · 持ち越し M").
+   */
   done: Task[];
+  /** How many of `done` were carried over rather than completed. */
+  carriedCount: number;
 }
 
 const byDateThenCreated = (a: Task, b: Task) =>
@@ -367,32 +519,43 @@ const byDateThenCreated = (a: Task, b: Task) =>
 /**
  * Open schedules sorted by date ascending, which is exactly overdue (oldest
  * first), today, then future (nearest first). The first `limit` are visible.
- * A schedule's completion date is its own date (BR-04).
+ * A schedule's completion date is its own date (BR-04). An open schedule
+ * that was carried over is closed: its copy is the open one. `carried`
+ * defaults to carriedIds over the given tasks.
  */
 export function scheduleGroups(
   tasks: Task[],
   planId: string,
-  limit = SCHEDULE_LIMIT
+  limit = SCHEDULE_LIMIT,
+  carried: Set<string> = carriedIds(tasks)
 ): ScheduleGroups {
   const all = planSchedules(tasks, planId);
-  const open = all.filter((t) => !t.completed).sort(byDateThenCreated);
-  const done = all
-    .filter((t) => t.completed)
-    .sort((a, b) => byDateThenCreated(b, a));
-  return { visible: open.slice(0, limit), hidden: open.slice(limit), done };
+  const isClosed = (t: Task) => t.completed || carried.has(t.id);
+  const open = all.filter((t) => !isClosed(t)).sort(byDateThenCreated);
+  const done = all.filter(isClosed).sort((a, b) => byDateThenCreated(b, a));
+  return {
+    visible: open.slice(0, limit),
+    hidden: open.slice(limit),
+    done,
+    carriedCount: done.filter((t) => !t.completed).length,
+  };
 }
 
 /**
  * The schedule shown on a plan card (spec 4.1): the oldest overdue one, else
- * the nearest open one. undefined means "予定なし".
+ * the nearest open one. undefined means "予定なし". Carried-over originals
+ * are skipped; their copies count instead.
  */
 export function nextSchedule(
   tasks: Task[],
   planId: string,
   today: string
 ): { task: Task; overdue: boolean } | undefined {
-  const first = scheduleGroups(tasks, planId, 1).visible[0];
-  return first ? { task: first, overdue: isOverdue(first, today) } : undefined;
+  const carried = carriedIds(tasks);
+  const first = scheduleGroups(tasks, planId, 1, carried).visible[0];
+  return first
+    ? { task: first, overdue: isOverdue(first, today, carried) }
+    : undefined;
 }
 
 // --- materials (教材, spec 4.2 / BR-05) --------------------------------

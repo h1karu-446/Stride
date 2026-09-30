@@ -6,7 +6,8 @@ import {
   useUpdateTask,
 } from "@/lib/queries";
 import { usePlans } from "@/lib/plans/queries";
-import { dropTimes, formatMinutes } from "@/lib/plans/logic";
+import { dropTimes, formatMinutes, isLockedSchedule } from "@/lib/plans/logic";
+import { todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 
@@ -322,11 +323,13 @@ export function TimelineView({
     if (sMin == null || eMin == null || eMin <= sMin) {
       return;
     }
+    // A past schedule never sends importance (BR-04); times do not affect the score.
+    const locked = isLockedSchedule(editing, todayISO());
     updateTaskMut.mutate({
       id: editing.id,
       patch: {
         title,
-        importance: editImportance,
+        ...(!locked && { importance: editImportance }),
         start_time: editStart,
         end_time: editEnd,
       },
@@ -546,6 +549,7 @@ export function TimelineView({
                     onResizeBottomStart={(e) =>
                       startResizeDrag(e, t, sMin, eMin, "bottom")
                     }
+                    locked={isLockedSchedule(t, todayISO())}
                     onToggle={() => toggleTaskMut(t)}
                     onDelete={() => deleteTaskMut.mutate(t.id)}
                   />
@@ -656,7 +660,13 @@ export function TimelineView({
               />
             </div>
             <select
-              className="input"
+              className="input disabled:opacity-60"
+              disabled={isLockedSchedule(editing, todayISO())}
+              title={
+                isLockedSchedule(editing, todayISO())
+                  ? "過去の予定は、タイトルだけ変更できます"
+                  : undefined
+              }
               value={editImportance}
               onChange={(e) =>
                 setEditImportance(e.target.value as Importance)
@@ -669,16 +679,20 @@ export function TimelineView({
               ))}
             </select>
             <div className="flex justify-between gap-2">
-              <button
-                type="button"
-                className="btn-ghost !py-1 !px-3 text-xs text-rose-500"
-                onClick={() => {
-                  deleteTaskMut.mutate(editing.id);
-                  setEditing(null);
-                }}
-              >
-                削除
-              </button>
+              {isLockedSchedule(editing, todayISO()) ? (
+                <span />
+              ) : (
+                <button
+                  type="button"
+                  className="btn-ghost !py-1 !px-3 text-xs text-rose-500"
+                  onClick={() => {
+                    deleteTaskMut.mutate(editing.id);
+                    setEditing(null);
+                  }}
+                >
+                  削除
+                </button>
+              )}
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -774,6 +788,7 @@ function TimelineBlock({
   onMoveStart,
   onResizeTopStart,
   onResizeBottomStart,
+  locked,
   onToggle,
   onDelete,
 }: {
@@ -787,6 +802,8 @@ function TimelineBlock({
   onMoveStart: (e: React.PointerEvent<HTMLDivElement>) => void;
   onResizeTopStart: (e: React.PointerEvent<HTMLDivElement>) => void;
   onResizeBottomStart: (e: React.PointerEvent<HTMLDivElement>) => void;
+  /** A past schedule: completion and deletion are off (BR-04). */
+  locked?: boolean;
   onToggle: () => void;
   onDelete: () => void;
 }) {
@@ -813,8 +830,10 @@ function TimelineBlock({
       <div className="flex items-start gap-1.5">
         <input
           type="checkbox"
-          className="size-3.5 rounded accent-notion-blue cursor-pointer mt-0.5"
+          className="size-3.5 rounded accent-notion-blue cursor-pointer mt-0.5 disabled:cursor-not-allowed disabled:opacity-50"
           checked={task.completed}
+          disabled={locked}
+          title={locked ? "過去の予定は、タイトルだけ変更できます" : undefined}
           onChange={onToggle}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -834,18 +853,20 @@ function TimelineBlock({
             </div>
           )}
         </div>
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="opacity-0 group-hover:opacity-100 transition text-current/60 hover:text-rose-500 text-[11px] leading-none"
-          aria-label="Delete"
-        >
-          ✕
-        </button>
+        {!locked && (
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="opacity-0 group-hover:opacity-100 transition text-current/60 hover:text-rose-500 text-[11px] leading-none"
+            aria-label="Delete"
+          >
+            ✕
+          </button>
+        )}
       </div>
       <div
         className="absolute left-0 right-0 top-0 cursor-ns-resize flex items-start justify-center"
@@ -874,6 +895,7 @@ export function UnscheduledPanel({
 }) {
   const deleteTaskMut = useDeleteTask();
   const toggleTaskMut = useToggleTask();
+  const today = todayISO();
   const unscheduled = useMemo(
     () => tasks.filter((t) => !t.start_time || !t.end_time),
     [tasks]
@@ -923,6 +945,8 @@ export function UnscheduledPanel({
               type="checkbox"
               className="size-3.5 rounded accent-notion-blue cursor-pointer"
               checked={t.completed}
+              disabled={isLockedSchedule(t, today)}
+              title={isLockedSchedule(t, today) ? "過去の予定は、タイトルだけ変更できます" : undefined}
               onChange={() => toggleTaskMut(t)}
               onPointerDown={(e) => e.stopPropagation()}
             />
@@ -950,14 +974,16 @@ export function UnscheduledPanel({
                 {formatMinutes(t.planned_minutes)}
               </span>
             ) : null}
-            <button
-              type="button"
-              className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-xs"
-              onClick={() => deleteTaskMut.mutate(t.id)}
-              aria-label="Delete"
-            >
-              ✕
-            </button>
+            {!isLockedSchedule(t, today) && (
+              <button
+                type="button"
+                className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-xs"
+                onClick={() => deleteTaskMut.mutate(t.id)}
+                aria-label="Delete"
+              >
+                ✕
+              </button>
+            )}
           </li>
         ))}
       </ul>

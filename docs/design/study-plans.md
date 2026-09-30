@@ -180,6 +180,7 @@ erDiagram
 | routine_id | uuid | ○ | — | `references routines(id) on delete set null`。ルーティンタスクだけに入る |
 | planned_minutes | integer | ○ | — | 所要時間。ルーティンタスクで使う |
 | is_milestone | boolean | × | `false` | マイルストーンの印 |
+| carried_from | uuid | ○ | — | `references tasks(id) on delete set null`。持ち越しで作った複製が、元の予定を指す（migration 0014、Issue #36）。`tasks (carried_from) where carried_from is not null` の部分一意インデックスで、1つの予定の複製は1つだけ。RLS の `with check` は、複製元も本人のタスクであることを要求する（ポリシーの中で `tasks` を直接参照すると再帰エラーになるため、`security definer` の関数 `is_own_task` で確かめる） |
 
 - 二重生成の防止：`create unique index tasks_routine_date_uniq on tasks (routine_id, scheduled_date) where routine_id is not null`
 - 追加のインデックス：`tasks (plan_id) where plan_id is not null`
@@ -398,9 +399,12 @@ sequenceDiagram
 
 ### 6.2 期限切れの予定を「今日に移す」
 
-1. 画面が `tasks.update({ scheduled_date: today })` を送る
-2. 差し替えたトリガーが、元の日と今日の両方の振り返りを更新し、両日のスコアを再計算する（2.2、4.4）
-3. `["tasks"]` と `["reviews"]` を無効化する
+Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
+
+1. 画面が、元の予定と同じ内容（タイトル、重要度、`plan_id`、`is_milestone`、`memo`、`planned_minutes`）で、`scheduled_date = today`、`carried_from = 元の id` のタスクを `tasks.insert` する（`carryOverInput`）。元の予定は更新しない
+2. トリガーは今日の振り返りだけを更新する。元の日のスコアは変わらない
+3. `["tasks"]` と `["reviews"]` を無効化する。一覧は `carried_from` から持ち越し済みの予定を求め、期限切れから外す（`carriedIds`、`scheduleGroups`）
+4. 過去の予定の編集は `planScheduleSave` で送る内容を決める（タイトルだけ。期限切れの予定で日付を今日以降にしたときは、上と同じ複製を作る）
 
 ### 6.3 ルーティンタスクの削除
 
@@ -441,6 +445,7 @@ sequenceDiagram
 | 2. 計画とルーティン | `0007_study_plans.sql` | `btree_gist` の有効化、`plans` / `phases` / `routines` / `routine_skips`、`tasks` の `plan_id` / `routine_id` / `planned_minutes`、部分一意インデックス、RLS、トリガー（updated_at、completed_at、暗黙のフェーズ、スキップ記録）、`generate_routine_tasks`、`delete_phase`、`delete_plan` |
 | 3. 予定と教材 | `0008_materials_and_milestones.sql` | `materials` / `material_phases`、`tasks.is_milestone`、`trg_touch_review_on_task` の差し替え（2.2） |
 | 4. Journey | `0009_wishes_and_achievements.sql` | `wishes`、`achievements` ビュー |
+| Issue #36 | `0014_task_carry_over.sql` | `tasks.carried_from`、部分一意インデックス、`is_own_task`、`tasks_owner_all` の差し替え |
 
 - 検証はDocker上のローカルSupabaseへ適用して行う。Issue #5で既存migration 0001〜0006を準備し、0007以降は各Issueで扱う。環境の切り替えは [プロジェクト固有Context](../project-context.md) を参照する
 - 現在のSupabaseでは新しいテーブルがData APIに自動公開されない。新規テーブルを使うロールへの明示的な `GRANT` とRLSを各migrationで設定する。既存2テーブルのローカル権限はIssue #5の専用SQLで補う
