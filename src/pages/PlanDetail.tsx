@@ -239,7 +239,8 @@ export default function PlanDetail() {
         {editing?.kind !== "phase-edit" && <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="min-w-0 space-y-3">
             {selected.routines.map((r) =>
-              selected.is_implicit && editing?.kind === "routine-edit" && editing.id === r.id ? (
+              // The ✎ on a menu edits only that menu; phase name and dates stay in the phase settings.
+              editing?.kind === "routine-edit" && editing.id === r.id ? (
                 <RoutineForm
                   key={r.id}
                   initial={{ ...r, menu: r.menu ?? "" }}
@@ -259,9 +260,7 @@ export default function PlanDetail() {
                 />
               ) : (
                 <RoutineCard key={r.id} routine={r}
-                  onEdit={() => selected.is_implicit
-                    ? setEditing({ kind: "routine-edit", id: r.id })
-                    : setEditing({ kind: "phase-edit", openRoutineId: r.id })} />
+                  onEdit={() => setEditing({ kind: "routine-edit", id: r.id })} />
               )
             )}
             {selected.is_implicit && editing?.kind === "routine-add" ? (

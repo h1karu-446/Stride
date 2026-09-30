@@ -5,6 +5,8 @@ import { hasErrors, validateRoutine } from "@/lib/plans/logic";
 import type { RoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
+import { formatMinutes } from "@/lib/plans/logic";
+import { chip, MINUTE_PRESETS, sameDays, WEEKDAY_PRESETS } from "./routinePresets";
 
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
 
@@ -49,7 +51,7 @@ export default function RoutineForm({
 
   return (
     <form
-      className="space-y-3 rounded-xl bg-slate-50/70 p-4 dark:bg-notion-panel-hover"
+      className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-notion-border"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSave && !saving) onSubmit({ ...v, minutes });
@@ -60,10 +62,16 @@ export default function RoutineForm({
           placeholder="例：IELTSのListeningを30分解く"
           onChange={(e) => setV({ ...v, title: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="所要時間（分）" error={errors.minutes}>
-          <input type="number" step={5} min={5} max={600} className="input" disabled={saving}
-            value={minutesText} onChange={(e) => setMinutesText(e.target.value)} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field group label="所要時間" error={errors.minutes}>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {MINUTE_PRESETS.map((m) => <button key={m} type="button" disabled={saving} aria-pressed={minutes === m}
+              className={chip(minutes === m)} onClick={() => setMinutesText(String(m))}>{formatMinutes(m)}</button>)}
+            <label className="flex items-center gap-1 text-xs muted">
+              <input type="number" step={5} min={5} max={600} aria-label="所要時間（分）" className="input !w-20 !py-1 text-sm" disabled={saving}
+                value={minutesText} onChange={(e) => setMinutesText(e.target.value)} />分
+            </label>
+          </div>
         </Field>
         <Field group label="重要度">
           <div className="flex gap-1.5">
@@ -71,7 +79,7 @@ export default function RoutineForm({
               <button key={i} type="button" disabled={saving} onClick={() => setV({ ...v, importance: i })}
                 className={clsx("flex-1 rounded-md border px-2 py-2 text-sm",
                   v.importance === i
-                    ? "border-blue-500 bg-blue-500/10"
+                    ? "border-notion-blue bg-notion-blue/10"
                     : "border-slate-300 dark:border-notion-border")}>
                 {i}
               </button>
@@ -80,6 +88,10 @@ export default function RoutineForm({
         </Field>
       </div>
       <Field group label="曜日" error={errors.weekdays}>
+        <div className="mb-2 flex gap-1.5">
+          {WEEKDAY_PRESETS.map((p) => <button key={p.label} type="button" disabled={saving} aria-pressed={sameDays(v.weekdays, p.days)}
+            className={chip(sameDays(v.weekdays, p.days))} onClick={() => setV({ ...v, weekdays: p.days })}>{p.label}</button>)}
+        </div>
         <div className="flex gap-1.5">
           {ISO_WEEKDAYS_IN_ORDER.map((d) => {
             const label = ISO_WEEKDAY_CHAR[d];
@@ -87,7 +99,7 @@ export default function RoutineForm({
             return (
               <button key={d} type="button" aria-pressed={on} disabled={saving} onClick={() => toggle(d)}
                 className={clsx("flex-1 rounded-md border py-1.5 text-sm",
-                  on ? "border-blue-500 bg-blue-500/10"
+                  on ? "border-notion-blue bg-notion-blue/10"
                      : "border-slate-300 dark:border-notion-border muted")}>
                 {label}
               </button>

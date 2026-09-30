@@ -3,21 +3,13 @@ import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
+import { chip, MINUTE_PRESETS, WEEKDAY_PRESETS } from "./routinePresets";
 import { formatMinutes, hasErrors, validatePhase, validateRoutine, weekdaysLabel } from "@/lib/plans/logic";
 import type { PhaseInput, PhaseRoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
 
 type Draft = { key: string; id?: string; input: PhaseRoutineInput };
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
-const MINUTE_PRESETS = [15, 30, 45, 60, 90];
-const WEEKDAY_PRESETS: { label: string; days: number[] }[] = [
-  { label: "毎日", days: [1, 2, 3, 4, 5, 6, 7] },
-  { label: "平日", days: [1, 2, 3, 4, 5] },
-  { label: "週末", days: [6, 7] },
-];
-const chip = (active: boolean) => `rounded-full border px-3 py-1 text-xs transition ${active
-  ? "border-notion-blue bg-notion-blue text-white" : "border-slate-300 hover:border-slate-400 dark:border-notion-border"}`;
-
 const blankRoutine = (): Draft => ({
   key: crypto.randomUUID(),
   input: { title: "", minutes: 30, weekdays: [1, 2, 3, 4, 5, 6, 7], importance: "中", menu: "" },
