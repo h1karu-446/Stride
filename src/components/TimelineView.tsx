@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   useAddTask,
-  useDeleteTask,
+  useDeleteTaskWithUndo,
   useToggleTask,
   useUpdateTask,
 } from "@/lib/queries";
@@ -153,7 +153,7 @@ export function TimelineView({
 }) {
   const addTaskMut = useAddTask();
   const updateTaskMut = useUpdateTask();
-  const deleteTaskMut = useDeleteTask();
+  const deleteTask = useDeleteTaskWithUndo();
   const toggleTaskMut = useToggleTask();
 
   const gridRef = useRef<HTMLDivElement>(null);
@@ -547,7 +547,7 @@ export function TimelineView({
                       startResizeDrag(e, t, sMin, eMin, "bottom")
                     }
                     onToggle={() => toggleTaskMut(t)}
-                    onDelete={() => deleteTaskMut.mutate(t.id)}
+                    onDelete={() => deleteTask(t)}
                   />
                 );
               });
@@ -673,7 +673,7 @@ export function TimelineView({
                 type="button"
                 className="btn-ghost !py-1 !px-3 text-xs text-rose-500"
                 onClick={() => {
-                  deleteTaskMut.mutate(editing.id);
+                  deleteTask(editing);
                   setEditing(null);
                 }}
               >
@@ -872,7 +872,7 @@ export function UnscheduledPanel({
   tasks: Task[];
   className?: string;
 }) {
-  const deleteTaskMut = useDeleteTask();
+  const deleteTask = useDeleteTaskWithUndo();
   const toggleTaskMut = useToggleTask();
   const unscheduled = useMemo(
     () => tasks.filter((t) => !t.start_time || !t.end_time),
@@ -953,7 +953,7 @@ export function UnscheduledPanel({
             <button
               type="button"
               className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-xs"
-              onClick={() => deleteTaskMut.mutate(t.id)}
+              onClick={() => deleteTask(t)}
               aria-label="Delete"
             >
               ✕

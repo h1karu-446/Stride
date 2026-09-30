@@ -5,7 +5,7 @@ import { format, parseISO } from "date-fns";
 import {
   useAddTask,
   useBedTarget,
-  useDeleteTask,
+  useDeleteTaskWithUndo,
   useReviews,
   useTasks,
   useToggleTask,
@@ -30,6 +30,7 @@ import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
 import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
+import { TaskUndoNotices } from "@/components/TaskUndoNotices";
 
 type ViewMode = "list" | "timeline";
 
@@ -323,6 +324,7 @@ export default function Today() {
           />
         </div>
       </div>
+      <TaskUndoNotices />
     </div>
   );
 }
@@ -663,7 +665,7 @@ function ImportanceMenu({
 function TaskRow({ task }: { task: Task }) {
   const toggleTask = useToggleTask();
   const updateTask = useUpdateTask();
-  const deleteTask = useDeleteTask();
+  const deleteTask = useDeleteTaskWithUndo();
   const { data: plans } = usePlans();
   const plan = task.plan_id
     ? plans?.find((p) => p.id === task.plan_id)
@@ -750,7 +752,7 @@ function TaskRow({ task }: { task: Task }) {
       />
       <button
         type="button"
-        onClick={() => deleteTask.mutate(task.id)}
+        onClick={() => deleteTask(task)}
         className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-sm"
         aria-label="Delete"
       >
