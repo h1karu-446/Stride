@@ -82,7 +82,11 @@ export type PlanColor =
   | "teal"
   | "blue"
   | "purple"
-  | "gray";
+  | "gray"
+  | "coral"
+  | "lime"
+  | "indigo"
+  | "brown";
 
 export interface Routine {
   id: string;

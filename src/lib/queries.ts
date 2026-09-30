@@ -9,6 +9,13 @@ import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/date";
 import { fetchAllPages } from "@/lib/pagination";
 import {
+  DeletedTaskSnapshot,
+  deletedNotice,
+  deleteErrorMessage,
+  parseDeleteResult,
+} from "@/lib/taskUndo";
+import { nextNoticeKey, useTaskUndoStore } from "@/lib/taskUndoStore";
+import {
   DailyReview,
   DEFAULT_BED_TARGET,
   DEFAULT_WAKE_TARGET,
@@ -244,6 +251,73 @@ export function useDeleteTask() {
       if (error) throw error;
     },
     onSuccess: () => invalidateAll(qc),
+  });
+}
+
+function putTaskBack(qc: QueryClient, task: Task) {
+  qc.setQueryData<Task[]>(TASKS_KEY, (old) =>
+    old && !old.some((t) => t.id === task.id) ? [...old, task] : old
+  );
+}
+
+// Today's delete with a 5-second undo (Issue #56). The row leaves the list at
+// once and is deleted right away by the RPC (tasks_record_routine_skip still
+// records the skip). The notice keeps the deleted row for useRestoreDeletedTask.
+// Plans' schedule list keeps using useDeleteTask.
+export function useDeleteTaskWithUndo() {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: async (task: Task): Promise<DeletedTaskSnapshot> => {
+      const { data, error } = await supabase.rpc("delete_task_for_undo", {
+        p_task_id: task.id,
+      });
+      if (error) throw error;
+      return parseDeleteResult(data);
+    },
+    onMutate: async (task: Task) => {
+      await qc.cancelQueries({ queryKey: TASKS_KEY });
+      qc.setQueryData<Task[]>(TASKS_KEY, (old) =>
+        old?.filter((t) => t.id !== task.id)
+      );
+    },
+    onSuccess: (snapshot, task) => {
+      useTaskUndoStore
+        .getState()
+        .add(deletedNotice(snapshot, task.title, Date.now(), nextNoticeKey()));
+    },
+    onError: (err, task) => {
+      // P0002: already gone (e.g. deleted on another device); keep it hidden.
+      if ((err as { code?: string } | null)?.code !== "P0002") {
+        putTaskBack(qc, task);
+      }
+      useTaskUndoStore.getState().add({
+        kind: "delete-failed",
+        key: nextNoticeKey(),
+        taskId: task.id,
+        title: task.title,
+        error: deleteErrorMessage(err),
+      });
+    },
+    onSettled: () => invalidateAll(qc),
+  });
+  return (task: Task) => mutation.mutate(task);
+}
+
+// Puts a deleted task back with the same id and values, and removes the
+// routine skip in the same transaction (RPC restore_deleted_task, 0016).
+export function useRestoreDeletedTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (snapshot: DeletedTaskSnapshot): Promise<Task> => {
+      const { data, error } = await supabase.rpc("restore_deleted_task", {
+        p_task: snapshot.task,
+        p_carried_copy_ids: snapshot.carriedCopyIds,
+      });
+      if (error) throw error;
+      return rowToTask(data as TaskRow);
+    },
+    onSuccess: (task) => putTaskBack(qc, task),
+    onSettled: () => invalidateAll(qc),
   });
 }
 

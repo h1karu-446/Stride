@@ -10,6 +10,10 @@ export const PLAN_COLORS: { key: PlanColor; label: string; hex: string }[] = [
   { key: "blue", label: "ブルー", hex: "#5B8FD9" },
   { key: "purple", label: "パープル", hex: "#9A6DD7" },
   { key: "gray", label: "グレー", hex: "#8A8985" },
+  { key: "coral", label: "コーラル", hex: "#D66B5B" },
+  { key: "lime", label: "ライム", hex: "#839B35" },
+  { key: "indigo", label: "インディゴ", hex: "#6467BE" },
+  { key: "brown", label: "ブラウン", hex: "#956E56" },
 ];
 
 export function planHex(color: PlanColor): string {
