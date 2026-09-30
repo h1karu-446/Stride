@@ -148,8 +148,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
               {!open ? <div className="flex items-center gap-2">
                 <button type="button" aria-expanded={false} disabled={saving}
                   onClick={() => setOpenKey(row.key)}
-                  className="min-w-0 flex-1 rounded-lg py-1.5 text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
-                  <span className="mr-2 text-xs muted">▸</span>
+                  className="flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+                  <span aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▸</span>
                   {row.input.title || <span className="muted">メニュー {index + 1}</span>}
                   <span className="ml-2 text-xs font-normal muted">{formatMinutes(row.input.minutes)} · {weekdaysLabel(row.input.weekdays)} · {row.input.importance}</span>
                   {hasErrors(routineErrors[index]) && attempted && <span className="ml-2 text-xs text-rose-600">要確認</span>}
