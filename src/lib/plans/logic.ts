@@ -403,9 +403,21 @@ export const MATERIAL_STATUS_LABEL: Record<MaterialStatus, string> = {
   done: "完了",
 };
 
-/** todo -> in_progress -> done -> todo (BR-05). */
-export function nextMaterialStatus(s: MaterialStatus): MaterialStatus {
-  return s === "todo" ? "in_progress" : s === "in_progress" ? "done" : "todo";
+/** The order of the status menu and the edit form (BR-05). */
+export const MATERIAL_STATUSES: readonly MaterialStatus[] = ["todo", "in_progress", "done"];
+
+/** Longest 「学ぶこと・メモ」 (materials.note, migration 0017). */
+export const MATERIAL_NOTE_MAX = 1000;
+
+/**
+ * The row update for choosing `status` directly (BR-05): `done` records the
+ * device's local date as the completion date, anything else clears it.
+ */
+export function materialStatusPatch(
+  status: MaterialStatus,
+  today: string
+): { status: MaterialStatus; completed_at: string | null } {
+  return { status, completed_at: status === "done" ? today : null };
 }
 
 export interface MaterialGroups {
@@ -481,13 +493,17 @@ export function validateSchedule(
 export function validateMaterial(v: {
   title: string;
   url?: string;
-}): Errors<"title" | "url"> {
-  const e: Errors<"title" | "url"> = {};
+  note?: string;
+}): Errors<"title" | "url" | "note"> {
+  const e: Errors<"title" | "url" | "note"> = {};
   if (len(v.title) < 1) e.title = "タイトルを入力してください";
   else if (len(v.title) > 100) e.title = "タイトルは100文字までです";
   const url = (v.url ?? "").trim();
   if (url && !/^https?:\/\/\S+$/.test(url)) {
     e.url = "http:// か https:// で始まるURLを入力してください";
+  }
+  if (len(v.note ?? "") > MATERIAL_NOTE_MAX) {
+    e.note = `メモは${MATERIAL_NOTE_MAX}文字までです`;
   }
   return e;
 }

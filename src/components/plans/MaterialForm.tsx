@@ -4,12 +4,11 @@ import { Field, FormActions, useEscToCancel } from "@/components/common/FormPart
 import {
   hasErrors,
   MATERIAL_STATUS_LABEL,
+  MATERIAL_STATUSES,
   validateMaterial,
 } from "@/lib/plans/logic";
 import type { MaterialInput } from "@/lib/plans/queries";
-import type { MaterialStatus, Phase } from "@/types";
-
-const STATUSES: MaterialStatus[] = ["todo", "in_progress", "done"];
+import type { Phase } from "@/types";
 
 /**
  * Inline edit form for a material (spec 4.2, 3.6). `phases` are the plan's
@@ -63,6 +62,12 @@ export default function MaterialForm({
         <input type="url" className="input" placeholder="https://" value={v.url ?? ""}
           onChange={(e) => { const url = e.target.value; setV((cur) => ({ ...cur, url })); }} />
       </Field>
+      <Field label="学ぶこと・メモ（任意）" error={errors.note}>
+        {/* Enter adds a line break here; save with the button (IME-safe). */}
+        <textarea className="input min-h-[4.5rem] resize-y" rows={3}
+          placeholder="例：第3章の非同期処理を理解する" value={v.note ?? ""}
+          onChange={(e) => { const note = e.target.value; setV((cur) => ({ ...cur, note })); }} />
+      </Field>
       {phases.length > 0 && (
         <Field group label="関連するフェーズ">
           <div className="flex flex-wrap gap-1.5">
@@ -83,7 +88,7 @@ export default function MaterialForm({
       )}
       <Field group label="状態">
         <div className="flex gap-1.5">
-          {STATUSES.map((s) => (
+          {MATERIAL_STATUSES.map((s) => (
             <button key={s} type="button" aria-pressed={v.status === s}
               onClick={() => setV((cur) => ({ ...cur, status: s }))}
               className={clsx("flex-1 rounded-md border px-2 py-1.5 text-sm",

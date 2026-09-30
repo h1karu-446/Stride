@@ -100,6 +100,8 @@ export interface Material {
   plan_id: string;
   title: string;
   url?: string;
+  /** 「学ぶこと・メモ」: free text, may contain line breaks (migration 0017). */
+  note?: string;
   status: MaterialStatus;
   completed_at?: string; // YYYY-MM-DD, set while status is "done"
   phase_ids: string[]; // linked phases (material_phases)
