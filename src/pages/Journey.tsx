@@ -9,7 +9,7 @@ import { todayISO } from "@/lib/date";
 import { useReviews } from "@/lib/queries";
 import { planHex } from "@/lib/plans/colors";
 import { formatDateLabel, spanLabel } from "@/lib/plans/logic";
-import { achievementRange, achievementStyle, freshWish, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
+import { achievementRange, achievementStyle, editableWish, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
 import { NEW_WISH, useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWish, useWishes } from "@/lib/journey/queries";
 import type { WishInput } from "@/lib/journey/queries";
 import type { Wish } from "@/types";
@@ -32,18 +32,21 @@ export default function Journey() {
   const pending = sortWishes((wishes.data ?? []).filter((wish) => !wish.achieved_at));
   // An achieved wish opened from the feed is loaded on its own (the view has no note or importance).
   const achievedEditing = useWish(editing && editing !== "new" && !pending.some((wish) => wish.id === editing) ? editing : null);
-  const achievedWish = freshWish(achievedEditing);
+  // The achieved wish whose form has been shown; later refetches keep the form (and its input).
+  const [shownWish, setShownWish] = useState<string | null>(null);
+  const achievedWish = editableWish(achievedEditing, !!editing && shownWish === editing);
+  useEffect(() => { if (achievedWish && editing && shownWish !== editing) setShownWish(editing); }, [achievedWish, editing, shownWish]);
   const average = monthlyAverage(reviews.data ?? [], format(month, "yyyy-MM"));
   useEffect(() => {
     if (!undo) return;
     const timer = window.setTimeout(() => setUndo(null), 5000);
     return () => window.clearTimeout(timer);
   }, [undo]);
-  const edit = (id: string | null) => { if (!mutation.isPending) { mutation.reset(); setEditing(id); } };
+  const edit = (id: string | null) => { if (!mutation.isPending) { mutation.reset(); setShownWish(null); setEditing(id); } };
   const save = (input: WishInput) => mutation.mutate({ type: "save", id: editing === "new" ? undefined : editing ?? undefined, input }, { onSuccess: () => setEditing(null) });
   const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo((current) => (current?.id === id ? null : current)) });
   // Achieved wishes are not deleted from the feed; restore them first (spec 4.4).
-  const form = (id: string, initial: WishInput, deletable = true, version = "") => <WishForm key={`${id}-${version}`} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
+  const form = (id: string, initial: WishInput, deletable = true) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
     onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
   const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement });
 
@@ -82,7 +85,7 @@ export default function Journey() {
         {rows.map((row) => {
           const style = achievementStyle(row);
           if (row.kind === "wish" && editing === row.id) {
-            return <div key={`${row.kind}-${row.id}`}>{achievedWish ? form(row.id, inputOf(achievedWish), false, achievedWish.updated_at)
+            return <div key={`${row.kind}-${row.id}`}>{achievedWish ? form(row.id, inputOf(achievedWish), false)
               : <p role={achievedEditing.isError ? "alert" : undefined} className={`text-sm py-2 ${achievedEditing.isError ? "text-red-500" : "muted"}`}>{achievedEditing.isError ? "読み込めませんでした。" : "読み込み中…"}
                 {achievedEditing.isError && <button className="underline ml-2" onClick={() => edit(null)}>閉じる</button>}</p>}</div>;
           }

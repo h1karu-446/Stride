@@ -16,13 +16,13 @@ export function useWishes() {
 }
 
 // One wish, for editing an achieved wish from the achievement feed (the view
-// does not carry the note or importance). Always refetched when the form opens:
-// the ★/☆ toggle may have changed the row since the cached copy was read, and
-// a form filled from that copy would silently undo the toggle on save.
+// does not carry the note or importance). Wish mutations invalidate ["wishes"],
+// which marks a cached copy stale; switching to its key then refetches it.
+// Journey waits for that refetch before showing the form (editableWish).
 export function useWish(id: string | null) {
   const { session } = useAuth();
   return useQuery({
-    queryKey: ["wishes", session?.user.id, "one", id], enabled: !!session && !!id, refetchOnMount: "always",
+    queryKey: ["wishes", session?.user.id, "one", id], enabled: !!session && !!id,
     queryFn: async (): Promise<Wish> => {
       const { data, error } = await supabase.from("wishes").select("*").eq("id", id!).single();
       if (error) throw error;

@@ -91,8 +91,6 @@ describe("wish settings (Issue #54)", () => {
     const q = writeMock();
     const hook = useWish("w1") as unknown as { enabled: boolean; queryKey: unknown[]; queryFn: () => Promise<unknown> };
     expect(hook.enabled).toBe(true);
-    // Reopening the form must not reuse a copy cached before a ★/☆ toggle.
-    expect((hook as unknown as { refetchOnMount: unknown }).refetchOnMount).toBe("always");
     expect(hook.queryKey[0]).toBe("wishes");
     expect(await hook.queryFn()).toEqual({ id: "w1" });
     expect(q.eq).toHaveBeenCalledWith("id", "w1");
