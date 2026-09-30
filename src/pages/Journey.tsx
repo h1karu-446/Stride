@@ -49,7 +49,7 @@ export default function Journey() {
   // Achieved wishes are not deleted from the feed; restore them first (spec 4.4).
   const form = (id: string, initial: WishInput, deletable = true) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
     onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
-  const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement });
+  const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement, achieved_at: wish.achieved_at });
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-4">

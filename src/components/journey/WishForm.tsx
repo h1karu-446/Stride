@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { Field, FormActions } from "@/components/common/FormParts";
+import DatePicker from "@/components/common/DatePicker";
+import { todayISO } from "@/lib/date";
 import { IMPORTANCE_LIST } from "@/types";
 import type { WishInput } from "@/lib/journey/queries";
 
@@ -14,7 +16,8 @@ export default function WishForm({ initial, onSubmit, onDelete, onCancel, saving
     window.addEventListener("keydown", cancel);
     return () => window.removeEventListener("keydown", cancel);
   }, [onCancel, saving]);
-  const valid = value.title.trim().length > 0 && value.title.trim().length <= 60 && value.note.length <= 100;
+  const futureDate = !!value.achieved_at && value.achieved_at > todayISO();
+  const valid = value.title.trim().length > 0 && value.title.trim().length <= 60 && value.note.length <= 100 && !futureDate;
   return <form className="space-y-3 rounded-lg border border-slate-200 dark:border-notion-border p-3" onSubmit={(event) => {
     event.preventDefault(); if (valid && !saving) onSubmit(value);
   }}>
@@ -26,6 +29,10 @@ export default function WishForm({ initial, onSubmit, onDelete, onCancel, saving
           className={clsx("flex-1 rounded-md border px-2 py-2 text-sm", value.importance === i ? "border-blue-500 bg-blue-500/10" : "border-slate-300 dark:border-notion-border")}>{i}</button>)}
       </div>
     </Field>
+    {initial.achieved_at && <Field group label="達成日">
+      <DatePicker label="達成日" value={value.achieved_at ?? ""} onChange={(achieved_at) => { if (achieved_at) setValue({ ...value, achieved_at }); }} />
+      {futureDate && <p role="alert" className="mt-1 text-xs text-rose-600">未来の日付は選べません</p>}
+    </Field>}
     <label className="flex items-center gap-2 text-sm">
       <input type="checkbox" checked={value.emphasize_achievement} disabled={saving} onChange={(e) => setValue({ ...value, emphasize_achievement: e.target.checked })} />
       達成の記録で目立たせる ★

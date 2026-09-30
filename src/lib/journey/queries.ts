@@ -72,13 +72,17 @@ export function useAnnualAchievements(year: string) {
   });
 }
 
-export type WishInput = { title: string; note: string; importance: Importance; emphasize_achievement: boolean };
+/** achieved_at is set only when editing an achieved wish (YYYY-MM-DD in the user's timezone). */
+export type WishInput = { title: string; note: string; importance: Importance; emphasize_achievement: boolean; achieved_at?: string | null };
 /** New wishes: importance 中, emphasis OFF (Issue #43). */
 export const NEW_WISH: WishInput = { title: "", note: "", importance: "中", emphasize_achievement: false };
 export type WishAction = { type: "save"; id?: string; input: WishInput } | { type: "delete"; id: string } | { type: "achieve"; id: string; achieved: boolean }
   | { type: "emphasize"; id: string; emphasized: boolean };
 export function wishPatch(input: WishInput) {
-  return { title: input.title.trim(), note: input.note || null, importance: input.importance, emphasize_achievement: input.emphasize_achievement };
+  return {
+    title: input.title.trim(), note: input.note || null, importance: input.importance, emphasize_achievement: input.emphasize_achievement,
+    ...(input.achieved_at ? { achieved_at: input.achieved_at } : {}),
+  };
 }
 
 export function useMutateWish() {
