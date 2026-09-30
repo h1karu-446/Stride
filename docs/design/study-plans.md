@@ -98,7 +98,7 @@ erDiagram
 | 列 | 型 | NULL | 既定 | 制約・説明 |
 | --- | --- | --- | --- | --- |
 | name | text | × | — | 1〜40文字（`char_length(btrim(name)) between 1 and 40`） |
-| color | text | × | — | `pink / orange / yellow / green / teal / blue / purple / gray` のいずれか |
+| color | text | × | — | `pink / orange / yellow / green / teal / blue / purple / gray / coral / lime / indigo / brown` のいずれか |
 | status | text | × | `'active'` | `idea / active / paused / done`（構想中／進行中／休止中／完了） |
 | due_date | date | ○ | — | 期日 |
 | goal | text | ○ | — | 目標。60文字まで |
@@ -423,7 +423,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | NFR-05 本人だけ | 全テーブルの RLS と、子テーブルの親所有チェック（4.3） |
 | NFR-06 表示を遅くしない | 生成はタスク一覧の表示を待たせない非同期処理にする。RPC は1回の insert ... select |
 | NFR-07 PC ブラウザ | 既存と同じ |
-| NFR-08 見た目 | 既存の Tailwind のクラスとトークン（`notion.*`）を使う。計画の8色は `tailwind.config.js` に追加する |
+| NFR-08 見た目 | 既存の Tailwind のクラスとトークン（`notion.*`）を使う。計画の12色は `src/lib/plans/colors.ts` で定義する |
 
 ## 8. リスクと対策
 
@@ -467,7 +467,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 
 ## 11. 未決事項
 
-- [ ] 計画の8色の具体的な色コード（ダーク・ライト両テーマ）。実装時に `tailwind.config.js` で決める
+- [x] 計画の12色の具体的な色コードは `src/lib/plans/colors.ts` で定義する。ライト・ダーク双方で色名を併記する
 - [ ] `usePlans()` の取得を、計画の詳細では1件だけの取得に分けるか（当面は全件取得で十分と見ている）
 
 ## 変更履歴

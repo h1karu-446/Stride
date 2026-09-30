@@ -210,9 +210,15 @@ describe("UT-15 defaultPlanColor", () => {
   });
   it("falls back to pink when all are used", () => {
     const all = (
-      ["pink", "orange", "yellow", "green", "teal", "blue", "purple", "gray"] as const
+      ["pink", "orange", "yellow", "green", "teal", "blue", "purple", "gray", "coral", "lime", "indigo", "brown"] as const
     ).map((c) => plan({ color: c }));
     expect(defaultPlanColor(all)).toBe("pink");
+  });
+  it("uses the added colors after the original eight", () => {
+    const original = (
+      ["pink", "orange", "yellow", "green", "teal", "blue", "purple", "gray"] as const
+    ).map((c) => plan({ color: c }));
+    expect(defaultPlanColor(original)).toBe("coral");
   });
 });
 
