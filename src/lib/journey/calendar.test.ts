@@ -5,8 +5,8 @@ import { calendarDays } from "./calendar";
 const review = (date: string, total_score: number, cluster: DailyReview["cluster"]) => ({ date, total_score, cluster });
 
 describe("Journey calendar days", () => {
-  it("covers whole Monday-start weeks for 4, 5 and 6 week months", () => {
-    expect(calendarDays(new Date(2027, 1, 1), [], "2026-09-30")).toHaveLength(28); // 2027-02: 月曜始まり・28日
+  it("covers whole Sunday-start weeks for 4, 5 and 6 week months", () => {
+    expect(calendarDays(new Date(2026, 1, 1), [], "2026-09-30")).toHaveLength(28); // 2026-02: 日曜始まり・28日
     expect(calendarDays(new Date(2026, 8, 1), [], "2026-09-30")).toHaveLength(35);
     expect(calendarDays(new Date(2026, 5, 1), [], "2026-09-30")).toHaveLength(35);
     expect(calendarDays(new Date(2026, 7, 1), [], "2026-09-30")).toHaveLength(42); // 2026-08: 土曜始まり・31日
@@ -20,7 +20,7 @@ describe("Journey calendar days", () => {
     expect(at("2026-09-03")).toMatchObject({ kind: "missing", score: null, label: "2026年9月3日 記録なし" });
     expect(at("2026-09-29")).toMatchObject({ kind: "today", isToday: true, href: "/", label: "2026年9月29日（今日） 記録なし" });
     expect(at("2026-09-30")).toMatchObject({ kind: "future", label: "2026年9月30日 未来" });
-    expect(days[0]).toMatchObject({ iso: "2026-08-31", inMonth: false, day: 31 });
+    expect(days[0]).toMatchObject({ iso: "2026-08-30", inMonth: false, day: 30 });
   });
 
   it("treats a recorded today as recorded while still linking to Today", () => {

@@ -2,10 +2,9 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { addMonths, format, getDaysInMonth, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
-import { calendarDates, moveCalendarDate } from "@/lib/calendar";
+import { calendarDates, moveCalendarDate, WEEKDAY_HEADERS as WEEKDAYS } from "@/lib/calendar";
 import { todayISO } from "@/lib/date";
 
-const WEEKDAYS = ["月", "火", "水", "木", "金", "土", "日"];
 
 export default function DatePicker({
   value,

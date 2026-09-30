@@ -5,8 +5,9 @@ import type { Cluster, DailyReview } from "@/types";
 import { todayISO } from "@/lib/date";
 import { calendarDays, type CalendarDay } from "@/lib/journey/calendar";
 import { ClusterBadge } from "@/components/ClusterBadge";
+import { WEEKDAY_HEADERS as DOW } from "@/lib/calendar";
 
-const DOW = ["月", "火", "水", "木", "金", "土", "日"];
+
 
 /** ランクの面色と文字色。面は控えめにし、点数とランク文字は濃い色で読めるようにする（ClusterBadge と同系）。 */
 const RANK_STYLE: Record<Cluster, string> = {

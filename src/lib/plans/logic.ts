@@ -1,3 +1,4 @@
+import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { getISODay, parseISO, differenceInCalendarDays, format } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import type {
@@ -79,7 +80,6 @@ export function phaseProgress(phase: Phase, today: string): number {
 
 // --- routines ----------------------------------------------------------
 
-const WEEKDAY_CHARS = ["月", "火", "水", "木", "金", "土", "日"];
 
 export function weekdaysLabel(weekdays: number[]): string {
   const days = [...new Set(weekdays)].sort((a, b) => a - b);
@@ -87,7 +87,8 @@ export function weekdaysLabel(weekdays: number[]): string {
   if (key === "1,2,3,4,5,6,7") return "毎日";
   if (key === "1,2,3,4,5") return "平日";
   if (key === "6,7") return "土日";
-  return days.map((d) => WEEKDAY_CHARS[d - 1]).join("");
+  // Sunday first, like the calendars.
+  return ISO_WEEKDAYS_IN_ORDER.filter((d) => days.includes(d)).map((d) => ISO_WEEKDAY_CHAR[d]).join("");
 }
 
 export function isoWeekday(date: string): number {

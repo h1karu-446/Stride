@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { calendarDates, moveCalendarDate } from "./calendar";
 
 describe("calendar navigation", () => {
-  it("fills six Monday-first weeks across the year boundary", () => {
+  it("fills six Sunday-first weeks across the year boundary", () => {
     const dates = calendarDates("2027-01");
     expect(dates).toHaveLength(42);
-    expect(dates[0]).toBe("2026-12-28");
-    expect(dates[41]).toBe("2027-02-07");
+    expect(dates[0]).toBe("2026-12-27");
+    expect(dates[41]).toBe("2027-02-06");
   });
 
   it("moves through leap day and clamps month movement", () => {

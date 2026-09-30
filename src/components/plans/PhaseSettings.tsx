@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
+import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { formatMinutes, hasErrors, validatePhase, validateRoutine, weekdaysLabel } from "@/lib/plans/logic";
 import type { PhaseInput, PhaseRoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
 
 type Draft = { key: string; id?: string; input: PhaseRoutineInput };
-const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
 const MINUTE_PRESETS = [15, 30, 45, 60, 90];
 const WEEKDAY_PRESETS: { label: string; days: number[] }[] = [
@@ -149,7 +149,6 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <h3 className="font-semibold">メニュー</h3>
-            <p className="text-xs muted">Todayには短いメニュー名を表示し、詳細は開いたときに読めます。</p>
           </div>
           <button type="button" onClick={addRoutine} disabled={saving}
             className="btn-outline !py-1.5 text-sm">＋ メニューを追加</button>
@@ -224,8 +223,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                       })}
                     </div>
                     <div className="flex gap-1.5">
-                      {DAYS.map((day, i) => {
-                        const number = i + 1;
+                      {ISO_WEEKDAYS_IN_ORDER.map((number) => {
+                        const day = ISO_WEEKDAY_CHAR[number];
                         const selected = row.input.weekdays.includes(number);
                         return <button key={number} type="button" disabled={saving} aria-pressed={selected}
                           onClick={() => updateRoutine(row.key, { weekdays: selected

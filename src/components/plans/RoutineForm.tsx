@@ -4,8 +4,8 @@ import { Field, FormActions } from "@/components/common/FormParts";
 import { hasErrors, validateRoutine } from "@/lib/plans/logic";
 import type { RoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
+import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 
-const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
 
 export default function RoutineForm({
@@ -81,8 +81,8 @@ export default function RoutineForm({
       </div>
       <Field group label="曜日" error={errors.weekdays}>
         <div className="flex gap-1.5">
-          {DAYS.map((label, idx) => {
-            const d = idx + 1;
+          {ISO_WEEKDAYS_IN_ORDER.map((d) => {
+            const label = ISO_WEEKDAY_CHAR[d];
             const on = v.weekdays.includes(d);
             return (
               <button key={d} type="button" aria-pressed={on} disabled={saving} onClick={() => toggle(d)}
