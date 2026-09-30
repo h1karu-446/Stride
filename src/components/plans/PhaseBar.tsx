@@ -11,6 +11,7 @@ const md = (d: string) => `${parseISO(d).getMonth() + 1}/${parseISO(d).getDate()
 type Dates = { start_date: string; end_date: string };
 type Drag = { id: string; pointerId: number; x: number; edge: PhaseDragEdge;
   start: string; end: string };
+type CreateDrag = { pointerId: number; startDay: number };
 
 /** A shared date axis keeps adjacent, empty, and overlapping periods honest. */
 export default function PhaseBar({ phases, color, selectedId, today, onSelect, onAdd, onAdjustDates }: {
@@ -19,7 +20,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   selectedId?: string;
   today: string;
   onSelect: (id: string) => void;
-  onAdd: () => void;
+  onAdd: (dates?: Dates) => void;
   onAdjustDates: (id: string, dates: Dates) => void;
 }) {
   const ordered = sortedPhases(phases);
@@ -27,14 +28,16 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   const lastEnd = ordered.reduce((end, phase) => phase.end_date! > end ? phase.end_date! : end,
     first?.end_date ?? today);
   const axisStart = addDaysISO(first?.start_date ?? today, -7);
-  const axisEnd = addDaysISO(lastEnd, 7);
+  const axisEnd = addDaysISO(lastEnd > today ? lastEnd : today, 37);
   const totalDays = differenceInCalendarDays(parseISO(axisEnd), parseISO(axisStart)) + 1;
   const width = Math.max(360, totalDays * (totalDays > 180 ? 8 : totalDays > 60 ? 10 : 14));
   const dayWidth = width / totalDays;
   const xFor = (date: string) => differenceInCalendarDays(parseISO(date), parseISO(axisStart)) * dayWidth;
   const drag = useRef<Drag | null>(null);
+  const createDrag = useRef<CreateDrag | null>(null);
   const ignoreClickUntil = useRef(0);
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
+  const [createPreview, setCreatePreview] = useState<Dates | null>(null);
   const hex = planHex(color);
 
   const gaps: { start: string; end: string; days: number }[] = [];
@@ -83,6 +86,41 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
     onAdjustDates(phase.id, dates);
   }
 
+  function dayAt(clientX: number, row: HTMLDivElement) {
+    return Math.max(0, Math.min(totalDays - 1,
+      Math.floor((clientX - row.getBoundingClientRect().left) / dayWidth)));
+  }
+
+  function selectedDates(startDay: number, endDay: number): Dates {
+    return {
+      start_date: addDaysISO(axisStart, Math.min(startDay, endDay)),
+      end_date: addDaysISO(axisStart, Math.max(startDay, endDay)),
+    };
+  }
+
+  function createPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const startDay = dayAt(event.clientX, event.currentTarget);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    createDrag.current = { pointerId: event.pointerId, startDay };
+    setCreatePreview(selectedDates(startDay, startDay));
+  }
+
+  function createPointerMove(event: PointerEvent<HTMLDivElement>) {
+    const active = createDrag.current;
+    if (active?.pointerId !== event.pointerId) return;
+    setCreatePreview(selectedDates(active.startDay, dayAt(event.clientX, event.currentTarget)));
+  }
+
+  function createPointerUp(event: PointerEvent<HTMLDivElement>) {
+    const active = createDrag.current;
+    if (active?.pointerId !== event.pointerId) return;
+    const dates = selectedDates(active.startDay, dayAt(event.clientX, event.currentTarget));
+    createDrag.current = null;
+    setCreatePreview(null);
+    onAdd(dates);
+  }
+
   const dragEvents = {
     onPointerMove: pointerMove,
     onPointerUp: pointerUp,
@@ -90,10 +128,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   };
 
   return <section aria-label="フェーズの期間" className="space-y-2">
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs muted">帯の中央をドラッグして移動、両端で開始・終了日を調整。変更は設定画面で保存します。</p>
-      <button type="button" onClick={onAdd} className="text-sm text-notion-blue hover:underline">＋ フェーズを追加</button>
-    </div>
+    <p className="text-xs muted">帯の中央をドラッグして移動、両端で日付を調整。最下段をドラッグすると新しいフェーズを作れます。</p>
     <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-notion-border">
       <div className="relative" style={{ width }}>
         <div className="flex h-7 items-center justify-between bg-slate-50 px-2 text-xs muted dark:bg-notion-panel-hover">
@@ -134,6 +169,25 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
             </div>
           </div>;
         })}
+        <div title="ドラッグして新しいフェーズの期間を選択"
+          className="relative h-12 cursor-crosshair touch-none border-t border-slate-200/70 bg-slate-50/60 dark:border-notion-border dark:bg-notion-panel-hover/40"
+          onPointerDown={createPointerDown} onPointerMove={createPointerMove}
+          onPointerUp={createPointerUp}
+          onPointerCancel={() => { createDrag.current = null; setCreatePreview(null); }}>
+          {createPreview && <div aria-hidden="true"
+            className="pointer-events-none absolute top-1.5 h-9 rounded-md border border-dashed"
+            style={{ left: xFor(createPreview.start_date),
+              width: (differenceInCalendarDays(parseISO(createPreview.end_date), parseISO(createPreview.start_date)) + 1) * dayWidth,
+              borderColor: hex, background: `${hex}38` }} />}
+          <button type="button" onPointerDown={(event) => event.stopPropagation()}
+            onClick={() => onAdd()}
+            className="sticky left-2 z-10 ml-2 mt-1.5 rounded-md bg-slate-50/95 px-2 py-1.5 text-sm font-medium text-notion-blue hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:bg-notion-panel-hover">
+            ＋ 新規
+          </button>
+          {createPreview && <span className="pointer-events-none absolute right-2 top-3 z-10 rounded bg-white/90 px-1.5 text-xs tabular-nums dark:bg-notion-panel-hover">
+            {md(createPreview.start_date)}–{md(createPreview.end_date)}
+          </span>}
+        </div>
         {axisStart <= today && today <= axisEnd && <span aria-label="今日"
           className="pointer-events-none absolute bottom-0 top-7 z-20 w-px bg-slate-900 dark:bg-white"
           style={{ left: xFor(today) + dayWidth / 2 }} />}

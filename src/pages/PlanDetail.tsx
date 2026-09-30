@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
@@ -32,7 +32,8 @@ import {
 import { useTasks } from "@/lib/queries";
 
 type Editing =
-  | { kind: "phase-add" }
+  | { kind: "phase-add"; draftId: number;
+      initialDates?: { start_date: string; end_date: string } }
   | { kind: "phase-edit"; addRoutine?: boolean; openRoutineId?: string;
       initialDates?: { start_date: string; end_date: string } }
   | { kind: "routine-add" }
@@ -54,6 +55,7 @@ export default function PlanDetail() {
   const deleteRoutine = useDeleteRoutine();
 
   const [selectedId, setSelectedId] = useState<string>();
+  const nextPhaseDraftId = useRef(0);
   const [editing, setEditingRaw] = useState<Editing>(null);
   const [phaseDirty, setPhaseDirty] = useState(false);
   const today = todayISO();
@@ -114,7 +116,8 @@ export default function PlanDetail() {
       : "終了";
   };
 
-  const lastEnd = explicit[explicit.length - 1]?.end_date;
+  const lastEnd = explicit.reduce<string | undefined>((end, phase) =>
+    !end || phase.end_date! > end ? phase.end_date! : end, undefined);
   const newPhaseStart = lastEnd && lastEnd >= today ? addDaysISO(lastEnd, 1) : today;
 
   return (
@@ -148,34 +151,24 @@ export default function PlanDetail() {
 
       <GoalPanel key={`goal-${plan.id}`} plan={plan} />
 
-      {hasPhases && (
-        <PhaseBar
+      <PhaseBar
           phases={explicit}
           color={plan.color}
           selectedId={selected.id}
           today={today}
           onSelect={(pid) => { if (setEditing(null)) setSelectedId(pid); }}
-          onAdd={() => setEditing({ kind: "phase-add" })}
+          onAdd={(dates) => setEditing({ kind: "phase-add", draftId: ++nextPhaseDraftId.current,
+            initialDates: dates })}
           onAdjustDates={(pid, dates) => {
             if (setEditing({ kind: "phase-edit", initialDates: dates })) setSelectedId(pid);
           }}
         />
-      )}
-      {!hasPhases && editing?.kind !== "phase-add" && (
-        <div className="rounded-xl bg-slate-50 p-5 dark:bg-notion-panel-hover">
-          <h2 className="font-semibold">最初のフェーズを設定</h2>
-          <p className="mt-1 text-sm muted">期間と、期間中に繰り返すメニューを決めます。</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <button type="button" onClick={() => setEditing({ kind: "phase-add" })}
-              className="btn-primary">最初のフェーズを設定</button>
-            <a href="#phase-activity" className="text-sm muted hover:underline">フェーズなしで使う ↓</a>
-          </div>
-        </div>
-      )}
 
       {editing?.kind === "phase-add" && (
         <PhaseSettings
-          initial={{ name: "", start_date: newPhaseStart, end_date: addDaysISO(newPhaseStart, 29) }}
+          key={editing.draftId}
+          initial={{ name: "", start_date: editing.initialDates?.start_date ?? newPhaseStart,
+            end_date: editing.initialDates?.end_date ?? addDaysISO(newPhaseStart, 29) }}
           existingRoutines={selected.is_implicit ? settingsRoutines : []}
           saving={savePhase.isPending}
           failed={savePhase.isError}
