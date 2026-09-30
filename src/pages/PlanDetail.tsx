@@ -183,7 +183,8 @@ export default function PlanDetail() {
       )}
 
       <section id="phase-activity" className={`card space-y-4 ${editing?.kind === "phase-add" && !hasPhases ? "hidden" : ""}`}>
-        {!selected.is_implicit && (
+        {/* While editing, the form's own name field is the heading; don't show the name twice. */}
+        {!selected.is_implicit && editing?.kind !== "phase-edit" && (
           <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={() => setEditing({ kind: "phase-edit" })}
               className="rounded-lg text-left text-lg font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
