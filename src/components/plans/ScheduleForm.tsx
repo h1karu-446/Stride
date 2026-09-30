@@ -1,5 +1,6 @@
 import { useState } from "react";
 import clsx from "clsx";
+import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
 import { hasErrors, validateSchedule, type ScheduleValues } from "@/lib/plans/logic";
 import { IMPORTANCE_LIST } from "@/types";
@@ -40,11 +41,12 @@ export default function ScheduleForm({
   const canSave = !hasErrors(errors);
   const dateLocked = !!lock && !lock.carry;
   const carrying = !!lock?.carry && v.scheduled_date !== originalDate;
-  useEscToCancel(onCancel);
+  const minDate = originalDate && originalDate < today && !lock ? originalDate : today;
+  useEscToCancel(onCancel, !!saving);
 
   return (
     <form
-      className="rounded-lg border border-slate-200 dark:border-notion-border p-4 space-y-3"
+      className="space-y-3 rounded-xl bg-slate-50/70 p-4 dark:bg-notion-panel-hover"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSave && !saving) onSubmit({ ...v, title: v.title.trim() });
@@ -57,21 +59,21 @@ export default function ScheduleForm({
         </p>
       )}
       <Field label="タイトル" error={v.title ? errors.title : undefined}>
-        <input autoFocus className="input" value={v.title}
+        <input autoFocus className="input text-base font-medium" value={v.title}
+          disabled={saving}
           onChange={(e) => patch({ title: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label={carrying ? "日付（複製先）" : "日付"} error={errors.scheduled_date}>
-          <input type="date" className="input disabled:opacity-60" value={v.scheduled_date}
-            disabled={dateLocked}
-            min={originalDate && originalDate < today && !lock ? originalDate : today}
-            onChange={(e) => patch({ scheduled_date: e.target.value })} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field group label={carrying ? "日付（複製先）" : "日付"} error={errors.scheduled_date}>
+          <DatePicker label={carrying ? "日付（複製先）" : "日付"}
+            value={v.scheduled_date} minDate={minDate} disabled={dateLocked || saving}
+            onChange={(date) => patch({ scheduled_date: date })} />
         </Field>
         <Field group label="重要度">
           <div className="flex gap-1.5">
             {IMPORTANCE_LIST.map((i) => (
               <button key={i} type="button" aria-pressed={v.importance === i}
-                disabled={!!lock}
+                disabled={!!lock || saving}
                 onClick={() => patch({ importance: i })}
                 className={clsx("flex-1 rounded-md border px-2 py-2 text-sm disabled:opacity-60",
                   v.importance === i
@@ -84,7 +86,7 @@ export default function ScheduleForm({
         </Field>
       </div>
       <label className={clsx("flex items-center gap-2 text-sm", lock && "opacity-60")}>
-        <input type="checkbox" checked={v.is_milestone} disabled={!!lock}
+        <input type="checkbox" checked={v.is_milestone} disabled={!!lock || saving}
           onChange={(e) => patch({ is_milestone: e.target.checked })} />
         マイルストーン ◇
       </label>

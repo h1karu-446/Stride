@@ -3,17 +3,17 @@ import { useEffect, type ReactNode } from "react";
 export const SAVE_ERROR_MESSAGE = "保存できませんでした。もう一度お試しください";
 
 /** Esc acts as "キャンセル" on an inline edit form (spec 3.6). */
-export function useEscToCancel(onCancel: () => void) {
+export function useEscToCancel(onCancel: () => void, saving = false) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Esc while converting Japanese input only cancels the conversion.
       if (e.isComposing || e.keyCode === 229) return;
       // A modal handles its own Esc; do not also discard this form.
-      if (e.key === "Escape" && !document.querySelector("[role=dialog]")) onCancel();
+      if (e.key === "Escape" && !saving && !document.querySelector("[role=dialog]")) onCancel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, saving]);
 }
 
 /** "他 N件" / "完了 N" style toggle that expands in place (spec 3.4). */

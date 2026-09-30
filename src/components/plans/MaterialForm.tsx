@@ -36,7 +36,7 @@ export default function MaterialForm({
   const [v, setV] = useState(initial);
   const errors = validateMaterial(v);
   const canSave = !hasErrors(errors);
-  useEscToCancel(onCancel);
+  useEscToCancel(onCancel, !!saving);
 
   const togglePhase = (id: string) =>
     setV((cur) => ({
@@ -48,23 +48,24 @@ export default function MaterialForm({
 
   return (
     <form
-      className="rounded-lg border border-slate-200 dark:border-notion-border p-4 space-y-3"
+      className="space-y-3 rounded-xl bg-slate-50/70 p-4 dark:bg-notion-panel-hover"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSave && !saving) onSubmit(v);
       }}
     >
       <Field label="タイトル" error={v.title ? errors.title : undefined}>
-        <input autoFocus className="input" value={v.title}
+        <input autoFocus className="input text-base font-medium" value={v.title}
+          disabled={saving}
           onChange={(e) => { const title = e.target.value; setV((cur) => ({ ...cur, title })); }} />
       </Field>
       <Field label="リンク（任意）" error={errors.url}>
-        <input type="url" className="input" placeholder="https://" value={v.url ?? ""}
+        <input type="url" className="input" placeholder="https://" value={v.url ?? ""} disabled={saving}
           onChange={(e) => { const url = e.target.value; setV((cur) => ({ ...cur, url })); }} />
       </Field>
       <Field label="学ぶこと・メモ（任意）" error={errors.note}>
         {/* Enter adds a line break here; save with the button (IME-safe). */}
-        <textarea className="input min-h-[4.5rem] resize-y" rows={3}
+        <textarea className="input min-h-[4.5rem] resize-y" rows={3} disabled={saving}
           placeholder="例：第3章の非同期処理を理解する" value={v.note ?? ""}
           onChange={(e) => { const note = e.target.value; setV((cur) => ({ ...cur, note })); }} />
       </Field>
@@ -74,7 +75,7 @@ export default function MaterialForm({
             {phases.map((p) => {
               const on = v.phase_ids.includes(p.id);
               return (
-                <button key={p.id} type="button" aria-pressed={on}
+                <button key={p.id} type="button" aria-pressed={on} disabled={saving}
                   onClick={() => togglePhase(p.id)}
                   className={clsx("rounded-full border px-3 py-1 text-xs",
                     !on && "border-slate-300 dark:border-notion-border muted")}
@@ -89,7 +90,7 @@ export default function MaterialForm({
       <Field group label="状態">
         <div className="flex gap-1.5">
           {MATERIAL_STATUSES.map((s) => (
-            <button key={s} type="button" aria-pressed={v.status === s}
+            <button key={s} type="button" aria-pressed={v.status === s} disabled={saving}
               onClick={() => setV((cur) => ({ ...cur, status: s }))}
               className={clsx("flex-1 rounded-md border px-2 py-1.5 text-sm",
                 v.status === s

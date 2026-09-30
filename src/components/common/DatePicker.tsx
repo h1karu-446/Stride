@@ -14,6 +14,7 @@ export default function DatePicker({
   emptyLabel = "＋ 日付を設定",
   allowClear = false,
   disabled = false,
+  minDate,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -21,6 +22,7 @@ export default function DatePicker({
   emptyLabel?: string;
   allowClear?: boolean;
   disabled?: boolean;
+  minDate?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState((value || todayISO()).slice(0, 7));
@@ -45,7 +47,7 @@ export default function DatePicker({
         : rect.bottom + 8;
       setPosition({ top, left: Math.max(16, Math.min(rect.left, window.innerWidth - width - 16)), width });
     }
-    const initial = value || todayISO();
+    const initial = value && (!minDate || value >= minDate) ? value : minDate || todayISO();
     setMonth(initial.slice(0, 7));
     setFocused(initial);
     setOpen(true);
@@ -75,7 +77,7 @@ export default function DatePicker({
   }, [open]);
 
   function select(date: string) {
-    if (disabled) return;
+    if (disabled || (minDate && date < minDate)) return;
     onChange(date);
     setOpen(false);
     triggerRef.current?.focus();
@@ -101,8 +103,9 @@ export default function DatePicker({
     const next = moveCalendarDate(focused, key);
     if (next !== focused) {
       event.preventDefault();
-      setFocused(next);
-      setMonth(next.slice(0, 7));
+      const allowed = minDate && next < minDate ? minDate : next;
+      setFocused(allowed);
+      setMonth(allowed.slice(0, 7));
     }
   }
 
@@ -151,14 +154,16 @@ export default function DatePicker({
                 type="button"
                 aria-label={format(parseISO(date), "yyyy年M月d日", { locale: ja })}
                 aria-pressed={date === value}
+                disabled={!!minDate && date < minDate}
                 tabIndex={date === focused ? 0 : -1}
                 onClick={() => select(date)}
-                className={`aspect-square rounded-md text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${date === value ? "bg-notion-blue text-white font-bold" : date === today ? "border border-notion-blue text-notion-blue" : date.slice(0, 7) !== month ? "muted opacity-45 hover:bg-slate-100 dark:hover:bg-notion-panel-hover" : "hover:bg-slate-100 dark:hover:bg-notion-panel-hover"}`}
+                className={`aspect-square rounded-md text-xs tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue disabled:cursor-not-allowed disabled:opacity-30 ${date === value ? "bg-notion-blue text-white font-bold" : date === today ? "border border-notion-blue text-notion-blue" : date.slice(0, 7) !== month ? "muted opacity-45 hover:bg-slate-100 dark:hover:bg-notion-panel-hover" : "hover:bg-slate-100 dark:hover:bg-notion-panel-hover"}`}
               >{Number(date.slice(-2))}</button>
             ))}
           </div>
           <div className="mt-2 flex justify-end border-t border-slate-100 pt-2 dark:border-notion-border">
-            <button type="button" className="text-xs text-notion-blue hover:underline" onClick={() => select(today)}>今日を選ぶ</button>
+            <button type="button" disabled={!!minDate && today < minDate}
+              className="text-xs text-notion-blue hover:underline disabled:opacity-40" onClick={() => select(today)}>今日を選ぶ</button>
           </div>
         </div>, document.body
       )}
