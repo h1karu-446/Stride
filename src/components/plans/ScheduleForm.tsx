@@ -1,21 +1,22 @@
 import { useState } from "react";
 import clsx from "clsx";
 import { Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
-import { hasErrors, validateSchedule } from "@/lib/plans/logic";
-import { IMPORTANCE_LIST, type Importance } from "@/types";
+import { hasErrors, validateSchedule, type ScheduleValues } from "@/lib/plans/logic";
+import { IMPORTANCE_LIST } from "@/types";
 
-export type ScheduleInput = {
-  title: string;
-  scheduled_date: string;
-  importance: Importance;
-  is_milestone: boolean;
-};
+export type ScheduleInput = ScheduleValues;
 
-/** Inline edit form for a plan schedule (spec 4.2, 3.6). */
+/**
+ * Inline edit form for a plan schedule (spec 4.2, 3.6).
+ * `lock` is set for a schedule dated before today (BR-04): only the title can
+ * change, and for an overdue one that has not been carried over yet
+ * (`lock.carry`), choosing a date from today on copies it to that date.
+ */
 export default function ScheduleForm({
   initial,
   originalDate,
   today,
+  lock,
   onSubmit,
   onDelete,
   onCancel,
@@ -26,6 +27,7 @@ export default function ScheduleForm({
   /** Saved date when editing; keeping a past one is allowed (BR-04). */
   originalDate?: string;
   today: string;
+  lock?: { carry: boolean };
   onSubmit: (v: ScheduleInput) => void;
   onDelete?: () => void;
   onCancel: () => void;
@@ -36,6 +38,8 @@ export default function ScheduleForm({
   const patch = (p: Partial<ScheduleInput>) => setV((cur) => ({ ...cur, ...p }));
   const errors = validateSchedule(v, today, originalDate);
   const canSave = !hasErrors(errors);
+  const dateLocked = !!lock && !lock.carry;
+  const carrying = !!lock?.carry && v.scheduled_date !== originalDate;
   useEscToCancel(onCancel);
 
   return (
@@ -46,22 +50,30 @@ export default function ScheduleForm({
         if (canSave && !saving) onSubmit({ ...v, title: v.title.trim() });
       }}
     >
+      {lock && (
+        <p className="text-xs muted">
+          過去の予定は、タイトルだけ変更できます
+          {lock.carry && "。日付を今日以降にすると、この予定を元の日に残したまま、その日に複製します"}
+        </p>
+      )}
       <Field label="タイトル" error={v.title ? errors.title : undefined}>
         <input autoFocus className="input" value={v.title}
           onChange={(e) => patch({ title: e.target.value })} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="日付" error={errors.scheduled_date}>
-          <input type="date" className="input" value={v.scheduled_date}
-            min={originalDate && originalDate < today ? originalDate : today}
+        <Field label={carrying ? "日付（複製先）" : "日付"} error={errors.scheduled_date}>
+          <input type="date" className="input disabled:opacity-60" value={v.scheduled_date}
+            disabled={dateLocked}
+            min={originalDate && originalDate < today && !lock ? originalDate : today}
             onChange={(e) => patch({ scheduled_date: e.target.value })} />
         </Field>
         <Field group label="重要度">
           <div className="flex gap-1.5">
             {IMPORTANCE_LIST.map((i) => (
               <button key={i} type="button" aria-pressed={v.importance === i}
+                disabled={!!lock}
                 onClick={() => patch({ importance: i })}
-                className={clsx("flex-1 rounded-md border px-2 py-2 text-sm",
+                className={clsx("flex-1 rounded-md border px-2 py-2 text-sm disabled:opacity-60",
                   v.importance === i
                     ? "border-blue-500 bg-blue-500/10"
                     : "border-slate-300 dark:border-notion-border")}>
@@ -71,12 +83,13 @@ export default function ScheduleForm({
           </div>
         </Field>
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={v.is_milestone}
+      <label className={clsx("flex items-center gap-2 text-sm", lock && "opacity-60")}>
+        <input type="checkbox" checked={v.is_milestone} disabled={!!lock}
           onChange={(e) => patch({ is_milestone: e.target.checked })} />
         マイルストーン ◇
       </label>
-      <FormActions onDelete={onDelete} onCancel={onCancel}
+      <FormActions onDelete={lock ? undefined : onDelete} onCancel={onCancel}
+        saveLabel={carrying ? "複製して保存" : undefined}
         canSave={canSave} saving={saving} error={failed} />
     </form>
   );
