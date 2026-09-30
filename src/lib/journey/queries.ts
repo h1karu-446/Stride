@@ -44,6 +44,30 @@ export function useAchievements(months: number, today: string) {
   });
 }
 
+// Every achievement, oldest first, for the full-screen reel (/journey/achievements).
+export function useAllAchievements() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["achievements", session?.user.id, "all"], enabled: !!session,
+    queryFn: (): Promise<Achievement[]> =>
+      fetchAllPages<Achievement>((start, end) => supabase.from("achievements").select("*")
+        .order("achieved_on").order("kind").order("id").range(start, end)),
+  });
+}
+
+// The achievements view has no importance, so the reel reads it from achieved wishes.
+export function useAchievedWishImportance() {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["wishes", session?.user.id, "achieved-importance"], enabled: !!session,
+    queryFn: async (): Promise<Map<string, Importance>> => {
+      const rows = await fetchAllPages<{ id: string; importance: Importance }>((start, end) =>
+        supabase.from("wishes").select("id, importance").not("achieved_at", "is", null).order("id").range(start, end));
+      return new Map(rows.map((r) => [r.id, r.importance]));
+    },
+  });
+}
+
 // The oldest record date decides between "no records at all" and "none in this range",
 // and whether "もっと見る" can reach anything older.
 export function useOldestAchievement() {

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "@/components/Layout";
 import Today from "@/pages/Today";
 import Journey from "@/pages/Journey";
+import AchievementReel from "@/pages/AchievementReel";
 import Plans from "@/pages/Plans";
 import PlanDetail from "@/pages/PlanDetail";
 import Settings from "@/pages/Settings";
@@ -29,6 +30,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/journey/achievements" element={<AchievementReel />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Today />} />
         <Route path="/day/:date" element={<Today />} />
