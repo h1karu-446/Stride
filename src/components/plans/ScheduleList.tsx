@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
 import { useQueryClient } from "@tanstack/react-query";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { FoldButton, SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
@@ -31,7 +32,7 @@ const OVERDUE = "#F2994A";
 export default function ScheduleList({
   planId,
   color,
-  tasks,
+  tasks: allTasks,
   today,
   editing,
   onEdit,
@@ -49,6 +50,9 @@ export default function ScheduleList({
   const add = useAddTask();
   const update = useUpdateTask();
   const del = useDeleteTask();
+  const deferDelete = useDeferredDelete((state) => state.schedule);
+  const hidden = useHiddenKeys();
+  const tasks = allTasks.filter((task) => !hidden.has(`task:${task.id}`));
   const carry = useAddTask();
   const qc = useQueryClient();
   // Rows whose carry-over is in flight or whose list refresh has not landed
@@ -126,7 +130,10 @@ export default function ScheduleList({
       failed={add.isError || update.isError || del.isError}
       onCancel={onClose}
       onSubmit={(v) => submit(v, task)}
-      onDelete={task ? () => del.mutate(task.id, { onSuccess: onClose }) : undefined}
+      onDelete={task ? () => {
+        deferDelete({ key: `task:${task.id}`, label: task.title, commit: () => del.mutateAsync(task.id) });
+        onClose();
+      } : undefined}
     />
   );
 

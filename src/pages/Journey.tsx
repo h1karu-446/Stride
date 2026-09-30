@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
 import { format, startOfMonth } from "date-fns";
 import { Link } from "react-router-dom";
 import ScoreCalendar from "@/components/journey/ScoreCalendar";
@@ -29,7 +30,9 @@ export default function Journey() {
   const achievements = useRecentAchievements(FEED_LIMIT);
   const annual = useAnnualAchievements(today.slice(0, 4));
   const mutation = useMutateWish();
-  const pending = sortWishes((wishes.data ?? []).filter((wish) => !wish.achieved_at));
+  const deferDelete = useDeferredDelete((state) => state.schedule);
+  const hidden = useHiddenKeys();
+  const pending = sortWishes((wishes.data ?? []).filter((wish) => !wish.achieved_at && !hidden.has(`wish:${wish.id}`)));
   // An achieved wish opened from the feed is loaded on its own (the view has no note or importance).
   const achievedEditing = useWish(editing && editing !== "new" && !pending.some((wish) => wish.id === editing) ? editing : null);
   // The achieved wish whose form has been shown; later refetches keep the form (and its input).
@@ -47,7 +50,10 @@ export default function Journey() {
   const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo((current) => (current?.id === id ? null : current)) });
   // Achieved wishes are not deleted from the feed; restore them first (spec 4.4).
   const form = (id: string, initial: WishInput, deletable = true) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
-    onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })}
+    onDelete={id === "new" || !deletable ? undefined : () => {
+      deferDelete({ key: `wish:${id}`, label: initial.title || "やりたいこと", commit: () => mutation.mutateAsync({ type: "delete", id }).then(() => undefined) });
+      setEditing(null);
+    }}
     onRestore={initial.achieved_at ? () => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => { setEditing(null); setUndo((current) => (current?.id === id ? null : current)); } }) : undefined} />;
   const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement, achieved_at: wish.achieved_at });
 

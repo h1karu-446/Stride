@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
 import clsx from "clsx";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { FoldButton } from "@/components/common/FormParts";
@@ -82,6 +83,8 @@ export default function MaterialList({
 }) {
   const save = useSaveMaterial();
   const del = useDeleteMaterial();
+  const deferDelete = useDeferredDelete((state) => state.schedule);
+  const hidden = useHiddenKeys();
   const setStatus = useSetMaterialStatus();
   const [showOther, setShowOther] = useState(false);
   const [showDone, setShowDone] = useState(false);
@@ -92,7 +95,7 @@ export default function MaterialList({
   // Materials whose status change is in flight: their badge is disabled so
   // two changes can never be applied out of order.
   const [statusPending, setStatusPending] = useState<ReadonlySet<string>>(new Set());
-  const materials = plan.materials;
+  const materials = plan.materials.filter((m) => !hidden.has(`material:${m.id}`));
   const groups = materialGroups(materials, selectedPhaseId);
   const editingRow = materials.find((m) => m.id === editing);
 
@@ -150,7 +153,10 @@ export default function MaterialList({
         failed={save.isError || del.isError}
         onCancel={close}
         onSubmit={(input) => submit(input, target)}
-        onDelete={target ? () => del.mutate(target.id, { onSuccess: close }) : undefined}
+        onDelete={target ? () => {
+          deferDelete({ key: `material:${target.id}`, label: target.title, commit: () => del.mutateAsync(target.id) });
+          close();
+        } : undefined}
       />
     );
   };

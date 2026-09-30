@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import UndoToasts from "@/components/common/UndoToasts";
 import clsx from "clsx";
 import { useUiStore } from "@/lib/uiStore";
 import { useAuth } from "@/lib/auth";
@@ -89,6 +90,7 @@ export default function Layout() {
       </header>
       <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
         <Outlet />
+        <UndoToasts />
       </main>
     </div>
   );

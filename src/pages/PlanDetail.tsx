@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
+import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
 import ExecutionSquares from "@/components/plans/ExecutionSquares";
 import GoalPanel from "@/components/plans/GoalPanel";
 import MaterialList from "@/components/plans/MaterialList";
@@ -53,6 +54,8 @@ export default function PlanDetail() {
   const deletePhase = useDeletePhase();
   const saveRoutine = useSaveRoutine();
   const deleteRoutine = useDeleteRoutine();
+  const deferDelete = useDeferredDelete((state) => state.schedule);
+  const hidden = useHiddenKeys();
 
   const [selectedId, setSelectedId] = useState<string>();
   const nextPhaseDraftId = useRef(0);
@@ -61,7 +64,12 @@ export default function PlanDetail() {
   const today = todayISO();
 
   const plan = plans?.find((p) => p.id === id);
-  const phases = useMemo(() => plan?.phases ?? [], [plan]);
+  // Phases and routines waiting for a deferred delete are hidden (undo toast).
+  const hiddenKey = [...hidden].join();
+  const phases = useMemo(() => (plan?.phases ?? [])
+    .filter((phase) => !hidden.has(`phase:${phase.id}`))
+    .map((phase) => ({ ...phase, routines: phase.routines.filter((r) => !hidden.has(`routine:${r.id}`)) })),
+  [plan, hiddenKey]);
   // Fall back to the initial choice when nothing (or a deleted phase) is selected.
   const selected =
     phases.find((p) => p.id === selectedId) ?? initialPhase(phases, today);
@@ -124,8 +132,9 @@ export default function PlanDetail() {
     <div className="space-y-6">
       <PlanHeader key={`header-${plan.id}`} plan={plan} today={today} deleteFailed={deletePlan.isError}
         onDelete={() => {
-          if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材と、明日以降の未完了の予定も削除され、元に戻せません")) {
-            deletePlan.mutate(plan.id, { onSuccess: () => navigate("/plans") });
+          if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材と、明日以降の未完了の予定も削除されます（直後なら元に戻せます）")) {
+            deferDelete({ key: `plan:${plan.id}`, label: plan.name, commit: () => deletePlan.mutateAsync(plan.id) });
+            navigate("/plans");
           }
         }} />
 
@@ -221,11 +230,8 @@ export default function PlanDetail() {
               )
             }
             onDelete={() => {
-              if (window.confirm("このフェーズとメニューを削除しますか？ 作成済みのTodayタスクは残ります")) {
-                deletePhase.mutate(selected.id, {
-                  onSuccess: () => { setSelectedId(undefined); setPhaseDirty(false); setEditingRaw(null); },
-                });
-              }
+              deferDelete({ key: `phase:${selected.id}`, label: selected.name ?? "フェーズ", commit: () => deletePhase.mutateAsync(selected.id) });
+              setSelectedId(undefined); setPhaseDirty(false); setEditingRaw(null);
             }}
           />
         )}
@@ -246,9 +252,10 @@ export default function PlanDetail() {
                       { onSuccess: closeEditing }
                     )
                   }
-                  onDelete={() =>
-                    deleteRoutine.mutate(r.id, { onSuccess: closeEditing })
-                  }
+                  onDelete={() => {
+                    deferDelete({ key: `routine:${r.id}`, label: r.title, commit: () => deleteRoutine.mutateAsync(r.id) });
+                    closeEditing();
+                  }}
                 />
               ) : (
                 <RoutineCard key={r.id} routine={r}

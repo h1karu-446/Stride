@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useHiddenKeys } from "@/lib/deferredDelete";
 import { Link, useNavigate } from "react-router-dom";
 import { SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import PlanCard from "@/components/plans/PlanCard";
@@ -29,8 +30,10 @@ export default function Plans() {
   const [creating, setCreating] = useState(false);
   const today = todayISO();
 
+  const hidden = useHiddenKeys();
+  const hiddenKey = [...hidden].join();
   const groups = useMemo(() => {
-    const all = plans ?? [];
+    const all = (plans ?? []).filter((p) => !hidden.has(`plan:${p.id}`));
     const by = (s: PlanStatus) => all.filter((p) => p.status === s);
     return {
       active: sortActivePlans(by("active")),
@@ -38,7 +41,7 @@ export default function Plans() {
       idea: sortInactivePlans(by("idea"), "idea"),
       done: sortInactivePlans(by("done"), "done"),
     };
-  }, [plans]);
+  }, [plans, hiddenKey]);
   const summary = useMemo(() => todaySummary(plans ?? [], today), [plans, today]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
