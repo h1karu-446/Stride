@@ -679,7 +679,8 @@ function TaskRow({ task }: { task: Task }) {
   const plan = task.plan_id
     ? plans?.find((p) => p.id === task.plan_id)
     : undefined;
-  const memoLine = plan ? memoOneLine(task.memo) : "";
+  const memoLine = plan && !task.routine_id ? memoOneLine(task.memo) : "";
+  const [detailOpen, setDetailOpen] = useState(false);
   const duration = taskDurationMinutes(task);
   // A past schedule keeps its completion, importance and existence (BR-04).
   const locked = isLockedSchedule(task, todayISO());
@@ -755,6 +756,16 @@ function TaskRow({ task }: { task: Task }) {
                 {memoLine}
               </span>
             )}
+          </div>
+        )}
+        {task.routine_id && task.memo && (
+          <div className="mt-1 text-xs">
+            <button type="button" aria-expanded={detailOpen}
+              onClick={() => setDetailOpen(!detailOpen)}
+              className="rounded text-notion-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+              {detailOpen ? "メニューの詳細を閉じる" : "メニューの詳細を見る"}
+            </button>
+            {detailOpen && <p className="mt-1 whitespace-pre-wrap break-words muted">{task.memo}</p>}
           </div>
         )}
       </div>

@@ -226,54 +226,34 @@ export function useDeletePlan() {
 
 export type PhaseInput = { name: string; start_date: string; end_date: string };
 
-export function useSavePhase() {
+export type PhaseRoutineInput = RoutineInput & { id?: string };
+
+/** Phase fields and the complete routine list are committed in one DB transaction. */
+export function useSavePhaseSettings() {
   const qc = useQueryClient();
-  const { session } = useAuth();
   return useMutation({
-    mutationFn: async ({
-      planId,
-      phaseId,
-      input,
-    }: {
+    mutationFn: async ({ planId, phaseId, input, routines }: {
       planId: string;
       phaseId?: string;
       input: PhaseInput;
-    }) => {
-      if (!session) throw new Error("Not signed in");
-      const body = {
-        name: input.name.trim(),
-        start_date: input.start_date,
-        end_date: input.end_date,
-      };
-      if (phaseId) {
-        const { error } = await supabase
-          .from("phases").update(body).eq("id", phaseId);
-        if (error) throw error;
-        return;
-      }
-      // Adding a phase: the implicit phase becomes the first real phase so its
-      // routines carry over (BR-03); otherwise insert a new row.
-      const { data: implicit, error: e1 } = await supabase
-        .from("phases")
-        .select("id")
-        .eq("plan_id", planId)
-        .eq("is_implicit", true)
-        .maybeSingle();
-      if (e1) throw e1;
-      if (implicit) {
-        const { error } = await supabase
-          .from("phases")
-          .update({ ...body, is_implicit: false })
-          .eq("id", (implicit as { id: string }).id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("phases").insert({
-          ...body,
-          user_id: session.user.id,
-          plan_id: planId,
-        });
-        if (error) throw error;
-      }
+      routines: PhaseRoutineInput[];
+    }): Promise<string> => {
+      const { data, error } = await supabase.rpc("save_phase_settings", {
+        p_plan_id: planId,
+        p_phase_id: phaseId ?? null,
+        p_name: input.name.trim(),
+        p_start_date: input.start_date,
+        p_end_date: input.end_date,
+        p_routines: routines.map(({ id, ...routine }) => ({
+          ...(id ? { id } : {}),
+          ...routine,
+          title: routine.title.trim(),
+          menu: routine.menu?.trim() || null,
+          weekdays: [...routine.weekdays].sort((a, b) => a - b),
+        })),
+      });
+      if (error) throw error;
+      return data as string;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
   });

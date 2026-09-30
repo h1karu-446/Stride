@@ -13,12 +13,14 @@ export default function DatePicker({
   label,
   emptyLabel = "＋ 日付を設定",
   allowClear = false,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   label: string;
   emptyLabel?: string;
   allowClear?: boolean;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [month, setMonth] = useState((value || todayISO()).slice(0, 7));
@@ -29,7 +31,12 @@ export default function DatePicker({
   const focusRef = useRef<HTMLButtonElement>(null);
   const today = todayISO();
 
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   function openCalendar() {
+    if (disabled) return;
     const rect = triggerRef.current?.getBoundingClientRect();
     if (rect) {
       const width = Math.min(288, window.innerWidth - 32);
@@ -68,6 +75,7 @@ export default function DatePicker({
   }, [open]);
 
   function select(date: string) {
+    if (disabled) return;
     onChange(date);
     setOpen(false);
     triggerRef.current?.focus();
@@ -106,6 +114,7 @@ export default function DatePicker({
         type="button"
         aria-label={`${label}: ${value ? format(parseISO(value), "yyyy年M月d日", { locale: ja }) : "未設定"}`}
         aria-expanded={open}
+        disabled={disabled}
         onClick={() => open ? setOpen(false) : openCalendar()}
         className={`inline-flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${value ? "border-slate-300 bg-white font-medium dark:border-notion-border dark:bg-notion-panel" : "border-dashed border-slate-300 muted hover:border-notion-blue dark:border-notion-border"}`}
       >
@@ -113,7 +122,7 @@ export default function DatePicker({
         <span>{value ? format(parseISO(value), "yyyy年M月d日 (EEE)", { locale: ja }) : emptyLabel}</span>
       </button>
       {value && allowClear && (
-        <button type="button" onClick={() => onChange("")} className="text-xs muted hover:text-rose-600">解除</button>
+        <button type="button" disabled={disabled} onClick={() => onChange("")} className="text-xs muted hover:text-rose-600">解除</button>
       )}
       {open && createPortal(
         <div

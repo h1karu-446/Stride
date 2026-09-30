@@ -32,11 +32,12 @@ export default function RoutineForm({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // A modal handles its own Esc; do not also discard this form.
-      if (e.key === "Escape" && !document.querySelector("[role=dialog]")) onCancel();
+      if (e.key === "Escape" && !e.isComposing && e.keyCode !== 229
+          && !document.querySelector("[role=dialog]") && !saving) onCancel();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
+  }, [onCancel, saving]);
 
   const toggle = (d: number) =>
     setV({
@@ -54,8 +55,9 @@ export default function RoutineForm({
         if (canSave && !saving) onSubmit({ ...v, minutes });
       }}
     >
-      <Field label="タイトル" error={v.title ? errors.title : undefined}>
+      <Field label="メニュー（必須）" error={v.title ? errors.title : undefined}>
         <input autoFocus className="input" value={v.title}
+          placeholder="例：IELTSのListeningを30分解く"
           onChange={(e) => setV({ ...v, title: e.target.value })} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -93,8 +95,9 @@ export default function RoutineForm({
           })}
         </div>
       </Field>
-      <Field label="メニュー（任意）" error={errors.menu}>
+      <Field label="メニューの詳細（任意）" error={errors.menu}>
         <textarea className="input min-h-[96px]" value={v.menu ?? ""}
+          placeholder="例：公式問題集10のTest 2。間違えた設問は聞き直す"
           onChange={(e) => setV({ ...v, menu: e.target.value })} />
       </Field>
       <FormActions onDelete={onDelete} onCancel={onCancel}

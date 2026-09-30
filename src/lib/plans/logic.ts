@@ -349,14 +349,14 @@ export function validateRoutine(v: {
   menu?: string;
 }): Errors<"title" | "minutes" | "weekdays" | "menu"> {
   const e: Errors<"title" | "minutes" | "weekdays" | "menu"> = {};
-  if (len(v.title) < 1) e.title = "タイトルを入力してください";
-  else if (len(v.title) > 40) e.title = "タイトルは40文字までです";
+  if (len(v.title) < 1) e.title = "メニューを入力してください";
+  else if (len(v.title) > 40) e.title = "メニューは40文字までです";
   if (!Number.isInteger(v.minutes) || v.minutes < 5 || v.minutes > 600 ||
       v.minutes % 5 !== 0) {
     e.minutes = "所要時間は5〜600分の5分刻みで入力してください";
   }
   if (v.weekdays.length < 1) e.weekdays = "曜日を1つ以上選んでください";
-  if (len(v.menu) > 2000) e.menu = "メニューは2000文字までです";
+  if (len(v.menu) > 2000) e.menu = "メニューの詳細は2000文字までです";
   return e;
 }
 

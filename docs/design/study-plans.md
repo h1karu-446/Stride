@@ -67,7 +67,7 @@ flowchart LR
 ```
 
 - 画面からの読み書きは、既存と同じく supabase-js でテーブルを直接操作する（RLSで保護）
-- 複数の行をまとめて整合性を保つ必要がある操作だけ、RPC（PostgreSQLの関数）にする：ルーティンの生成、フェーズの削除、計画の削除
+- 複数の行をまとめて整合性を保つ必要がある操作だけ、RPC（PostgreSQLの関数）にする：ルーティンの生成、フェーズとメニューの一括保存、フェーズの削除、計画の削除
 
 ## 4. DB設計
 
@@ -257,7 +257,7 @@ create policy "<table>_owner_all" on public.<table> for all
 - 同じ計画に他の通常フェーズがあれば、そのフェーズを削除する（ルーティンと教材の紐づけは cascade で消える）
 - 最後の1つなら、そのフェーズのルーティンと教材の紐づけを削除し、行を `is_implicit = true`（名前・期間は NULL）に更新する
 
-最初のフェーズの追加は、暗黙のフェーズの行を `update`（`is_implicit = false`、名前と期間を設定）するだけで済むので、RPC にしない。ルーティンと教材の紐づけは同じ行に付いたまま引き継がれる。
+最初のフェーズの追加は、暗黙のフェーズの行を `update`（`is_implicit = false`、名前と期間を設定）する。メニューの追加・更新・削除と一括保存するため、Issue #49 から `save_phase_settings` RPC を使う。security invokerとRLSを維持し、同じ計画の行をロックする。入力エラー時はフェーズとメニューの全変更がロールバックされる。ルーティンと教材の紐づけは同じフェーズ行に付いたまま引き継がれる。
 
 #### delete_plan(p_plan_id uuid, p_today date) returns void
 
@@ -451,11 +451,12 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | 4. Journey | `0009_wishes_and_achievements.sql` | `wishes`、`achievements` ビュー |
 | Issue #36 | `0014_task_carry_over.sql` | `tasks.carried_from`、部分一意インデックス、`is_own_task`、`tasks_owner_all` の差し替え |
 | Issue #54 | `0018_wish_importance_emphasis.sql` | `wishes.importance`・`wishes.emphasize_achievement`、`achievements.emphasized`（ビューの drop → create） |
+| Issue #49・#52 | `0019_phase_settings.sql` | フェーズと全メニューを原子的に保存する `save_phase_settings` RPC（既存データの書き換えなし） |
 
 - 検証はDocker上のローカルSupabaseへ適用して行う。Issue #5で既存migration 0001〜0006を準備し、0007以降は各Issueで扱う。環境の切り替えは [プロジェクト固有Context](../project-context.md) を参照する
 - 現在のSupabaseでは新しいテーブルがData APIに自動公開されない。新規テーブルを使うロールへの明示的な `GRANT` とRLSを各migrationで設定する。既存2テーブルのローカル権限はIssue #5の専用SQLで補う
 - 本番への適用は `supabase db push`（またはダッシュボードのSQLエディタ）。ローカル検証とは分け、対象プロジェクトと実行許可を確認する。手順と確認項目はリリース手順書に書く
-- どの migration も列やテーブルを追加するだけで、既存の列を変えない。画面側を戻せば、DBを戻さなくても以前の動きになる（新しい列は NULL 可か既定値あり）
+- 新しいRPCは既存の画面やDB列の意味を変えない。画面側を戻した場合も、既存の個別編集は利用できる
 - `delete_plan` がリリース3以降の `is_milestone` などに依存しないよう、関数はリリース2の時点の列だけで書く
 
 ## 10. 検討した代替案（ADR）

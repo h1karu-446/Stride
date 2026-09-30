@@ -88,6 +88,7 @@ export function FormActions({
           <button
             type="button"
             onClick={onDelete}
+            disabled={saving}
             className="text-xs text-red-500 hover:underline"
           >
             削除
@@ -96,7 +97,7 @@ export function FormActions({
           <span />
         )}
         <div className="flex gap-2">
-          <button type="button" onClick={onCancel} className="btn-outline !py-1.5">
+          <button type="button" onClick={onCancel} disabled={saving} className="btn-outline !py-1.5">
             キャンセル
           </button>
           <button

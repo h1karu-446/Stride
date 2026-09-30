@@ -6,7 +6,7 @@ import ExecutionSquares from "@/components/plans/ExecutionSquares";
 import GoalPanel from "@/components/plans/GoalPanel";
 import MaterialList from "@/components/plans/MaterialList";
 import PhaseBar from "@/components/plans/PhaseBar";
-import PhaseForm from "@/components/plans/PhaseForm";
+import PhaseSettings from "@/components/plans/PhaseSettings";
 import PlanHeader from "@/components/plans/PlanHeader";
 import RoutineCard from "@/components/plans/RoutineCard";
 import RoutineForm from "@/components/plans/RoutineForm";
@@ -25,7 +25,7 @@ import {
   useDeletePlan,
   useDeleteRoutine,
   usePlans,
-  useSavePhase,
+  useSavePhaseSettings,
   useSaveRoutine,
   useUpdatePlan,
 } from "@/lib/plans/queries";
@@ -33,7 +33,7 @@ import { useTasks } from "@/lib/queries";
 
 type Editing =
   | { kind: "phase-add" }
-  | { kind: "phase-edit" }
+  | { kind: "phase-edit"; addRoutine?: boolean; openRoutineId?: string }
   | { kind: "routine-add" }
   | { kind: "routine-edit"; id: string }
   | { kind: "schedule"; id: string } // task id, or "new"
@@ -47,13 +47,14 @@ export default function PlanDetail() {
   const { data: tasks = [] } = useTasks();
   const updatePlan = useUpdatePlan();
   const deletePlan = useDeletePlan();
-  const savePhase = useSavePhase();
+  const savePhase = useSavePhaseSettings();
   const deletePhase = useDeletePhase();
   const saveRoutine = useSaveRoutine();
   const deleteRoutine = useDeleteRoutine();
 
   const [selectedId, setSelectedId] = useState<string>();
   const [editing, setEditingRaw] = useState<Editing>(null);
+  const [phaseDirty, setPhaseDirty] = useState(false);
   const today = todayISO();
 
   const plan = plans?.find((p) => p.id === id);
@@ -66,14 +67,22 @@ export default function PlanDetail() {
     [tasks, plan, today]
   );
 
-  // Only one edit form at a time: opening another discards the current one.
+  // Keep a draft when the user accidentally switches phases or editors.
   const setEditing = useCallback((e: Editing) => {
+    if (savePhase.isPending) return false;
+    // The current settings panel already edits this phase. Reopening it with
+    // the same React key would clear the parent's dirty flag but keep its draft.
+    if (editing?.kind === "phase-edit" && e?.kind === "phase-edit") return false;
+    if ((editing?.kind === "phase-add" || editing?.kind === "phase-edit") && phaseDirty
+        && !window.confirm("保存していないフェーズの変更を破棄しますか？")) return false;
     savePhase.reset();
     saveRoutine.reset();
     deletePhase.reset();
     deleteRoutine.reset();
+    setPhaseDirty(false);
     setEditingRaw(e);
-  }, [savePhase, saveRoutine, deletePhase, deleteRoutine]);
+    return true;
+  }, [editing, phaseDirty, savePhase, saveRoutine, deletePhase, deleteRoutine]);
   const closeEditing = useCallback(() => setEditing(null), [setEditing]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
@@ -91,6 +100,8 @@ export default function PlanDetail() {
   const color = planHex(plan.color);
   const explicit = sortedPhases(phases.filter((p) => !p.is_implicit));
   const hasPhases = explicit.length > 0;
+  const settingsRoutines = selected.routines.map(({ id, title, minutes, weekdays, importance, menu }) =>
+    ({ id, title, minutes, weekdays, importance, menu }));
 
   const phaseHeading = () => {
     if (!selected.start_date || !selected.end_date) return "";
@@ -107,7 +118,7 @@ export default function PlanDetail() {
 
   return (
     <div className="space-y-6">
-      <PlanHeader key={plan.id} plan={plan} today={today} deleteFailed={deletePlan.isError}
+      <PlanHeader key={`header-${plan.id}`} plan={plan} today={today} deleteFailed={deletePlan.isError}
         onDelete={() => {
           if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材と、明日以降の未完了の予定も削除され、元に戻せません")) {
             deletePlan.mutate(plan.id, { onSuccess: () => navigate("/plans") });
@@ -134,7 +145,7 @@ export default function PlanDetail() {
         </div>
       )}
 
-      <GoalPanel key={plan.id} plan={plan} />
+      <GoalPanel key={`goal-${plan.id}`} plan={plan} />
 
       {hasPhases && (
         <PhaseBar
@@ -142,34 +153,46 @@ export default function PlanDetail() {
           color={plan.color}
           selectedId={selected.id}
           today={today}
-          onSelect={(pid) => { setSelectedId(pid); setEditing(null); }}
+          onSelect={(pid) => { if (setEditing(null)) setSelectedId(pid); }}
           onAdd={() => setEditing({ kind: "phase-add" })}
         />
       )}
       {!hasPhases && editing?.kind !== "phase-add" && (
-        <button type="button" onClick={() => setEditing({ kind: "phase-add" })}
-          className="text-sm muted hover:underline">
-          ＋ フェーズを追加
-        </button>
+        <div className="rounded-xl bg-slate-50 p-5 dark:bg-notion-panel-hover">
+          <h2 className="font-semibold">最初のフェーズを設定</h2>
+          <p className="mt-1 text-sm muted">期間と、期間中に繰り返すメニューを決めます。</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={() => setEditing({ kind: "phase-add" })}
+              className="btn-primary">最初のフェーズを設定</button>
+            <a href="#phase-activity" className="text-sm muted hover:underline">フェーズなしで使う ↓</a>
+          </div>
+        </div>
       )}
 
       {editing?.kind === "phase-add" && (
-        <PhaseForm
+        <PhaseSettings
           initial={{ name: "", start_date: newPhaseStart, end_date: addDaysISO(newPhaseStart, 29) }}
           siblings={phases}
+          existingRoutines={selected.is_implicit ? settingsRoutines : []}
           saving={savePhase.isPending}
           failed={savePhase.isError}
           onCancel={closeEditing}
-          onSubmit={(input) =>
-            savePhase.mutate({ planId: plan.id, input }, { onSuccess: closeEditing })
+          onDirtyChange={setPhaseDirty}
+          onSave={(input, routines) =>
+            savePhase.mutate({ planId: plan.id, input, routines }, { onSuccess: (phaseId) => {
+              setSelectedId(phaseId); setPhaseDirty(false); setEditingRaw(null);
+            } })
           }
         />
       )}
 
-      <section className="card space-y-4">
+      <section id="phase-activity" className={`card space-y-4 ${editing?.kind === "phase-add" && !hasPhases ? "hidden" : ""}`}>
         {!selected.is_implicit && (
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">{selected.name}</h2>
+            <button type="button" onClick={() => setEditing({ kind: "phase-edit" })}
+              className="rounded-lg text-left text-lg font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+              {selected.name}
+            </button>
             <div className="flex items-center gap-2 text-sm muted">
               <span>{phaseHeading()}</span>
               <button type="button" aria-label="フェーズを編集" className="btn-ghost !p-1.5"
@@ -179,7 +202,7 @@ export default function PlanDetail() {
         )}
 
         {editing?.kind === "phase-edit" && !selected.is_implicit && (
-          <PhaseForm
+          <PhaseSettings key={`${selected.id}-${editing.addRoutine ? "add" : editing.openRoutineId ?? "edit"}`}
             initial={{
               name: selected.name ?? "",
               start_date: selected.start_date ?? "",
@@ -187,27 +210,33 @@ export default function PlanDetail() {
             }}
             siblings={phases}
             selfId={selected.id}
+            existingRoutines={settingsRoutines}
+            startWithNewRoutine={editing.addRoutine}
+            openRoutineId={editing.openRoutineId}
             saving={savePhase.isPending}
             failed={savePhase.isError || deletePhase.isError}
             onCancel={closeEditing}
-            onSubmit={(input) =>
+            onDirtyChange={setPhaseDirty}
+            onSave={(input, routines) =>
               savePhase.mutate(
-                { planId: plan.id, phaseId: selected.id, input },
-                { onSuccess: closeEditing }
+                { planId: plan.id, phaseId: selected.id, input, routines },
+                { onSuccess: () => { setPhaseDirty(false); setEditingRaw(null); } }
               )
             }
-            onDelete={() =>
-              deletePhase.mutate(selected.id, {
-                onSuccess: () => { setSelectedId(undefined); closeEditing(); },
-              })
-            }
+            onDelete={() => {
+              if (window.confirm("このフェーズとメニューを削除しますか？ 作成済みのTodayタスクは残ります")) {
+                deletePhase.mutate(selected.id, {
+                  onSuccess: () => { setSelectedId(undefined); setPhaseDirty(false); setEditingRaw(null); },
+                });
+              }
+            }}
           />
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-3">
+        {editing?.kind !== "phase-edit" && <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-3">
             {selected.routines.map((r) =>
-              editing?.kind === "routine-edit" && editing.id === r.id ? (
+              selected.is_implicit && editing?.kind === "routine-edit" && editing.id === r.id ? (
                 <RoutineForm
                   key={r.id}
                   initial={{ ...r, menu: r.menu ?? "" }}
@@ -226,10 +255,12 @@ export default function PlanDetail() {
                 />
               ) : (
                 <RoutineCard key={r.id} routine={r}
-                  onEdit={() => setEditing({ kind: "routine-edit", id: r.id })} />
+                  onEdit={() => selected.is_implicit
+                    ? setEditing({ kind: "routine-edit", id: r.id })
+                    : setEditing({ kind: "phase-edit", openRoutineId: r.id })} />
               )
             )}
-            {editing?.kind === "routine-add" ? (
+            {selected.is_implicit && editing?.kind === "routine-add" ? (
               <RoutineForm
                 initial={{
                   title: plan.name, minutes: 30, weekdays: [1, 2, 3, 4, 5, 6, 7],
@@ -243,17 +274,21 @@ export default function PlanDetail() {
                 }
               />
             ) : selected.routines.length === 0 ? (
-              <EmptyAddButton label="ルーティンを追加"
-                onClick={() => setEditing({ kind: "routine-add" })} />
+              <EmptyAddButton label="メニューを追加"
+                onClick={() => selected.is_implicit
+                  ? setEditing({ kind: "routine-add" })
+                  : setEditing({ kind: "phase-edit", addRoutine: true })} />
             ) : (
               <button type="button" className="text-sm muted hover:underline"
-                onClick={() => setEditing({ kind: "routine-add" })}>
-                ＋ ルーティンを追加
+                onClick={() => selected.is_implicit
+                  ? setEditing({ kind: "routine-add" })
+                  : setEditing({ kind: "phase-edit", addRoutine: true })}>
+                ＋ メニューを追加
               </button>
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-200 dark:border-notion-border p-4 flex flex-col gap-4">
+          <div className="min-w-0 rounded-lg border border-slate-200 p-4 flex flex-col gap-4 dark:border-notion-border">
             <div className="flex items-start justify-between">
               <span className="text-sm muted">直近14日</span>
               <span>
@@ -261,11 +296,11 @@ export default function PlanDetail() {
                 <span className="text-xs muted"> / {exec.target}日</span>
               </span>
             </div>
-            <div className="mt-auto">
+            <div className="mt-auto overflow-x-auto">
               <ExecutionSquares cells={exec.cells} color={color} today={today} size="lg" showNone />
             </div>
           </div>
-        </div>
+        </div>}
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">

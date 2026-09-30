@@ -16,17 +16,17 @@ export default function RoutineCard({
   const long = lines.length > MENU_LINES;
 
   return (
-    <div className="rounded-lg border border-slate-200 dark:border-notion-border p-4 space-y-2">
+    <div className="space-y-2 border-b border-slate-100 py-3 last:border-b-0 dark:border-notion-border">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-semibold">{routine.title}</span>
+        <span className="min-w-0 break-words font-semibold">{routine.title}</span>
         <Chip>{routine.minutes}分</Chip>
         <Chip>{weekdaysLabel(routine.weekdays)}</Chip>
         <Chip>{routine.importance}</Chip>
-        <button type="button" onClick={onEdit} aria-label="ルーティンを編集"
+        <button type="button" onClick={onEdit} aria-label="メニューを編集"
           className="ml-auto btn-ghost !p-1.5">✎</button>
       </div>
       {routine.menu && (
-        <div className="text-sm whitespace-pre-wrap muted">
+        <div className="text-sm whitespace-pre-wrap muted" aria-label="メニューの詳細">
           {expanded || !long ? routine.menu : lines.slice(0, MENU_LINES).join("\n")}
           {long && (
             <button type="button" onClick={() => setExpanded(!expanded)}
