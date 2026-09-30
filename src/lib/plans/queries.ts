@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/date";
-import { linkablePhaseIds } from "@/lib/plans/logic";
+import { linkablePhaseIds, materialStatusPatch } from "@/lib/plans/logic";
 import type {
   Importance,
   Material,
@@ -56,6 +56,7 @@ interface MaterialRow {
   plan_id: string;
   title: string;
   url: string | null;
+  note?: string | null; // undefined until migration 0017 is applied
   status: MaterialStatus;
   completed_at: string | null;
   created_at: string;
@@ -68,6 +69,7 @@ function rowToMaterial(r: MaterialRow): Material {
     plan_id: r.plan_id,
     title: r.title,
     url: r.url ?? undefined,
+    note: r.note ?? undefined,
     status: r.status,
     completed_at: r.completed_at ?? undefined,
     phase_ids: (r.material_phases ?? []).map((mp) => mp.phase_id),
@@ -294,6 +296,7 @@ export function useDeletePhase() {
 export type MaterialInput = {
   title: string;
   url?: string;
+  note?: string;
   status: MaterialStatus;
   phase_ids: string[];
 };
@@ -354,6 +357,7 @@ export function useSaveMaterial() {
       const body: Record<string, unknown> = {
         title: input.title.trim(),
         url: input.url?.trim() || null,
+        note: input.note?.trim() || null,
         status: input.status,
       };
       // The client sends its local date so completed_at is not shifted by UTC.
@@ -412,14 +416,14 @@ export function useDeleteMaterial() {
   });
 }
 
-/** The status badge: saves on click, updating the cache first (design 5.4). */
+/** The status menu: saves the chosen status, updating the cache first (design 5.4). */
 export function useSetMaterialStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: MaterialStatus }) => {
       const { error } = await supabase
         .from("materials")
-        .update({ status, completed_at: status === "done" ? todayISO() : null })
+        .update(materialStatusPatch(status, todayISO()))
         .eq("id", id);
       if (error) throw error;
     },
@@ -434,7 +438,7 @@ export function useSetMaterialStatus() {
               ? {
                   ...m,
                   status,
-                  completed_at: status === "done" ? todayISO() : undefined,
+                  completed_at: materialStatusPatch(status, todayISO()).completed_at ?? undefined,
                 }
               : m
           ),

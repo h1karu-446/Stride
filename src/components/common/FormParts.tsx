@@ -6,6 +6,8 @@ export const SAVE_ERROR_MESSAGE = "保存できませんでした。もう一度
 export function useEscToCancel(onCancel: () => void) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Esc while converting Japanese input only cancels the conversion.
+      if (e.isComposing || e.keyCode === 229) return;
       // A modal handles its own Esc; do not also discard this form.
       if (e.key === "Escape" && !document.querySelector("[role=dialog]")) onCancel();
     };

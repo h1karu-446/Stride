@@ -3,8 +3,9 @@ import type { Material, Phase, Task } from "@/types";
 import {
   isOverdue,
   linkablePhaseIds,
+  MATERIAL_STATUSES,
   materialGroups,
-  nextMaterialStatus,
+  materialStatusPatch,
   nextSchedule,
   scheduleGroups,
   validateMaterial,
@@ -154,11 +155,20 @@ describe("UT-09 materialGroups", () => {
   });
 });
 
-describe("UT-10 nextMaterialStatus", () => {
-  it("cycles todo -> in_progress -> done -> todo", () => {
-    expect(nextMaterialStatus("todo")).toBe("in_progress");
-    expect(nextMaterialStatus("in_progress")).toBe("done");
-    expect(nextMaterialStatus("done")).toBe("todo");
+describe("UT-10 materialStatusPatch (direct status choice, Issue #53)", () => {
+  it("offers the three statuses in a fixed order", () => {
+    expect(MATERIAL_STATUSES).toEqual(["todo", "in_progress", "done"]);
+  });
+  it("any status can be chosen in one step, including todo -> done and done -> todo", () => {
+    expect(materialStatusPatch("done", TODAY)).toEqual({ status: "done", completed_at: TODAY });
+    expect(materialStatusPatch("todo", TODAY)).toEqual({ status: "todo", completed_at: null });
+    expect(materialStatusPatch("in_progress", TODAY)).toEqual({
+      status: "in_progress",
+      completed_at: null,
+    });
+  });
+  it("records the local date sent by the device as the completion date", () => {
+    expect(materialStatusPatch("done", "2026-01-01").completed_at).toBe("2026-01-01");
   });
 });
 
@@ -210,5 +220,12 @@ describe("UT-19 validation: schedules and materials", () => {
     expect(validateMaterial({ title: "x", url: "example.com" }).url).toBeDefined();
     expect(validateMaterial({ title: "x", url: "ftp://example.com" }).url).toBeDefined();
     expect(validateMaterial({ title: "x", url: "https://" }).url).toBeDefined();
+  });
+  it("material: note is optional, up to 1000 chars after trimming, line breaks allowed", () => {
+    expect(validateMaterial({ title: "x", note: "" })).toEqual({});
+    expect(validateMaterial({ title: "x", note: "第3章の非同期処理を理解する\n演習" })).toEqual({});
+    expect(validateMaterial({ title: "x", note: "あ".repeat(1000) })).toEqual({});
+    expect(validateMaterial({ title: "x", note: ` ${"あ".repeat(1000)}\n` })).toEqual({});
+    expect(validateMaterial({ title: "x", note: "あ".repeat(1001) }).note).toBeDefined();
   });
 });
