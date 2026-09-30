@@ -93,7 +93,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
 
   return (
     <form aria-label={selfId ? "フェーズを設定" : "新しいフェーズを設定"}
-      className="rounded-xl bg-slate-50 p-4 shadow-sm dark:bg-notion-panel-hover sm:p-5 space-y-5"
+      // Editing sits inside the phase card, so it has no box of its own; adding stands alone as a card.
+      className={selfId ? "space-y-5" : "card space-y-5"}
       onSubmit={(event) => {
         event.preventDefault();
         setAttempted(true);
@@ -223,7 +224,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
         </div>
       </div>
       {/* Keep the actions reachable on a long form. */}
-      <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur dark:border-notion-border dark:bg-notion-panel-hover/95 sm:-mx-5 sm:-mb-5 sm:px-5">
+      <div className={`sticky bottom-0 -mx-5 border-t border-slate-200 bg-white/95 px-5 py-3 backdrop-blur dark:border-notion-border dark:bg-notion-panel/95 ${selfId ? "" : "-mb-5 rounded-b-xl"}`}>
         {attempted && !canSave && <p role="alert" className="mb-2 text-xs text-rose-600">未入力の項目があります</p>}
         <FormActions onDelete={onDelete} onCancel={onCancel} canSave
           saving={saving} error={failed} saveLabel="保存" />
