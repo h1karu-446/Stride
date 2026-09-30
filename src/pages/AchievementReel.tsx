@@ -109,11 +109,11 @@ export default function AchievementReel() {
       </header>
 
       {ready && months.length > 0 && (
-        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-1/2 z-20 -translate-y-1/2 overflow-hidden mix-blend-difference motion-reduce:hidden">
+        <div aria-hidden className="pointer-events-none fixed inset-x-0 top-1/2 z-0 -translate-y-1/2 overflow-hidden motion-reduce:hidden">
           <div ref={marqueeRef} className="flex w-max items-baseline gap-[6vw] whitespace-nowrap will-change-transform">
             {months.map((m, i) => (
-              <span key={m.key} data-reel-label className="flex items-baseline gap-[2vw] font-display text-[15vw] italic leading-none text-stone-100/90 sm:text-[11vw]">
-                <span className="text-[0.28em] not-italic tracking-[0.2em] text-[#c9a86a]">{m.year}</span>
+              <span key={m.key} data-reel-label className="flex items-baseline gap-[2vw] font-display text-[15vw] italic leading-none text-stone-100/25 sm:text-[11vw]">
+                <span className="text-[0.28em] not-italic tracking-[0.2em] text-[#c9a86a]/50">{m.year}</span>
                 {m.month}<span className="font-mincho text-[0.45em] not-italic">月</span>
                 {i < months.length - 1 && <span className="ml-[3vw] text-[0.5em] text-stone-100/30">/</span>}
               </span>
