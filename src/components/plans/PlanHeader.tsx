@@ -76,10 +76,10 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 if (event.key === "Enter") { event.preventDefault(); saveName(); }
-                if (event.key === "Escape" && !update.isPending) setEditingName(false);
+                if (event.key === "Escape" && !update.isPending) { event.nativeEvent.stopImmediatePropagation(); setEditingName(false); setNameError(""); }
               }} />
             <button type="button" onClick={saveName} disabled={update.isPending} className="btn-primary !px-2 !py-1 text-xs">保存</button>
-            <button type="button" onClick={() => setEditingName(false)} disabled={update.isPending} className="btn-outline !px-2 !py-1 text-xs">取消</button>
+            <button type="button" onClick={() => { setEditingName(false); setNameError(""); }} disabled={update.isPending} className="btn-outline !px-2 !py-1 text-xs">取消</button>
           </div>
         ) : (
           <button type="button" disabled={update.isPending} onClick={() => { update.reset(); setNameDraft(plan.name); setNameError(""); setEditingName(true); }}
@@ -104,7 +104,7 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
         {plan.due_date && <span className="muted">{daysLeftLabel(plan.due_date, today)}</span>}
       </div>
       {(nameError || update.isError || deleteFailed) && (
-        <p role="alert" className="mt-2 text-xs text-rose-600">{nameError || "保存できませんでした。もう一度操作してください"}</p>
+        <p role="alert" className="mt-2 text-xs text-rose-600">{nameError || (deleteFailed ? "削除できませんでした。もう一度操作してください" : "保存できませんでした。もう一度操作してください")}</p>
       )}
     </header>
   );

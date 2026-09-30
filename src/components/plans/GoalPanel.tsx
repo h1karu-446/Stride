@@ -90,6 +90,8 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
       event.preventDefault();
       removeAt(index);
     } else if (event.key === "Escape" && !update.isPending) {
+      // Keep other open forms (useEscToCancel on window) from being cancelled too.
+      event.nativeEvent.stopImmediatePropagation();
       setEditing(null);
     }
   }
@@ -121,7 +123,7 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing || event.keyCode === 229) return;
                 if (event.key === "Enter") { event.preventDefault(); saveGoal(); }
-                if (event.key === "Escape" && !update.isPending) setEditing(null);
+                if (event.key === "Escape" && !update.isPending) { event.nativeEvent.stopImmediatePropagation(); setEditing(null); }
               }} />
             <EditActions onSave={saveGoal} onCancel={() => setEditing(null)} saving={update.isPending} />
           </div>
@@ -156,13 +158,10 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
           </div>
         ) : vision.length ? (
           <div>
-            <div role="button" tabIndex={0} onClick={startVision} onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") { event.preventDefault(); startVision(); }
-            }} aria-label="目指す姿を編集" className="block w-full cursor-text rounded-lg text-left hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
-              <ul className="list-disc space-y-1 pl-5 text-sm break-words">
-                {(expanded ? vision : vision.slice(0, PREVIEW_ITEMS)).map((item, index) => <li key={index}>{item}</li>)}
-              </ul>
-            </div>
+            <ul onClick={startVision} className="list-disc cursor-text space-y-1 rounded-lg pl-5 text-sm break-words hover:bg-white/30">
+              {(expanded ? vision : vision.slice(0, PREVIEW_ITEMS)).map((item, index) => <li key={index}>{item}</li>)}
+            </ul>
+            <button type="button" onClick={startVision} disabled={update.isPending} className="mt-1 mr-3 text-xs text-notion-blue hover:underline">目指す姿を編集</button>
             {vision.length > PREVIEW_ITEMS && <button type="button" onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-notion-blue hover:underline">{expanded ? "閉じる" : "続きを表示"}</button>}
           </div>
         ) : (

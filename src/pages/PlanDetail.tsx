@@ -109,7 +109,7 @@ export default function PlanDetail() {
     <div className="space-y-6">
       <PlanHeader key={plan.id} plan={plan} today={today} deleteFailed={deletePlan.isError}
         onDelete={() => {
-          if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材も削除され、元に戻せません")) {
+          if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材と、明日以降の未完了の予定も削除され、元に戻せません")) {
             deletePlan.mutate(plan.id, { onSuccess: () => navigate("/plans") });
           }
         }} />
@@ -130,6 +130,7 @@ export default function PlanDetail() {
             }>
             ✕
           </button>
+          {updatePlan.isError && <p role="alert" className="w-full text-xs text-rose-600">保存できませんでした。もう一度操作してください</p>}
         </div>
       )}
 
