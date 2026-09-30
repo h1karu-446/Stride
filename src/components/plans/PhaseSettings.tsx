@@ -43,6 +43,9 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   const [openKey, setOpenKey] = useState<string | null>(() => startWithNewRoutine
     ? routines[routines.length - 1]?.key ?? null
     : openRoutineId ?? routines[0]?.key ?? null);
+  // Only a menu the user asked to add takes focus; a new phase starts at its name.
+  const [focusKey, setFocusKey] = useState<string | null>(() => startWithNewRoutine
+    ? routines[routines.length - 1]?.key ?? null : null);
   const [dirty, setDirty] = useState(!!initialDirty);
   // Errors stay hidden until the first save attempt, so an empty new form is not all red.
   const [attempted, setAttempted] = useState(false);
@@ -76,6 +79,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
     const next = blankRoutine();
     setRoutines((rows) => [...rows, next]);
     setOpenKey(next.key);
+    setFocusKey(next.key);
     setDirty(true);
   }
 
@@ -176,7 +180,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                   <div className="flex items-center gap-2">
                     <button type="button" aria-expanded={true} disabled={saving} onClick={() => setOpenKey(null)}
                       title="閉じる" aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▾</button>
-                    <input aria-label={`メニュー ${index + 1} の名前`} autoFocus={!row.input.title}
+                    <input aria-label={`メニュー ${index + 1} の名前`} autoFocus={row.key === focusKey}
                       className="input flex-1 font-medium" maxLength={40} value={row.input.title} disabled={saving}
                       placeholder={`メニュー ${index + 1}：例）IELTSのListeningを30分解く`}
                       onChange={(event) => updateRoutine(row.key, { title: event.target.value })} />
