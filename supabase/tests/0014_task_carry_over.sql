@@ -14,6 +14,7 @@ insert into public.plans (id, user_id, name, color, status) values
 
 do $$
 declare v_orig uuid; v_copy uuid; before_score numeric; after_score numeric;
+        today_before numeric; today_after numeric;
         d0 date := current_date - 1;
 begin
   -- DB-40: an open schedule on yesterday (which has a review) lowers its score
@@ -32,6 +33,13 @@ begin
   end if;
   before_score := after_score;
 
+  -- Today has a review and one completed task (completion 100%)
+  insert into public.daily_reviews (user_id, date, fulfillment) values (auth.uid(), current_date, 3);
+  insert into public.tasks (user_id, title, importance, scheduled_date, completed)
+  values (auth.uid(), 'A today done', '中', current_date, true);
+  select completion_score into today_before from public.daily_reviews
+   where user_id = auth.uid() and date = current_date;
+
   -- DB-41: carrying over inserts a copy; the original day keeps its score
   insert into public.tasks (user_id, title, importance, scheduled_date, plan_id,
                             is_milestone, memo, carried_from)
@@ -46,6 +54,12 @@ begin
   if not exists (select 1 from public.tasks
                   where id = v_orig and scheduled_date = d0 and not completed) then
     raise exception 'DB-41: original moved or changed';
+  end if;
+  -- DB-41: the open copy is counted on today, so today's score drops
+  select completion_score into today_after from public.daily_reviews
+   where user_id = auth.uid() and date = current_date;
+  if not today_after < today_before then
+    raise exception 'DB-41: today score not lowered by the copy (% -> %)', today_before, today_after;
   end if;
 
   -- DB-43: one copy per original

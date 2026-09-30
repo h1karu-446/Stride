@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { FoldButton, SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import ScheduleForm, { type ScheduleInput } from "./ScheduleForm";
@@ -9,6 +10,7 @@ import {
   formatDateLabel,
   isLockedSchedule,
   isOverdue,
+  isUniqueViolation,
   planScheduleSave,
   scheduleGroups,
 } from "@/lib/plans/logic";
@@ -47,12 +49,40 @@ export default function ScheduleList({
   const update = useUpdateTask();
   const del = useDeleteTask();
   const carry = useAddTask();
+  const qc = useQueryClient();
+  // Rows whose carry-over is in flight or whose list refresh has not landed
+  // yet. The button stays off until the refreshed list closes the row, so a
+  // second click cannot hit the one-copy index (tasks_carried_from_uniq).
+  const [carrying, setCarrying] = useState<ReadonlySet<string>>(new Set());
   const [showHidden, setShowHidden] = useState(false);
   const [showDone, setShowDone] = useState(false);
   const carried = carriedIds(tasks);
   const groups = scheduleGroups(tasks, planId, undefined, carried);
   const total = groups.visible.length + groups.hidden.length + groups.done.length;
   const doneCount = groups.done.length - groups.carriedCount;
+
+  const carryOver = (t: Task) => {
+    if (carrying.has(t.id)) return;
+    carry.reset();
+    setCarrying((s) => new Set(s).add(t.id));
+    const done = async () => {
+      await qc.invalidateQueries({ queryKey: ["tasks"] });
+      setCarrying((s) => {
+        const next = new Set(s);
+        next.delete(t.id);
+        return next;
+      });
+    };
+    carry.mutate(carryOverInput(t, today), {
+      onSuccess: done,
+      onError: (e) => {
+        // Already carried (another tab, or a click before the list refreshed):
+        // the copy exists, so this is not a failure; just reload the list.
+        if (isUniqueViolation(e)) carry.reset();
+        void done();
+      },
+    });
+  };
 
   const open = (target: string) => {
     add.reset();
@@ -132,8 +162,8 @@ export default function ScheduleList({
           {wasCarried && <span className="shrink-0 text-xs muted">持ち越し</span>}
         </button>
         {overdue && (
-          <button type="button" disabled={carry.isPending}
-            onClick={() => carry.mutate(carryOverInput(t, today))}
+          <button type="button" disabled={carrying.has(t.id)}
+            onClick={() => carryOver(t)}
             className="shrink-0 rounded-md border px-2.5 py-0.5 text-xs hover:bg-orange-500/10"
             style={{ borderColor: `${OVERDUE}80`, color: OVERDUE }}>
             今日に移す

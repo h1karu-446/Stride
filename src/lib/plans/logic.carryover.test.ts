@@ -6,6 +6,7 @@ import {
   carryOverInput,
   isLockedSchedule,
   isOverdue,
+  isUniqueViolation,
   nextSchedule,
   planScheduleSave,
   scheduleGroups,
@@ -104,6 +105,15 @@ describe("UT-21 carried originals in the lists", () => {
     expect(canCarryOver(orig, TODAY, new Set(["orig"]))).toBe(false);
     expect(canCarryOver(sched(PAST, { completed: true }), TODAY, new Set())).toBe(false);
     expect(canCarryOver(sched(TODAY), TODAY, new Set())).toBe(false);
+  });
+});
+
+describe("UT-21 isUniqueViolation", () => {
+  it("recognizes only the Postgres unique violation code", () => {
+    expect(isUniqueViolation({ code: "23505", message: "duplicate key" })).toBe(true);
+    expect(isUniqueViolation({ code: "42501" })).toBe(false);
+    expect(isUniqueViolation(new Error("network"))).toBe(false);
+    expect(isUniqueViolation(null)).toBe(false);
   });
 });
 

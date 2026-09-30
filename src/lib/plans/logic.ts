@@ -401,6 +401,14 @@ export function carryOverInput(task: Task, date: string): AddTaskInput {
   };
 }
 
+/**
+ * A Postgres unique violation (23505) from Supabase. Carrying over hits it
+ * when the original already has a copy (tasks_carried_from_uniq).
+ */
+export function isUniqueViolation(e: unknown): boolean {
+  return typeof e === "object" && e !== null && (e as { code?: unknown }).code === "23505";
+}
+
 export interface ScheduleValues {
   title: string;
   scheduled_date: string;
