@@ -139,6 +139,10 @@ export interface Wish {
   title: string;
   note: string | null;
   achieved_at: string | null; // YYYY-MM-DD in the user's timezone
+  /** For ordering and recognition only; never affects scores or counts. */
+  importance: Importance;
+  /** Show the achievement prominently (gold, bold, ★). New wishes default to false. */
+  emphasize_achievement: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -157,4 +161,6 @@ export interface Achievement {
   plan_color: PlanColor | null;
   /** Plan creation time (timestamptz, plans only); shown in the device's time zone. */
   started_at: string | null;
+  /** The wish's emphasize_achievement (wishes only); null for the other kinds. */
+  emphasized: boolean | null;
 }

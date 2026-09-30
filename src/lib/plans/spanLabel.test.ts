@@ -15,7 +15,7 @@ const plan = (created_at: string, completed_at?: string): Plan => ({
 // What the achievements view returns for the same plan (0012: started_at = plans.created_at).
 const achievement = (p: Plan): Achievement => ({
   kind: "plan", id: p.id, user_id: "owner", title: p.name, achieved_on: p.completed_at!,
-  plan_id: p.id, plan_name: p.name, plan_color: p.color, started_at: p.created_at,
+  plan_id: p.id, plan_name: p.name, plan_color: p.color, started_at: p.created_at, emphasized: null,
 });
 const journeyLabel = (a: Achievement) => spanLabel(a.started_at!, a.achieved_on);
 

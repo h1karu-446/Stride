@@ -1,7 +1,8 @@
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { rangeBefore } from "@/lib/date";
 import { streakCount } from "@/lib/score";
-import type { Achievement, AchievementKind, DailyReview } from "@/types";
+import { IMPORTANCE_LIST } from "@/types";
+import type { Achievement, AchievementKind, DailyReview, Wish } from "@/types";
 
 export const ACHIEVEMENT_STYLE: Record<AchievementKind, { icon: string; className: string; prominent: boolean }> = {
   wish: { icon: "★", className: "text-amber-600 dark:text-amber-400 font-bold", prominent: true },
@@ -9,6 +10,18 @@ export const ACHIEVEMENT_STYLE: Record<AchievementKind, { icon: string; classNam
   milestone: { icon: "◇", className: "text-slate-500 dark:text-notion-muted", prominent: false },
   material: { icon: "▤", className: "text-slate-500 dark:text-notion-muted", prominent: false },
 };
+
+// A wish whose emphasis is turned off looks like the other quiet records.
+const QUIET_WISH_STYLE = { icon: "☆", className: "text-slate-500 dark:text-notion-muted", prominent: false };
+
+export function achievementStyle(row: Pick<Achievement, "kind" | "emphasized">) {
+  return row.kind === "wish" && row.emphasized === false ? QUIET_WISH_STYLE : ACHIEVEMENT_STYLE[row.kind];
+}
+
+// Pending wishes: 重 → 中 → 軽, keeping the added order within each level.
+export function sortWishes(wishes: Wish[]): Wish[] {
+  return [...wishes].sort((a, b) => IMPORTANCE_LIST.indexOf(a.importance) - IMPORTANCE_LIST.indexOf(b.importance));
+}
 
 export function groupAchievements(rows: Achievement[]): [string, Achievement[]][] {
   const groups = new Map<string, Achievement[]>();
