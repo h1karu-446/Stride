@@ -1,7 +1,8 @@
 import { addMonths, format, parseISO, startOfMonth } from "date-fns";
 import { rangeBefore } from "@/lib/date";
 import { streakCount } from "@/lib/score";
-import type { Achievement, AchievementKind, DailyReview } from "@/types";
+import { IMPORTANCE_LIST } from "@/types";
+import type { Achievement, AchievementKind, DailyReview, Wish } from "@/types";
 
 export const ACHIEVEMENT_STYLE: Record<AchievementKind, { icon: string; className: string; prominent: boolean }> = {
   wish: { icon: "★", className: "text-amber-600 dark:text-amber-400 font-bold", prominent: true },
@@ -9,6 +10,30 @@ export const ACHIEVEMENT_STYLE: Record<AchievementKind, { icon: string; classNam
   milestone: { icon: "◇", className: "text-slate-500 dark:text-notion-muted", prominent: false },
   material: { icon: "▤", className: "text-slate-500 dark:text-notion-muted", prominent: false },
 };
+
+// A wish whose emphasis is turned off looks like the other quiet records.
+const QUIET_WISH_STYLE = { icon: "☆", className: "text-slate-500 dark:text-notion-muted", prominent: false };
+
+export function achievementStyle(row: Pick<Achievement, "kind" | "emphasized">) {
+  return row.kind === "wish" && row.emphasized === false ? QUIET_WISH_STYLE : ACHIEVEMENT_STYLE[row.kind];
+}
+
+// The wish to fill the edit form opened from the achievement feed with.
+// Before the form is first shown, wait for data that is neither stale nor being
+// fetched: a ★/☆ toggle invalidates ["wishes"], so a copy cached before it is
+// stale and is refetched when the form opens, and filling the form from it
+// would silently undo the toggle on save. Once the form is shown (`shown`), keep
+// it through later background refetches (another row's ○, undo, reconnect) so
+// the text being typed is not lost; the form keeps its own state from then on.
+export function editableWish(query: { data?: Wish; isFetching: boolean; isStale: boolean }, shown: boolean): Wish | null {
+  if (!query.data) return null;
+  return shown || (!query.isFetching && !query.isStale) ? query.data : null;
+}
+
+// Pending wishes: 重 → 中 → 軽, keeping the added order within each level.
+export function sortWishes(wishes: Wish[]): Wish[] {
+  return [...wishes].sort((a, b) => IMPORTANCE_LIST.indexOf(a.importance) - IMPORTANCE_LIST.indexOf(b.importance));
+}
 
 export function groupAchievements(rows: Achievement[]): [string, Achievement[]][] {
   const groups = new Map<string, Achievement[]>();

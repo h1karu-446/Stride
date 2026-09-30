@@ -7,15 +7,13 @@ import GoalPanel from "@/components/plans/GoalPanel";
 import MaterialList from "@/components/plans/MaterialList";
 import PhaseBar from "@/components/plans/PhaseBar";
 import PhaseForm from "@/components/plans/PhaseForm";
-import PlanFormModal from "@/components/plans/PlanFormModal";
+import PlanHeader from "@/components/plans/PlanHeader";
 import RoutineCard from "@/components/plans/RoutineCard";
 import RoutineForm from "@/components/plans/RoutineForm";
 import ScheduleList from "@/components/plans/ScheduleList";
-import StatusMenu from "@/components/plans/StatusMenu";
 import { addDaysISO, todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import {
-  daysLeftLabel,
   executionCells,
   formatDateLabel,
   initialPhase,
@@ -56,7 +54,6 @@ export default function PlanDetail() {
 
   const [selectedId, setSelectedId] = useState<string>();
   const [editing, setEditingRaw] = useState<Editing>(null);
-  const [planModal, setPlanModal] = useState(false);
   const today = todayISO();
 
   const plan = plans?.find((p) => p.id === id);
@@ -110,29 +107,12 @@ export default function PlanDetail() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link to="/plans" className="text-sm muted hover:underline">‹ 計画</Link>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: color }} />
-          <h1 className="text-3xl font-bold tracking-tight break-words min-w-0">{plan.name}</h1>
-          <StatusMenu
-            status={plan.status}
-            onChange={(status) => updatePlan.mutate({ id: plan.id, patch: { status } })}
-          />
-          {plan.due_date && (
-            <span className="text-sm muted">
-              {formatDateLabel(plan.due_date, today)} · {daysLeftLabel(plan.due_date, today)}
-            </span>
-          )}
-          <button type="button" aria-label="計画を編集" className="ml-auto btn-outline !p-2"
-            onClick={() => { updatePlan.reset(); setPlanModal(true); }}>
-            ✎
-          </button>
-        </div>
-        {updatePlan.isError && !planModal && (
-          <p className="mt-2 text-xs text-red-500">保存できませんでした。もう一度お試しください</p>
-        )}
-      </div>
+      <PlanHeader key={plan.id} plan={plan} today={today} deleteFailed={deletePlan.isError}
+        onDelete={() => {
+          if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材も削除され、元に戻せません")) {
+            deletePlan.mutate(plan.id, { onSuccess: () => navigate("/plans") });
+          }
+        }} />
 
       {shouldShowOverdueNotice(plan, today) && (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-orange-400/50 bg-orange-500/10 px-4 py-3 text-sm">
@@ -153,7 +133,7 @@ export default function PlanDetail() {
         </div>
       )}
 
-      <GoalPanel plan={plan} onEdit={() => setPlanModal(true)} />
+      <GoalPanel key={plan.id} plan={plan} />
 
       {hasPhases && (
         <PhaseBar
@@ -309,39 +289,6 @@ export default function PlanDetail() {
         />
       </div>
 
-      {planModal && (
-        <PlanFormModal
-          mode="edit"
-          initial={{
-            name: plan.name,
-            color: plan.color,
-            status: plan.status,
-            due_date: plan.due_date,
-            goal: plan.goal ?? "",
-            goal_note: plan.goal_note ?? "",
-          }}
-          saving={updatePlan.isPending}
-          failed={updatePlan.isError || deletePlan.isError}
-          onClose={() => setPlanModal(false)}
-          onSubmit={(v) =>
-            updatePlan.mutate(
-              {
-                id: plan.id,
-                patch: {
-                  name: v.name, color: v.color, due_date: v.due_date ?? "",
-                  goal: v.goal ?? "", goal_note: v.goal_note ?? "",
-                },
-              },
-              { onSuccess: () => setPlanModal(false) }
-            )
-          }
-          onDelete={() => {
-            if (window.confirm("この計画を削除しますか？ フェーズ・ルーティン・教材も削除されます")) {
-              deletePlan.mutate(plan.id, { onSuccess: () => navigate("/plans") });
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

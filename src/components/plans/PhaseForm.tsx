@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Field, FormActions } from "@/components/common/FormParts";
+import DatePicker from "@/components/common/DatePicker";
 import { hasErrors, validatePhase } from "@/lib/plans/logic";
 import type { PhaseInput } from "@/lib/plans/queries";
 import type { Phase } from "@/types";
@@ -48,15 +49,23 @@ export default function PhaseForm({
         <input autoFocus className="input" value={v.name}
           onChange={(e) => setV({ ...v, name: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="開始日" error={errors.start_date}>
-          <input type="date" className="input" value={v.start_date}
-            onChange={(e) => setV({ ...v, start_date: e.target.value })} />
-        </Field>
-        <Field label="終了日" error={errors.end_date}>
-          <input type="date" className="input" value={v.end_date}
-            onChange={(e) => setV({ ...v, end_date: e.target.value })} />
-        </Field>
+      <div className="rounded-xl bg-slate-50 p-3 dark:bg-notion-panel-hover">
+        <span className="label">フェーズの期間</span>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+          <div className="min-w-0">
+            <span className="mb-1 block text-xs muted">開始日</span>
+            <DatePicker label="フェーズの開始日" value={v.start_date}
+              onChange={(date) => setV({ ...v, start_date: date })} emptyLabel="開始日を選ぶ" />
+          </div>
+          <span className="pl-2 text-sm muted sm:pb-2 sm:pl-0" aria-hidden="true"><span className="sm:hidden">↓</span><span className="hidden sm:inline">→</span></span>
+          <div className="min-w-0">
+            <span className="mb-1 block text-xs muted">終了日</span>
+            <DatePicker label="フェーズの終了日" value={v.end_date}
+              onChange={(date) => setV({ ...v, end_date: date })} emptyLabel="終了日を選ぶ" />
+          </div>
+        </div>
+        {errors.start_date && <p className="mt-2 text-xs text-rose-600">{errors.start_date}</p>}
+        {errors.end_date && <p className="mt-2 text-xs text-rose-600">{errors.end_date}</p>}
       </div>
       <FormActions onDelete={onDelete} onCancel={onCancel}
         canSave={canSave} saving={saving} error={failed} />

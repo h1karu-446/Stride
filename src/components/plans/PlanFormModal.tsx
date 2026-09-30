@@ -1,25 +1,22 @@
 import { useState } from "react";
 import Modal from "@/components/common/Modal";
+import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
 import { PLAN_COLORS } from "@/lib/plans/colors";
 import { hasErrors, PLAN_STATUS_LABEL, validatePlan } from "@/lib/plans/logic";
 import type { PlanInput } from "@/lib/plans/queries";
 import type { PlanStatus } from "@/types";
 
-/** Create (mode="create") or edit (mode="edit") a plan. */
+/** The creation form; plan details are edited at their display positions. */
 export default function PlanFormModal({
-  mode,
   initial,
   onSubmit,
-  onDelete,
   onClose,
   saving,
   failed,
 }: {
-  mode: "create" | "edit";
   initial: PlanInput;
   onSubmit: (v: PlanInput) => void;
-  onDelete?: () => void;
   onClose: () => void;
   saving?: boolean;
   failed?: boolean;
@@ -29,7 +26,7 @@ export default function PlanFormModal({
   const canSave = !hasErrors(errors);
 
   return (
-    <Modal title={mode === "create" ? "新しい計画" : "計画を編集"} onClose={onClose}>
+    <Modal title="新しい計画" onClose={onClose}>
       <form
         className="space-y-4"
         onSubmit={(e) => {
@@ -62,49 +59,31 @@ export default function PlanFormModal({
             ))}
           </div>
         </Field>
-        {mode === "create" && (
-          <Field label="状態">
-            <select
-              className="input"
-              value={v.status}
-              onChange={(e) => setV({ ...v, status: e.target.value as PlanStatus })}
-            >
-              {(Object.keys(PLAN_STATUS_LABEL) as PlanStatus[]).map((s) => (
-                <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>
-              ))}
-            </select>
-          </Field>
-        )}
-        <Field label="期日（任意）">
-          <input
-            type="date"
+        <Field label="状態">
+          <select
             className="input"
-            value={v.due_date ?? ""}
-            onChange={(e) => setV({ ...v, due_date: e.target.value || undefined })}
-          />
+            value={v.status}
+            onChange={(e) => setV({ ...v, status: e.target.value as PlanStatus })}
+          >
+            {(Object.keys(PLAN_STATUS_LABEL) as PlanStatus[]).map((s) => (
+              <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>
+            ))}
+          </select>
         </Field>
-        {mode === "edit" && (
-          <>
-            <Field label="目標（任意）" error={errors.goal}>
-              <input
-                className="input"
-                value={v.goal ?? ""}
-                onChange={(e) => setV({ ...v, goal: e.target.value })}
-              />
-            </Field>
-            <Field label="補足（任意）" error={errors.goal_note}>
-              <textarea
-                className="input min-h-[96px]"
-                value={v.goal_note ?? ""}
-                onChange={(e) => setV({ ...v, goal_note: e.target.value })}
-              />
-            </Field>
-          </>
-        )}
+        <div>
+          <span className="label">期日</span>
+          <DatePicker
+            label="計画の期日"
+            value={v.due_date ?? ""}
+            onChange={(date) => setV({ ...v, due_date: date || undefined })}
+            emptyLabel="＋ 期日を設定"
+            allowClear
+          />
+          {!v.due_date && <p className="mt-1 text-xs muted">期限なし</p>}
+        </div>
         <FormActions
-          onDelete={onDelete}
           onCancel={onClose}
-          saveLabel={mode === "create" ? "作成" : "保存"}
+          saveLabel="作成"
           canSave={canSave}
           saving={saving}
           error={failed}

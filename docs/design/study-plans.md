@@ -101,8 +101,8 @@ erDiagram
 | color | text | × | — | `pink / orange / yellow / green / teal / blue / purple / gray / coral / lime / indigo / brown` のいずれか |
 | status | text | × | `'active'` | `idea / active / paused / done`（構想中／進行中／休止中／完了） |
 | due_date | date | ○ | — | 期日 |
-| goal | text | ○ | — | 目標。60文字まで |
-| goal_note | text | ○ | — | 補足。1000文字まで |
+| goal | text | ○ | — | 到達目標。1行、60文字まで |
+| goal_note | text | ○ | — | 目指す姿。1行1項目の箇条書き、合計1000文字まで。既存データは表示時に解釈 |
 | completed_at | date | ○ | — | 完了日。トリガーで設定（4.4） |
 | overdue_notice_dismissed_for | date | ○ | — | 期日超過の案内を閉じたときの期日。`due_date` と等しい間は案内を出さない |
 
@@ -171,6 +171,8 @@ erDiagram
 | title | text | × | — | 1〜60文字 |
 | note | text | ○ | — | 100文字まで |
 | achieved_at | date | ○ | — | 達成した日。NULL なら未達成 |
+| importance | text | × | `'中'` | `重` / `中` / `軽`（`wishes_importance_check`）。並びと見分けのためだけに使い、スコアと年の達成件数には影響しない（migration 0018、Issue #54） |
+| emphasize_achievement | boolean | × | `false` | 達成の記録で強調するか。重要度とは独立。0018 の適用時点でのやりたいことは `true`（見た目を変えないため）、以後の新規は `false` |
 
 #### tasks（既存テーブルへの追加列）
 
@@ -226,6 +228,7 @@ create policy "<table>_owner_all" on public.<table> for all
 | achieved_on | 達成した日（`achieved_at`、`completed_at`、`scheduled_date`、`completed_at`） |
 | plan_id / plan_name / plan_color | 紐づく計画（`wish` では NULL） |
 | started_at | 計画の完了で期間を出すための作成日時（timestamptz、`plan` のみ）。画面で端末の日付に変換する。0009 の `started_on`（UTC 日付）を migration 0012 で置き換えた（Issue #34） |
+| emphasized | やりたいことの `emphasize_achievement`（boolean、`wish` のみ。ほかの種類は NULL で、見せ方は種類で決まる）。migration 0018 で追加（Issue #54）。0012 と同じく drop → create し、`security_invoker = true` と GRANT を付け直した |
 
 画面側は `achieved_on` の降順で3か月分ずつ取得する（`gte` / `lt` で月の範囲を指定）。
 
@@ -336,13 +339,14 @@ export interface Material {
 }
 export interface Wish {
   id: string; user_id: string; title: string; note: string | null;
-  achieved_at: string | null; created_at: string; updated_at: string;
+  achieved_at: string | null; importance: Importance;
+  emphasize_achievement: boolean; created_at: string; updated_at: string;
 }
 export interface Achievement {
   kind: "wish" | "plan" | "milestone" | "material";
   id: string; user_id: string; title: string; achieved_on: string;
   plan_id: string | null; plan_name: string | null; plan_color: PlanColor | null;
-  started_at: string | null;
+  started_at: string | null; emphasized: boolean | null;
 }
 ```
 
@@ -446,6 +450,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | 3. 予定と教材 | `0008_materials_and_milestones.sql` | `materials` / `material_phases`、`tasks.is_milestone`、`trg_touch_review_on_task` の差し替え（2.2） |
 | 4. Journey | `0009_wishes_and_achievements.sql` | `wishes`、`achievements` ビュー |
 | Issue #36 | `0014_task_carry_over.sql` | `tasks.carried_from`、部分一意インデックス、`is_own_task`、`tasks_owner_all` の差し替え |
+| Issue #54 | `0018_wish_importance_emphasis.sql` | `wishes.importance`・`wishes.emphasize_achievement`、`achievements.emphasized`（ビューの drop → create） |
 
 - 検証はDocker上のローカルSupabaseへ適用して行う。Issue #5で既存migration 0001〜0006を準備し、0007以降は各Issueで扱う。環境の切り替えは [プロジェクト固有Context](../project-context.md) を参照する
 - 現在のSupabaseでは新しいテーブルがData APIに自動公開されない。新規テーブルを使うロールへの明示的な `GRANT` とRLSを各migrationで設定する。既存2テーブルのローカル権限はIssue #5の専用SQLで補う
@@ -475,6 +480,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | 日付 | 内容 |
 | --- | --- |
 | 2026-09-29 | 初版作成、承認 |
+| 2026-09-30 | Issue #54：`wishes` に重要度と達成の強調を追加、`achievements` に `emphasized` を追加（4.2、4.5、5.3、9章） |
 
 ### 実装上の型の補足（Issue #12）
 

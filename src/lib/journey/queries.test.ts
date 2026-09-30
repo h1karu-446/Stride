@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ from: vi.fn(), invalidateQueries: vi.fn() }));
 vi.mock("@/lib/supabase", () => ({ supabase: { from: mocks.from } }));
 vi.mock("@/lib/auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
 vi.mock("@tanstack/react-query", () => ({ keepPreviousData: "keep-previous", useQuery: (options: unknown) => options, useMutation: (options: unknown) => options, useQueryClient: () => ({ invalidateQueries: mocks.invalidateQueries }) }));
-import { useAchievements, useAnnualAchievements, useOldestAchievement, useWishes } from "./queries";
+import { NEW_WISH, useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWish, useWishes } from "./queries";
 import { useCreatePlan, useUpdatePlan, useDeletePlan } from "@/lib/plans/queries";
 import { useAddTask, useUpdateTask, useDeleteTask } from "@/lib/queries";
 
@@ -58,6 +58,42 @@ describe("Journey API pagination", () => {
     expect(q.in).toHaveBeenCalledWith("kind", ["plan", "wish"]);
     expect(q.gte).toHaveBeenCalledWith("achieved_on", "2026-01-01");
     expect(q.lt).toHaveBeenCalledWith("achieved_on", "2027-01-01");
+  });
+});
+describe("wish settings (Issue #54)", () => {
+  function writeMock() {
+    const q = { insert: vi.fn(), update: vi.fn(), eq: vi.fn(), select: vi.fn(), single: vi.fn() };
+    for (const key of ["insert", "update", "eq", "select"] as const) q[key].mockReturnValue(q);
+    q.single.mockResolvedValue({ data: { id: "w1" }, error: null });
+    mocks.from.mockReturnValue(q);
+    return q;
+  }
+  const mutate = (action: unknown) => (useMutateWish() as unknown as { mutationFn: (a: unknown) => Promise<void> }).mutationFn(action);
+  it("creates new wishes with importance 中 and emphasis OFF by default", async () => {
+    expect(NEW_WISH).toMatchObject({ importance: "中", emphasize_achievement: false });
+    const q = writeMock();
+    await mutate({ type: "save", input: { ...NEW_WISH, title: " travel " } });
+    expect(q.insert).toHaveBeenCalledWith({ title: "travel", note: null, importance: "中", emphasize_achievement: false, user_id: "owner" });
+  });
+  it("saves both settings independently when editing", async () => {
+    const q = writeMock();
+    await mutate({ type: "save", id: "w1", input: { title: "a", note: "n", importance: "軽", emphasize_achievement: true } });
+    expect(q.update).toHaveBeenCalledWith({ title: "a", note: "n", importance: "軽", emphasize_achievement: true });
+    expect(q.eq).toHaveBeenCalledWith("id", "w1");
+  });
+  it("toggles only the emphasis from the achievement feed, leaving the achieved date alone", async () => {
+    const q = writeMock();
+    await mutate({ type: "emphasize", id: "w1", emphasized: false });
+    expect(q.update).toHaveBeenCalledWith({ emphasize_achievement: false });
+  });
+  it("loads one wish for editing only when an id is given", async () => {
+    expect((useWish(null) as unknown as { enabled: boolean }).enabled).toBe(false);
+    const q = writeMock();
+    const hook = useWish("w1") as unknown as { enabled: boolean; queryKey: unknown[]; queryFn: () => Promise<unknown> };
+    expect(hook.enabled).toBe(true);
+    expect(hook.queryKey[0]).toBe("wishes");
+    expect(await hook.queryFn()).toEqual({ id: "w1" });
+    expect(q.eq).toHaveBeenCalledWith("id", "w1");
   });
 });
 it.each([useCreatePlan, useUpdatePlan, useDeletePlan, useAddTask, useUpdateTask, useDeleteTask])("invalidates achievements after %s", (hook) => {
