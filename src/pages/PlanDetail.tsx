@@ -33,7 +33,8 @@ import { useTasks } from "@/lib/queries";
 
 type Editing =
   | { kind: "phase-add" }
-  | { kind: "phase-edit"; addRoutine?: boolean; openRoutineId?: string }
+  | { kind: "phase-edit"; addRoutine?: boolean; openRoutineId?: string;
+      initialDates?: { start_date: string; end_date: string } }
   | { kind: "routine-add" }
   | { kind: "routine-edit"; id: string }
   | { kind: "schedule"; id: string } // task id, or "new"
@@ -72,7 +73,7 @@ export default function PlanDetail() {
     if (savePhase.isPending) return false;
     // The current settings panel already edits this phase. Reopening it with
     // the same React key would clear the parent's dirty flag but keep its draft.
-    if (editing?.kind === "phase-edit" && e?.kind === "phase-edit") return false;
+    if (editing?.kind === "phase-edit" && e?.kind === "phase-edit" && !e.initialDates) return false;
     if ((editing?.kind === "phase-add" || editing?.kind === "phase-edit") && phaseDirty
         && !window.confirm("保存していないフェーズの変更を破棄しますか？")) return false;
     savePhase.reset();
@@ -155,6 +156,9 @@ export default function PlanDetail() {
           today={today}
           onSelect={(pid) => { if (setEditing(null)) setSelectedId(pid); }}
           onAdd={() => setEditing({ kind: "phase-add" })}
+          onAdjustDates={(pid, dates) => {
+            if (setEditing({ kind: "phase-edit", initialDates: dates })) setSelectedId(pid);
+          }}
         />
       )}
       {!hasPhases && editing?.kind !== "phase-add" && (
@@ -172,7 +176,6 @@ export default function PlanDetail() {
       {editing?.kind === "phase-add" && (
         <PhaseSettings
           initial={{ name: "", start_date: newPhaseStart, end_date: addDaysISO(newPhaseStart, 29) }}
-          siblings={phases}
           existingRoutines={selected.is_implicit ? settingsRoutines : []}
           saving={savePhase.isPending}
           failed={savePhase.isError}
@@ -202,16 +205,16 @@ export default function PlanDetail() {
         )}
 
         {editing?.kind === "phase-edit" && !selected.is_implicit && (
-          <PhaseSettings key={`${selected.id}-${editing.addRoutine ? "add" : editing.openRoutineId ?? "edit"}`}
+          <PhaseSettings key={`${selected.id}-${editing.addRoutine ? "add" : editing.openRoutineId ?? "edit"}-${editing.initialDates?.start_date ?? ""}-${editing.initialDates?.end_date ?? ""}`}
             initial={{
               name: selected.name ?? "",
-              start_date: selected.start_date ?? "",
-              end_date: selected.end_date ?? "",
+              start_date: editing.initialDates?.start_date ?? selected.start_date ?? "",
+              end_date: editing.initialDates?.end_date ?? selected.end_date ?? "",
             }}
-            siblings={phases}
             selfId={selected.id}
             existingRoutines={settingsRoutines}
             startWithNewRoutine={editing.addRoutine}
+            initialDirty={!!editing.initialDates}
             openRoutineId={editing.openRoutineId}
             saving={savePhase.isPending}
             failed={savePhase.isError || deletePhase.isError}

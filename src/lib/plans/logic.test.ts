@@ -10,6 +10,8 @@ import {
   initialPhase,
   memoOneLine,
   phaseForDate,
+  phaseDatesAfterDrag,
+  phasesForDate,
   phaseProgress,
   routinesForDate,
   shouldShowOverdueNotice,
@@ -63,6 +65,10 @@ describe("UT-01 phaseForDate", () => {
   it("returns the implicit phase for a plan without phases", () => {
     expect(phaseForDate([implicit()], TODAY)?.id).toBe("imp");
   });
+  it("returns both phases when their periods overlap", () => {
+    const overlapping = phase({ id: "c", start_date: "2026-09-20", end_date: "2026-10-10" });
+    expect(phasesForDate([overlapping, phases[0]], TODAY).map((p) => p.id)).toEqual(["a", "c"]);
+  });
 });
 
 describe("UT-02 initialPhase", () => {
@@ -76,6 +82,19 @@ describe("UT-02 initialPhase", () => {
   });
   it("falls back to the last phase", () => {
     expect(initialPhase([a, b], "2026-12-01")?.id).toBe("b");
+  });
+});
+
+describe("phase timeline adjustment", () => {
+  it("moves both ends by whole days, including month boundaries", () => {
+    expect(phaseDatesAfterDrag("2026-09-30", "2026-10-02", "move", 2))
+      .toEqual({ start_date: "2026-10-02", end_date: "2026-10-04" });
+  });
+  it("clamps a resized edge to keep at least one day", () => {
+    expect(phaseDatesAfterDrag("2026-09-30", "2026-10-02", "start", 5).start_date)
+      .toBe("2026-10-02");
+    expect(phaseDatesAfterDrag("2026-09-30", "2026-10-02", "end", -5).end_date)
+      .toBe("2026-09-30");
   });
 });
 
@@ -109,6 +128,15 @@ describe("routinesForDate (UT-04 conditions)", () => {
     });
     expect(routinesForDate(weekdayOnly, TODAY)).toHaveLength(1);
     expect(routinesForDate(weekdayOnly, "2026-10-03")).toHaveLength(0); // Sat
+  });
+  it("includes menus from every phase covering the day", () => {
+    const overlapping = plan({ phases: [
+      phase({ id: "a", routines: [routine({ id: "r-a", minutes: 30 })] }),
+      phase({ id: "b", start_date: "2026-09-20", end_date: "2026-10-10",
+        routines: [routine({ id: "r-b", minutes: 45 })] }),
+    ] });
+    expect(routinesForDate(overlapping, TODAY).map((r) => r.id)).toEqual(["r-a", "r-b"]);
+    expect(todaySummary([overlapping], TODAY).totalMinutes).toBe(75);
   });
 });
 
@@ -255,15 +283,14 @@ describe("UT-19 validation", () => {
     expect(validatePlan({ name: "a", goal: "a".repeat(61) }).goal).toBeDefined();
     expect(validatePlan({ name: "a", goal_note: "a".repeat(1001) }).goal_note).toBeDefined();
   });
-  it("phase: required, order, overlap", () => {
+  it("phase: required, order, and allowed overlap", () => {
     const sib = [phase({ id: "a", name: "A", start_date: "2026-10-01", end_date: "2026-10-31" })];
     const ok = { name: "B", start_date: "2026-11-01", end_date: "2026-11-30" };
-    expect(validatePhase(ok, sib)).toEqual({});
-    expect(validatePhase({ ...ok, name: "" }, sib).name).toBeDefined();
-    expect(validatePhase({ ...ok, end_date: "2026-10-01" }, sib).end_date).toBeDefined();
-    expect(validatePhase({ ...ok, start_date: "2026-10-31" }, sib).start_date).toBeDefined();
-    // editing itself is not an overlap
-    expect(validatePhase({ ...ok, start_date: "2026-10-05", end_date: "2026-10-10" }, sib, "a")).toEqual({});
+    expect(validatePhase(ok)).toEqual({});
+    expect(validatePhase({ ...ok, name: "" }).name).toBeDefined();
+    expect(validatePhase({ ...ok, end_date: "2026-10-01" }).end_date).toBeDefined();
+    expect(validatePhase({ ...ok, start_date: "2026-10-31" })).toEqual({});
+    expect(validatePhase({ ...ok, start_date: "2026-10-05", end_date: "2026-10-10" })).toEqual({});
   });
   it("routine: title, minutes, weekdays, menu", () => {
     const ok = { title: "英語", minutes: 30, weekdays: [1], menu: "" };

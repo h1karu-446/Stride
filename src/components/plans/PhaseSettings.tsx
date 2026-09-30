@@ -4,7 +4,7 @@ import { Field, FormActions } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { hasErrors, validatePhase, validateRoutine } from "@/lib/plans/logic";
 import type { PhaseInput, PhaseRoutineInput } from "@/lib/plans/queries";
-import type { Importance, Phase } from "@/types";
+import type { Importance } from "@/types";
 
 type Draft = { key: string; id?: string; input: PhaseRoutineInput };
 const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
@@ -15,14 +15,15 @@ const blankRoutine = (): Draft => ({
   input: { title: "", minutes: 30, weekdays: [1, 2, 3, 4, 5, 6, 7], importance: "中", menu: "" },
 });
 
-export default function PhaseSettings({ initial, siblings, selfId, existingRoutines, startWithNewRoutine,
+export default function PhaseSettings({ initial, selfId, existingRoutines, startWithNewRoutine,
+  initialDirty,
   openRoutineId, saving,
   failed, onSave, onCancel, onDelete, onDirtyChange }: {
   initial: PhaseInput;
-  siblings: Phase[];
   selfId?: string;
   existingRoutines: PhaseRoutineInput[];
   startWithNewRoutine?: boolean;
+  initialDirty?: boolean;
   openRoutineId?: string;
   saving: boolean;
   failed: boolean;
@@ -40,9 +41,9 @@ export default function PhaseSettings({ initial, siblings, selfId, existingRouti
   const [openKey, setOpenKey] = useState<string | null>(() => startWithNewRoutine
     ? routines[routines.length - 1]?.key ?? null
     : openRoutineId ?? routines[0]?.key ?? null);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, setDirty] = useState(!!initialDirty);
   const today = todayISO();
-  const phaseErrors = validatePhase(phase, siblings, selfId);
+  const phaseErrors = validatePhase(phase);
   const routineErrors = routines.map(({ input }) => validateRoutine(input));
   const canSave = !hasErrors(phaseErrors) && routineErrors.every((errors) => !hasErrors(errors));
 

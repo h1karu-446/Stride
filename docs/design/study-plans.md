@@ -16,7 +16,7 @@
 
 - 既存の構成（React 18 + TanStack Query + Supabase、スコアはPostgreSQLの関数とトリガーで計算）を変えずに拡張する
 - スコアの計算式（`calculate_daily_score`）と `src/lib/score.ts` には手を入れない（NFR-02）
-- データの整合性に関わるルール（二重生成の防止、フェーズの重なり、完了日の記録）は、画面ではなくDBの制約とトリガーで守る。画面側のチェックは入力補助として重ねる
+- データの整合性に関わるルール（二重生成の防止、完了日の記録）は、画面ではなくDBの制約とトリガーで守る。画面側のチェックは入力補助として重ねる
 - 1ユーザー・少量データ（計画は数十件、タスクは年間数千件）を前提に、読み込みは「ユーザーの全件をまとめて取得し、画面側で絞り込む」既存の方式に合わせる
 - migration は追記のみ（`docs/project-context.md` の制約）。リリースごとに1本ずつ追加する
 
@@ -118,7 +118,7 @@ erDiagram
 
 - CHECK：`(is_implicit and name is null and start_date is null and end_date is null) or (not is_implicit and name is not null and start_date is not null and end_date is not null and start_date <= end_date)`
 - 暗黙のフェーズは計画に1つまで：`unique (plan_id) where is_implicit`
-- 期間の重なりの禁止：`exclude using gist (plan_id with =, daterange(start_date, end_date, '[]') with &&) where (not is_implicit)`（拡張 `btree_gist` を有効にする）
+- 0007で設けた期間の重なり禁止は0020で解除する。重なった日は既存の `generate_routine_tasks` が各フェーズのルーティンを選び、`(routine_id, scheduled_date)` の一意性で重複生成を防ぐ
 - 「暗黙のフェーズと通常のフェーズが同じ計画に並存しない」ことは、フェーズの追加・削除を 4.6 の手順に限ることで守る
 
 #### routines（ルーティン）
@@ -435,7 +435,6 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | --- | --- | --- |
 | 端末とDBで「今日」がずれる | 日本時間の0〜9時にDBの `current_date` は前日になる | 日付はすべて画面から送る（生成日、完了日、今日に移す）。RPC は±1日の範囲を許す |
 | トリガーの差し替えで既存の動きが壊れる | スコアの再計算が漏れる | 差し替えは「old の日付も更新する」処理の追加だけにする。migration 適用後に、日付変更と通常の完了の両方で `daily_reviews` の値を確認する |
-| `btree_gist` 拡張が使えない | フェーズの重なり制約を作れない | Supabase では有効化できる。使えない場合は、フェーズの insert/update トリガーで重なりを検査する方式に切り替える |
 | `useTasks()` が全件取得のまま | 数年分で件数が増えると重くなる | 当面は問題にならない件数（年間数千件）。遅くなったら期間で絞る取得に変える（今回は対象外） |
 | 生成タイミングの競合 | 2つのタブで同時に開くと二重に作られる | 部分一意インデックスで防ぐ |
 
@@ -452,6 +451,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | Issue #36 | `0014_task_carry_over.sql` | `tasks.carried_from`、部分一意インデックス、`is_own_task`、`tasks_owner_all` の差し替え |
 | Issue #54 | `0018_wish_importance_emphasis.sql` | `wishes.importance`・`wishes.emphasize_achievement`、`achievements.emphasized`（ビューの drop → create） |
 | Issue #49・#52 | `0019_phase_settings.sql` | フェーズと全メニューを原子的に保存する `save_phase_settings` RPC（既存データの書き換えなし） |
+| Issue #61 | `0020_overlapping_phases.sql` | 期間の重なり禁止を解除し、重なった日は各フェーズのメニューを生成する |
 
 - 検証はDocker上のローカルSupabaseへ適用して行う。Issue #5で既存migration 0001〜0006を準備し、0007以降は各Issueで扱う。環境の切り替えは [プロジェクト固有Context](../project-context.md) を参照する
 - 現在のSupabaseでは新しいテーブルがData APIに自動公開されない。新規テーブルを使うロールへの明示的な `GRANT` とRLSを各migrationで設定する。既存2テーブルのローカル権限はIssue #5の専用SQLで補う

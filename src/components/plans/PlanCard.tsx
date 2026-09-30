@@ -6,8 +6,9 @@ import {
   executionCells,
   formatDateLabel,
   nextSchedule,
-  phaseForDate,
+  phasesForDate,
   phaseProgress,
+  routinesForDate,
   weekdaysLabel,
 } from "@/lib/plans/logic";
 import type { Plan, Task } from "@/types";
@@ -24,13 +25,19 @@ export default function PlanCard({
 }) {
   const color = planHex(plan.color);
   const explicit = plan.phases.filter((p) => !p.is_implicit);
-  const phase = phaseForDate(plan.phases, today);
-  const routines = phase?.routines ?? [];
+  const activePhases = phasesForDate(plan.phases, today);
+  const phase = activePhases[0];
+  const routines = routinesForDate(plan, today);
   const exec = executionCells(tasks, plan.id, today, 7);
 
   let middle: React.ReactNode = null;
   if (explicit.length > 0) {
-    middle = phase && !phase.is_implicit ? (
+    middle = activePhases.length > 1 ? (
+      <div className="space-y-1">
+        <div className="truncate text-sm">{activePhases.map((p) => p.name).join(" · ")}</div>
+        <div className="text-xs muted">{activePhases.length}フェーズが進行中</div>
+      </div>
+    ) : phase && !phase.is_implicit ? (
       <div className="space-y-1.5">
         <div className="text-sm truncate">{phase.name}</div>
         <Bar ratio={phaseProgress(phase, today)} color={color} />

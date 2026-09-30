@@ -31,15 +31,31 @@ export function isDateInPhase(phase: Phase, date: string): boolean {
     phase.start_date <= date && date <= phase.end_date;
 }
 
-/** The phase that contains `date`; the implicit phase always matches. */
+/** All phases covering `date`; overlapping phases can run together. */
+export function phasesForDate(phases: Phase[], date: string): Phase[] {
+  return sortedPhases(phases).filter((p) => isDateInPhase(p, date));
+}
+
+/** The first phase covering `date`, used only as an initial selection. */
 export function phaseForDate(phases: Phase[], date: string): Phase | undefined {
-  return phases.find((p) => isDateInPhase(p, date));
+  return phasesForDate(phases, date)[0];
 }
 
 export function sortedPhases(phases: Phase[]): Phase[] {
   return [...phases].sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")
   );
+}
+
+export type PhaseDragEdge = "move" | "start" | "end";
+
+/** Preview a day-granularity timeline adjustment without crossing its own edge. */
+export function phaseDatesAfterDrag(
+  start: string, end: string, edge: PhaseDragEdge, days: number
+): { start_date: string; end_date: string } {
+  if (edge === "move") return { start_date: addDaysISO(start, days), end_date: addDaysISO(end, days) };
+  if (edge === "start") return { start_date: [addDaysISO(start, days), end].sort()[0], end_date: end };
+  return { start_date: start, end_date: [start, addDaysISO(end, days)].sort()[1] };
 }
 
 /** Initial selection on the detail screen (spec 4.2). */
@@ -316,9 +332,7 @@ export function validatePlan(v: {
 }
 
 export function validatePhase(
-  v: { name: string; start_date: string; end_date: string },
-  siblings: Phase[],
-  selfId?: string
+  v: { name: string; start_date: string; end_date: string }
 ): Errors<"name" | "start_date" | "end_date"> {
   const e: Errors<"name" | "start_date" | "end_date"> = {};
   if (len(v.name) < 1) e.name = "名前を入力してください";
@@ -328,15 +342,6 @@ export function validatePhase(
   if (v.start_date && v.end_date) {
     if (v.start_date > v.end_date) {
       e.end_date = "終了日は開始日以降にしてください";
-    } else {
-      const clash = siblings.find(
-        (p) =>
-          !p.is_implicit &&
-          p.id !== selfId &&
-          p.start_date! <= v.end_date &&
-          v.start_date <= p.end_date!
-      );
-      if (clash) e.start_date = `「${clash.name}」の期間と重なっています`;
     }
   }
   return e;
