@@ -18,6 +18,12 @@ export function achievementStyle(row: Pick<Achievement, "kind" | "emphasized">) 
   return row.kind === "wish" && row.emphasized === false ? QUIET_WISH_STYLE : ACHIEVEMENT_STYLE[row.kind];
 }
 
+// The wish to fill an edit form with: only data that has finished loading, never
+// a cached copy that is being refetched (it may predate a ★/☆ toggle).
+export function freshWish(query: { data?: Wish; isFetching: boolean }): Wish | null {
+  return query.isFetching ? null : query.data ?? null;
+}
+
 // Pending wishes: 重 → 中 → 軽, keeping the added order within each level.
 export function sortWishes(wishes: Wish[]): Wish[] {
   return [...wishes].sort((a, b) => IMPORTANCE_LIST.indexOf(a.importance) - IMPORTANCE_LIST.indexOf(b.importance));

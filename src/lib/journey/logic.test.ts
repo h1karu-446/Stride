@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Achievement, DailyReview, Wish } from "@/types";
-import { ACHIEVEMENT_STYLE, achievementRange, achievementStyle, sortWishes, annualAchievementCount, groupAchievements, journeyStreak, monthlyAverage } from "./logic";
+import { ACHIEVEMENT_STYLE, achievementRange, achievementStyle, freshWish, sortWishes, annualAchievementCount, groupAchievements, journeyStreak, monthlyAverage } from "./logic";
 const achievement = (id: string, kind: Achievement["kind"], achieved_on: string): Achievement => ({ id, kind, achieved_on, user_id: "owner", title: id, plan_id: null, plan_name: null, plan_color: null, started_at: null, emphasized: kind === "wish" ? true : null });
 const review = (date: string, total_score: number, cluster: DailyReview["cluster"] = "A") => ({ date, total_score, cluster } as DailyReview);
 
@@ -51,5 +51,17 @@ describe("UT-22 pending wish order (Issue #54)", () => {
   });
   it("keeps today's order when every wish is 中 (existing wishes after migration 0018)", () => {
     expect(sortWishes([wish("x", "中"), wish("y", "中")]).map((w) => w.id)).toEqual(["x", "y"]);
+  });
+});
+describe("editing an achieved wish from the feed (Issue #54 review)", () => {
+  const wish = (emphasize_achievement: boolean, updated_at: string): Wish => ({ id: "w", importance: "中", user_id: "owner", title: "w", note: null, achieved_at: "2026-09-01", emphasize_achievement, created_at: "", updated_at });
+  it("open → cancel → toggle ★ → reopen: the form waits for the refetch instead of using the cached copy", () => {
+    const cached = wish(false, "2026-09-30T00:00:00Z");
+    const refetched = wish(true, "2026-09-30T00:01:00Z");
+    // Reopened: the cache still holds the value from before the toggle while it refetches.
+    expect(freshWish({ data: cached, isFetching: true })).toBeNull();
+    // Only the refetched row fills the form, so saving keeps the toggle.
+    expect(freshWish({ data: refetched, isFetching: false })).toBe(refetched);
+    expect(freshWish({ data: undefined, isFetching: false })).toBeNull();
   });
 });

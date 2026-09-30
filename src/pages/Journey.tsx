@@ -9,7 +9,7 @@ import { todayISO } from "@/lib/date";
 import { useReviews } from "@/lib/queries";
 import { planHex } from "@/lib/plans/colors";
 import { formatDateLabel, spanLabel } from "@/lib/plans/logic";
-import { achievementRange, achievementStyle, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
+import { achievementRange, achievementStyle, freshWish, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
 import { NEW_WISH, useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWish, useWishes } from "@/lib/journey/queries";
 import type { WishInput } from "@/lib/journey/queries";
 import type { Wish } from "@/types";
@@ -32,6 +32,7 @@ export default function Journey() {
   const pending = sortWishes((wishes.data ?? []).filter((wish) => !wish.achieved_at));
   // An achieved wish opened from the feed is loaded on its own (the view has no note or importance).
   const achievedEditing = useWish(editing && editing !== "new" && !pending.some((wish) => wish.id === editing) ? editing : null);
+  const achievedWish = freshWish(achievedEditing);
   const average = monthlyAverage(reviews.data ?? [], format(month, "yyyy-MM"));
   useEffect(() => {
     if (!undo) return;
@@ -41,8 +42,9 @@ export default function Journey() {
   const edit = (id: string | null) => { if (!mutation.isPending) { mutation.reset(); setEditing(id); } };
   const save = (input: WishInput) => mutation.mutate({ type: "save", id: editing === "new" ? undefined : editing ?? undefined, input }, { onSuccess: () => setEditing(null) });
   const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo((current) => (current?.id === id ? null : current)) });
-  const form = (id: string, initial: WishInput) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
-    onDelete={id === "new" ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
+  // Achieved wishes are not deleted from the feed; restore them first (spec 4.4).
+  const form = (id: string, initial: WishInput, deletable = true, version = "") => <WishForm key={`${id}-${version}`} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
+    onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
   const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement });
 
   return <div className="space-y-6">
@@ -68,7 +70,7 @@ export default function Journey() {
         {editing === "new" && form("new", NEW_WISH)}
         {!wishes.isPending && !wishes.isError && !pending.length && editing !== "new" && <button className="w-full rounded-lg border border-dashed border-slate-300 dark:border-notion-border p-4 text-sm muted" onClick={() => edit("new")}>＋ やりたいことを追加</button>}
         {undo && <div role="status" className="text-sm">「{undo.title}」を達成しました <button className="text-blue-500 underline" disabled={mutation.isPending} onClick={() => restore(undo.id)}>元に戻す</button></div>}
-        {mutation.isError && !editing && <p role="alert" className="text-sm text-red-500">{SAVE_ERROR_MESSAGE}</p>}
+        {mutation.isError && !editing && mutation.variables?.type !== "emphasize" && <p role="alert" className="text-sm text-red-500">{SAVE_ERROR_MESSAGE}</p>}
       </section>
     </div>
     <section className="card space-y-5" aria-label="達成の記録">
@@ -80,22 +82,24 @@ export default function Journey() {
         {rows.map((row) => {
           const style = achievementStyle(row);
           if (row.kind === "wish" && editing === row.id) {
-            return <div key={`${row.kind}-${row.id}`}>{achievedEditing.data ? form(row.id, inputOf(achievedEditing.data))
+            return <div key={`${row.kind}-${row.id}`}>{achievedWish ? form(row.id, inputOf(achievedWish), false, achievedWish.updated_at)
               : <p role={achievedEditing.isError ? "alert" : undefined} className={`text-sm py-2 ${achievedEditing.isError ? "text-red-500" : "muted"}`}>{achievedEditing.isError ? "読み込めませんでした。" : "読み込み中…"}
                 {achievedEditing.isError && <button className="underline ml-2" onClick={() => edit(null)}>閉じる</button>}</p>}</div>;
           }
+          const toggleFailed = mutation.isError && mutation.variables?.type === "emphasize" && mutation.variables.id === row.id;
           return <div key={`${row.kind}-${row.id}`} className={`group flex flex-wrap items-center gap-3 py-2 text-sm ${style.className}`}>
             <span className="min-w-10 shrink-0 text-xs font-normal tabular-nums">{formatDateLabel(row.achieved_on, today)}</span>
             {row.kind === "wish"
               ? <button type="button" aria-pressed={style.prominent} aria-label={`「${row.title}」を達成の記録で目立たせる`} title="達成の記録で目立たせる" disabled={mutation.isPending}
-                  onClick={() => mutation.mutate({ type: "emphasize", id: row.id, emphasized: !style.prominent })} className="rounded focus-visible:outline focus-visible:outline-2">{style.icon}</button>
+                  onClick={() => mutation.mutate({ type: "emphasize", id: row.id, emphasized: !style.prominent })} className="-my-2 -mx-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-notion-panel-hover focus-visible:outline focus-visible:outline-2">{style.icon}</button>
               : <span aria-hidden>{style.icon}</span>}
             {row.kind === "wish"
-              ? <button type="button" className="min-w-0 flex-1 break-words text-left" disabled={mutation.isPending} onClick={() => edit(row.id)}>{row.title}</button>
+              ? <button type="button" className="min-w-0 flex-1 break-words rounded text-left hover:underline focus-visible:outline focus-visible:outline-2" disabled={mutation.isPending} onClick={() => edit(row.id)}>{row.title}</button>
               : <span className="min-w-0 flex-1 break-words">{row.title}</span>}
             {row.kind === "plan" && row.started_at && <span className="text-xs font-normal muted">{spanLabel(row.started_at, row.achieved_on)}</span>}
             {row.plan_id && row.plan_name && row.kind !== "plan" && <Link className="text-xs font-normal hover:underline" style={{ color: planHex(row.plan_color ?? "gray") }} to={`/plans/${row.plan_id}`}>{row.plan_name}</Link>}
             {row.kind === "wish" && <button disabled={mutation.isPending} onClick={() => restore(row.id)} className="text-xs font-normal muted opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline focus-visible:outline-2">未達成に戻す</button>}
+            {toggleFailed && <p role="alert" className="basis-full text-xs font-normal text-red-500">{SAVE_ERROR_MESSAGE}</p>}
           </div>;
         })}
       </div>)}
