@@ -155,5 +155,6 @@ export interface Achievement {
   plan_id: string | null;
   plan_name: string | null;
   plan_color: PlanColor | null;
-  started_on: string | null;
+  /** Plan creation time (timestamptz, plans only); shown in the device's time zone. */
+  started_at: string | null;
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Achievement, DailyReview } from "@/types";
 import { ACHIEVEMENT_STYLE, achievementRange, annualAchievementCount, groupAchievements, journeyStreak, monthlyAverage } from "./logic";
-const achievement = (id: string, kind: Achievement["kind"], achieved_on: string): Achievement => ({ id, kind, achieved_on, user_id: "owner", title: id, plan_id: null, plan_name: null, plan_color: null, started_on: null });
+const achievement = (id: string, kind: Achievement["kind"], achieved_on: string): Achievement => ({ id, kind, achieved_on, user_id: "owner", title: id, plan_id: null, plan_name: null, plan_color: null, started_at: null });
 const review = (date: string, total_score: number, cluster: DailyReview["cluster"] = "A") => ({ date, total_score, cluster } as DailyReview);
 
 describe("UT-17 achievement groups", () => {

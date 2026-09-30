@@ -224,7 +224,7 @@ create policy "<table>_owner_all" on public.<table> for all
 | title | やりたいことのタイトル、計画名、予定のタイトル、教材のタイトル |
 | achieved_on | 達成した日（`achieved_at`、`completed_at`、`scheduled_date`、`completed_at`） |
 | plan_id / plan_name / plan_color | 紐づく計画（`wish` では NULL） |
-| started_on | 計画の完了で期間を出すための作成日（`plan` のみ） |
+| started_at | 計画の完了で期間を出すための作成日時（timestamptz、`plan` のみ）。画面で端末の日付に変換する。0009 の `started_on`（UTC 日付）を migration 0012 で置き換えた（Issue #34） |
 
 画面側は `achieved_on` の降順で3か月分ずつ取得する（`gte` / `lt` で月の範囲を指定）。
 
@@ -333,13 +333,19 @@ export interface Material {
   status: MaterialStatus; completed_at?: string; phase_ids: string[];
   created_at: string;
 }
-export interface Wish { id: string; title: string; note?: string; achieved_at?: string; created_at: string }
+export interface Wish {
+  id: string; user_id: string; title: string; note: string | null;
+  achieved_at: string | null; created_at: string; updated_at: string;
+}
 export interface Achievement {
   kind: "wish" | "plan" | "milestone" | "material";
-  id: string; title: string; achieved_on: string;
-  plan_id?: string; plan_name?: string; plan_color?: PlanColor; started_on?: string;
+  id: string; user_id: string; title: string; achieved_on: string;
+  plan_id: string | null; plan_name: string | null; plan_color: PlanColor | null;
+  started_at: string | null;
 }
 ```
+
+`Wish` と `Achievement` は、DB の行（`wishes` テーブル、`achievements` ビュー）と同じ形にする。値がない列は、Supabase が返すとおり `null` で表し、`user_id` も含める。これにより、取得した行を変換せずにそのまま使える（2026-09-30 に本人が決定。実装に合わせて設計を更新）。上の `Plan` などの既存の型は `?:` のまま残っているが、今後追加する型は DB の行と同じ形に寄せる。
 
 `Task` に `plan_id?`、`routine_id?`、`planned_minutes?`、`is_milestone: boolean` を追加し、`queries.ts` の `TaskRow` / `rowToTask` も合わせて変える。
 

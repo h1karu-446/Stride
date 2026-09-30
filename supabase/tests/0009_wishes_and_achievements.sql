@@ -1,4 +1,4 @@
--- Run with psql -v ON_ERROR_STOP=1 after migrations 0001..0009.
+-- Run with psql -v ON_ERROR_STOP=1 after migrations 0001..0012 (0012 renamed started_on to started_at).
 -- All fixtures and mutations are rolled back; existing users are untouched.
 begin;
 insert into auth.users (id, email) values
@@ -22,7 +22,7 @@ insert into public.tasks (id, user_id, plan_id, title, importance, scheduled_dat
 do $$ begin
  if (select count(*) from public.achievements) <> 4 then raise exception 'DB-60: expected four achievements'; end if;
  if (select count(distinct kind) from public.achievements) <> 4 then raise exception 'DB-60: expected four kinds'; end if;
- if not exists (select 1 from public.achievements where kind = 'plan' and started_on is not null and plan_name = 'done plan') then raise exception 'DB-60: plan metadata missing'; end if;
+ if not exists (select 1 from public.achievements where kind = 'plan' and started_at is not null and plan_name = 'done plan') then raise exception 'DB-60: plan metadata missing'; end if;
 end $$;
 update public.wishes set achieved_at = null where id = 'a9000000-0000-0000-0000-000000000011';
 do $$ begin
