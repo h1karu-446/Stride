@@ -14,6 +14,7 @@ export interface Task {
   routine_id?: string; // set only on tasks generated from a routine
   planned_minutes?: number; // duration, used by routine tasks
   is_milestone: boolean; // milestone mark on plan schedules
+  carried_from?: string; // the overdue schedule this task was copied from (BR-04)
   created_at: string;
   updated_at: string;
 }

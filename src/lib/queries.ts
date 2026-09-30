@@ -33,6 +33,7 @@ interface TaskRow {
   routine_id: string | null;
   planned_minutes: number | null;
   is_milestone: boolean;
+  carried_from: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +75,7 @@ function rowToTask(r: TaskRow): Task {
     routine_id: r.routine_id ?? undefined,
     planned_minutes: r.planned_minutes ?? undefined,
     is_milestone: r.is_milestone ?? false,
+    carried_from: r.carried_from ?? undefined,
     created_at: r.created_at,
     updated_at: r.updated_at,
   };
@@ -158,6 +160,8 @@ export type AddTaskInput = {
   memo?: string;
   plan_id?: string; // plan schedules (予定)
   is_milestone?: boolean;
+  planned_minutes?: number;
+  carried_from?: string; // carrying an overdue schedule over (BR-04)
 };
 
 export function useAddTask() {
@@ -176,6 +180,9 @@ export function useAddTask() {
         memo: input.memo ?? null,
         plan_id: input.plan_id ?? null,
         is_milestone: input.is_milestone ?? false,
+        // Only sent when set, so a plain add does not depend on migration 0014.
+        ...(input.planned_minutes != null && { planned_minutes: input.planned_minutes }),
+        ...(input.carried_from && { carried_from: input.carried_from }),
       };
       const { data, error } = await supabase
         .from("tasks")

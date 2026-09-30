@@ -18,7 +18,12 @@ import {
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
 import { normalizeRecordedTime } from "@/lib/recordedTime";
 import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
-import { memoOneLine } from "@/lib/plans/logic";
+import {
+  formatMinutes,
+  isLockedSchedule,
+  memoOneLine,
+  taskDurationMinutes,
+} from "@/lib/plans/logic";
 import { planHex } from "@/lib/plans/colors";
 import {
   calculateScore,
@@ -553,9 +558,11 @@ function ImportancePicker({
 function ImportanceMenu({
   value,
   onChange,
+  disabled,
 }: {
   value: Importance;
   onChange: (v: Importance) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -606,8 +613,10 @@ function ImportanceMenu({
         ref={triggerRef}
         type="button"
         onClick={toggle}
+        disabled={disabled}
+        title={disabled ? "過去の予定は、タイトルだけ変更できます" : undefined}
         className={
-          "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition " +
+          "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-60 " +
           meta.activeBg +
           " " +
           meta.activeText
@@ -669,6 +678,9 @@ function TaskRow({ task }: { task: Task }) {
     ? plans?.find((p) => p.id === task.plan_id)
     : undefined;
   const memoLine = plan ? memoOneLine(task.memo) : "";
+  const duration = taskDurationMinutes(task);
+  // A past schedule keeps its completion, importance and existence (BR-04).
+  const locked = isLockedSchedule(task, todayISO());
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
 
@@ -685,8 +697,10 @@ function TaskRow({ task }: { task: Task }) {
     <li className="group flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition">
       <input
         type="checkbox"
-        className="size-4 rounded accent-notion-blue cursor-pointer"
+        className="size-4 rounded accent-notion-blue cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
         checked={task.completed}
+        disabled={locked}
+        title={locked ? "過去の予定は、タイトルだけ変更できます" : undefined}
         onChange={() => toggleTask(task)}
       />
       <div className="flex-1 min-w-0">
@@ -742,20 +756,33 @@ function TaskRow({ task }: { task: Task }) {
           </div>
         )}
       </div>
+      {duration != null && (
+        <span
+          className="flex-shrink-0 text-xs muted tabular-nums"
+          title="所要時間"
+        >
+          {formatMinutes(duration)}
+        </span>
+      )}
       <ImportanceMenu
         value={task.importance}
+        disabled={locked}
         onChange={(v) =>
           updateTask.mutate({ id: task.id, patch: { importance: v } })
         }
       />
-      <button
-        type="button"
-        onClick={() => deleteTask.mutate(task.id)}
-        className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-sm"
-        aria-label="Delete"
-      >
-        ✕
-      </button>
+      {locked ? (
+        <span className="w-[1em] text-sm" aria-hidden />
+      ) : (
+        <button
+          type="button"
+          onClick={() => deleteTask.mutate(task.id)}
+          className="text-slate-300 dark:text-notion-muted hover:text-rose-500 opacity-0 group-hover:opacity-100 transition text-sm"
+          aria-label="Delete"
+        >
+          ✕
+        </button>
+      )}
     </li>
   );
 }
