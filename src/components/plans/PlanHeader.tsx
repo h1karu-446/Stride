@@ -88,6 +88,11 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
           </button>
         )}
         <StatusMenu status={plan.status} onChange={(status) => update.mutate({ id: plan.id, patch: { status } })} />
+        <div className="flex items-center gap-2 text-sm">
+          <DatePicker label="計画の期日" value={plan.due_date ?? ""} emptyLabel="＋ 期日を設定" allowClear
+            onChange={(due_date) => update.mutate({ id: plan.id, patch: { due_date } })} />
+          {plan.due_date && <span className="muted">{daysLeftLabel(plan.due_date, today)}</span>}
+        </div>
         <div ref={moreRef} className="relative ml-auto">
           <button type="button" aria-label="その他の操作" aria-expanded={moreOpen} className="btn-ghost !px-2 !py-1"
             onClick={() => setMoreOpen(!moreOpen)}>⋯</button>
@@ -97,11 +102,6 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
             </div>
           )}
         </div>
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2 pl-1 text-sm">
-        <DatePicker label="計画の期日" value={plan.due_date ?? ""} emptyLabel="＋ 期日を設定" allowClear
-          onChange={(due_date) => update.mutate({ id: plan.id, patch: { due_date } })} />
-        {plan.due_date && <span className="muted">{daysLeftLabel(plan.due_date, today)}</span>}
       </div>
       {(nameError || update.isError || deleteFailed) && (
         <p role="alert" className="mt-2 text-xs text-rose-600">{nameError || (deleteFailed ? "削除できませんでした。もう一度操作してください" : "保存できませんでした。もう一度操作してください")}</p>
