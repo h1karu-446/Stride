@@ -63,6 +63,36 @@ export default function AchievementReel() {
   // Start at the intro every time; scrolling down walks from the oldest record to today.
   useLayoutEffect(() => { window.scrollTo(0, 0); }, []);
 
+  // Slow auto-scroll through the reel. Any manual input (wheel, touch, keys, mouse) wins:
+  // auto-scroll pauses and picks up again after a few idle seconds. Off with reduced motion.
+  useEffect(() => {
+    if (!ready || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const SPEED = 36; // px per second
+    let pausedUntil = performance.now() + 1800;
+    let last = performance.now();
+    let carry = 0;
+    let frame = 0;
+    const pause = () => { pausedUntil = performance.now() + 3500; };
+    const events = ["wheel", "touchstart", "touchmove", "keydown", "mousedown"] as const;
+    events.forEach((type) => window.addEventListener(type, pause, { passive: true }));
+    const tick = (now: number) => {
+      const dt = Math.min(now - last, 100);
+      last = now;
+      const atEnd = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2;
+      if (now >= pausedUntil && !atEnd) {
+        carry += (SPEED * dt) / 1000;
+        const step = Math.floor(carry);
+        if (step > 0) { carry -= step; window.scrollBy(0, step); }
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(frame);
+      events.forEach((type) => window.removeEventListener(type, pause));
+    };
+  }, [ready]);
+
   useEffect(() => {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") navigate("/journey"); };
     window.addEventListener("keydown", close);
