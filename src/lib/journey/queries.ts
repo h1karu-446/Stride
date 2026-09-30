@@ -44,6 +44,20 @@ export function useAchievements(months: number, today: string) {
   });
 }
 
+// The latest `limit` achievements, newest first, for the Journey feed.
+export function useRecentAchievements(limit: number) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["achievements", session?.user.id, "recent", limit], enabled: !!session,
+    queryFn: async (): Promise<Achievement[]> => {
+      const { data, error } = await supabase.from("achievements").select("*")
+        .order("achieved_on", { ascending: false }).order("kind").order("id").limit(limit);
+      if (error) throw error;
+      return (data ?? []) as Achievement[];
+    },
+  });
+}
+
 // Every achievement, oldest first, for the full-screen reel (/journey/achievements).
 export function useAllAchievements() {
   const { session } = useAuth();

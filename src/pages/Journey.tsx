@@ -10,26 +10,24 @@ import { todayISO } from "@/lib/date";
 import { useReviews } from "@/lib/queries";
 import { planHex } from "@/lib/plans/colors";
 import { formatDateLabel, spanLabel } from "@/lib/plans/logic";
-import { achievementRange, achievementStyle, editableWish, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
-import { NEW_WISH, useAchievements, useAnnualAchievements, useMutateWish, useOldestAchievement, useWish, useWishes } from "@/lib/journey/queries";
+import { achievementStyle, editableWish, groupAchievements, journeyStreak, monthlyAverage, sortWishes } from "@/lib/journey/logic";
+import { NEW_WISH, useAnnualAchievements, useMutateWish, useRecentAchievements, useWish, useWishes } from "@/lib/journey/queries";
 import type { WishInput } from "@/lib/journey/queries";
 import type { Wish } from "@/types";
 
 export default function Journey() {
   const today = todayISO();
   const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  // The feed shows the last 3 months; everything else lives in the full-screen reel.
-  const months = 3;
+  // The feed shows the latest few records (about the height of the calendar card beside
+  // the wishes); everything else lives in the full-screen reel.
+  const FEED_LIMIT = 8;
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [undo, setUndo] = useState<{ id: string; title: string } | null>(null);
   const reviews = useReviews();
   const wishes = useWishes();
-  const achievements = useAchievements(months, today);
-  const oldest = useOldestAchievement();
+  const achievements = useRecentAchievements(FEED_LIMIT);
   const annual = useAnnualAchievements(today.slice(0, 4));
-  const feedFrom = achievementRange(today, months).from;
-  const hasOlder = !!oldest.data && oldest.data < feedFrom;
   const mutation = useMutateWish();
   const pending = sortWishes((wishes.data ?? []).filter((wish) => !wish.achieved_at));
   // An achieved wish opened from the feed is loaded on its own (the view has no note or importance).
@@ -61,7 +59,7 @@ export default function Journey() {
         <div><dt className="text-xs muted">年の達成</dt><dd className="text-xl font-semibold">{annual.isPending || annual.isError ? "—" : annual.data} <span className="text-xs">件</span></dd></div>
       </dl>
     </div>
-    {(reviews.isError || wishes.isError || achievements.isError || oldest.isError || annual.isError) && <div role="alert" className="card text-sm text-red-500">読み込めませんでした。<button className="underline ml-2" onClick={() => { void reviews.refetch(); void wishes.refetch(); void achievements.refetch(); void oldest.refetch(); void annual.refetch(); }}>再試行</button></div>}
+    {(reviews.isError || wishes.isError || achievements.isError || annual.isError) && <div role="alert" className="card text-sm text-red-500">読み込めませんでした。<button className="underline ml-2" onClick={() => { void reviews.refetch(); void wishes.refetch(); void achievements.refetch(); void annual.refetch(); }}>再試行</button></div>}
     <div className="grid lg:grid-cols-2 gap-6 items-stretch">
       <section className="card"><ScoreCalendar month={month} setMonth={setMonth} reviews={reviews.data ?? []} /></section>
       <section className="card space-y-3" aria-label="やりたいこと">
@@ -92,10 +90,10 @@ export default function Journey() {
           <p className="font-display text-xs italic tracking-[0.35em] text-[#c9a86a]">Achievements</p>
           <h2 className="mt-1 font-mincho text-xl text-stone-100">達成の記録</h2>
         </div>
-        {!!oldest.data && <Link to="/journey/achievements" className="group inline-flex items-center gap-2 rounded-full border border-[#c9a86a]/50 px-4 py-1.5 text-xs tracking-widest text-[#c9a86a] transition hover:bg-[#c9a86a]/10">もっと見る<span aria-hidden className="transition group-hover:translate-x-1">→</span></Link>}
+        {!!achievements.data?.length && <Link to="/journey/achievements" className="group inline-flex items-center gap-2 rounded-full border border-[#c9a86a]/50 px-4 py-1.5 text-xs tracking-widest text-[#c9a86a] transition hover:bg-[#c9a86a]/10">もっと見る<span aria-hidden className="transition group-hover:translate-x-1">→</span></Link>}
       </div>
       {achievements.isPending && <p className="text-sm muted">読み込み中…</p>}
-      {!achievements.isPending && !achievements.isError && !oldest.isPending && !oldest.isError && !achievements.data?.length && <p className="text-sm muted">{hasOlder ? `直近${months}か月の記録はありません` : "達成したことがここに並びます"}</p>}
+      {!achievements.isPending && !achievements.isError && !achievements.data?.length && <p className="text-sm muted">達成したことがここに並びます</p>}
       {groupAchievements(achievements.data ?? []).map(([key, rows]) => <div key={key} className="space-y-2">
         <h3 className="flex items-baseline gap-2 border-b border-[#c9a86a]/20 pb-2"><span className="font-display text-2xl italic text-[#e8d3a0]">{Number(key.slice(5))}</span><span className="font-mincho text-xs text-stone-400">{Number(key.slice(0, 4))}年{Number(key.slice(5))}月</span></h3>
         {rows.map((row, index) => {

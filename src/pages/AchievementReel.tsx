@@ -104,9 +104,8 @@ export default function AchievementReel() {
 
   return (
     <div className="min-h-screen bg-[#0a0908] text-stone-100 selection:bg-[#c9a86a]/30">
-      <header className="fixed inset-x-0 top-0 z-30 flex items-center justify-between px-5 py-4 mix-blend-difference">
+      <header className="fixed inset-x-0 top-0 z-30 px-5 py-4 mix-blend-difference">
         <p className="font-display text-sm italic tracking-[0.35em] text-stone-200">Stride · Achievements</p>
-        <Link to="/journey" aria-label="達成の記録を閉じる" className="rounded-full border border-stone-200/40 px-3 py-1 text-sm text-stone-200 hover:bg-stone-200/10 focus-visible:outline focus-visible:outline-2">✕</Link>
       </header>
 
       {ready && months.length > 0 && (
