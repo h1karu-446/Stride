@@ -47,7 +47,8 @@ export default function Journey() {
   const restore = (id: string) => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => setUndo((current) => (current?.id === id ? null : current)) });
   // Achieved wishes are not deleted from the feed; restore them first (spec 4.4).
   const form = (id: string, initial: WishInput, deletable = true) => <WishForm key={id} initial={initial} onSubmit={save} onCancel={() => edit(null)} saving={mutation.isPending} failed={mutation.isError}
-    onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })} />;
+    onDelete={id === "new" || !deletable ? undefined : () => mutation.mutate({ type: "delete", id }, { onSuccess: () => setEditing(null) })}
+    onRestore={initial.achieved_at ? () => mutation.mutate({ type: "achieve", id, achieved: false }, { onSuccess: () => { setEditing(null); setUndo((current) => (current?.id === id ? null : current)); } }) : undefined} />;
   const inputOf = (wish: Wish): WishInput => ({ title: wish.title, note: wish.note ?? "", importance: wish.importance, emphasize_achievement: wish.emphasize_achievement, achieved_at: wish.achieved_at });
 
   return <div className="space-y-6">
@@ -68,7 +69,6 @@ export default function Journey() {
             <h2 className="font-semibold">やりたいこと</h2>
             <p className="text-xs muted">{pending.length ? `${pending.length} 個のやりたいこと` : "いつかやりたいことを書き出そう"}{!annual.isPending && !annual.isError && annual.data ? ` · 今年 ${annual.data} 個かなえた` : ""}</p>
           </div>
-          <button className="btn-outline !py-1 text-sm" aria-label="やりたいことを追加" disabled={mutation.isPending} onClick={() => edit("new")}>＋ 追加</button>
         </div>
         {wishes.isPending && <p className="text-sm muted">読み込み中…</p>}
         <ul className="space-y-2">
@@ -78,6 +78,7 @@ export default function Journey() {
         </ul>
         {pending.length > 8 && <button className="text-xs muted hover:underline" onClick={() => setExpanded(!expanded)}>{expanded ? "閉じる" : `他 ${pending.length - 8}件`}</button>}
         {editing === "new" && form("new", NEW_WISH)}
+        {!!pending.length && editing !== "new" && <button type="button" disabled={mutation.isPending} onClick={() => edit("new")} className="w-full rounded-xl border border-dashed border-slate-300 py-2.5 text-sm muted transition hover:border-amber-400 hover:text-amber-600 dark:border-notion-border">＋ やりたいことを追加</button>}
         {!wishes.isPending && !wishes.isError && !pending.length && editing !== "new" && <button className="w-full rounded-xl border-2 border-dashed border-slate-300 p-6 text-center text-sm muted hover:border-amber-400 hover:text-amber-600 dark:border-notion-border" onClick={() => edit("new")}><span className="block text-2xl" aria-hidden>✨</span>行ってみたい場所、挑戦したいこと、手に入れたいもの。<br />まずは1つ書いてみよう</button>}
         {undo && <div role="status" className="flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300"><span aria-hidden>🎉</span><span className="min-w-0 flex-1 break-words">「{undo.title}」をかなえました！</span><button className="shrink-0 text-xs underline" disabled={mutation.isPending} onClick={() => restore(undo.id)}>元に戻す</button></div>}
         {mutation.isError && !editing && mutation.variables?.type !== "emphasize" && <p role="alert" className="text-sm text-red-500">{SAVE_ERROR_MESSAGE}</p>}
@@ -114,7 +115,6 @@ export default function Journey() {
             <span className={`min-w-0 flex-1 break-words ${style.prominent && (row.kind === "wish" || row.kind === "plan") ? "font-mincho text-base shimmer-gold" : ""}`}>{row.title}</span>
             {row.kind === "plan" && row.started_at && <span className="text-xs font-normal muted">{spanLabel(row.started_at, row.achieved_on)}</span>}
             {row.plan_id && row.plan_name && row.kind !== "plan" && <Link className="text-xs font-normal hover:underline" style={{ color: planHex(row.plan_color ?? "gray") }} to={`/plans/${row.plan_id}`}>{row.plan_name}</Link>}
-            {row.kind === "wish" && <button disabled={mutation.isPending} onClick={() => restore(row.id)} className="text-xs font-normal muted opacity-0 group-hover:opacity-100 focus:opacity-100 focus-visible:outline focus-visible:outline-2">未達成に戻す</button>}
             {row.kind === "wish" && <button type="button" disabled={mutation.isPending} onClick={() => edit(row.id)} aria-label={`「${row.title}」を編集`} className="shrink-0 rounded-md px-2 py-1 text-xs font-normal muted hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 dark:hover:bg-notion-panel-hover">編集</button>}
             {toggleFailed && <p role="alert" className="basis-full text-xs font-normal text-red-500">{SAVE_ERROR_MESSAGE}</p>}
           </div>;

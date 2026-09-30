@@ -6,8 +6,8 @@ import { todayISO } from "@/lib/date";
 import { IMPORTANCE_LIST } from "@/types";
 import type { WishInput } from "@/lib/journey/queries";
 
-export default function WishForm({ initial, onSubmit, onDelete, onCancel, saving, failed }: {
-  initial: WishInput; onSubmit: (value: WishInput) => void; onDelete?: () => void;
+export default function WishForm({ initial, onSubmit, onDelete, onRestore, onCancel, saving, failed }: {
+  initial: WishInput; onSubmit: (value: WishInput) => void; onDelete?: () => void; onRestore?: () => void;
   onCancel: () => void; saving: boolean; failed: boolean;
 }) {
   const [value, setValue] = useState(initial);
@@ -37,6 +37,7 @@ export default function WishForm({ initial, onSubmit, onDelete, onCancel, saving
       <input type="checkbox" checked={value.emphasize_achievement} disabled={saving} onChange={(e) => setValue({ ...value, emphasize_achievement: e.target.checked })} />
       達成の記録で目立たせる ★
     </label>
+    {onRestore && <button type="button" disabled={saving} onClick={onRestore} className="text-xs muted underline-offset-2 hover:underline">未達成に戻す（やりたいことの一覧に戻します）</button>}
     <FormActions onCancel={() => { if (!saving) onCancel(); }} onDelete={onDelete ? () => { if (!saving) onDelete(); } : undefined} canSave={valid} saving={saving} error={failed} />
   </form>;
 }
