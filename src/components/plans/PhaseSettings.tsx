@@ -37,7 +37,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   const [phase, setPhase] = useState(initial);
   const [routines, setRoutines] = useState<Draft[]>(() => {
     const existing: Draft[] = existingRoutines.map((input) => ({ key: input.id ?? crypto.randomUUID(), id: input.id, input }));
-    if (startWithNewRoutine || (!selfId && !existing.length)) existing.push(blankRoutine());
+    if (startWithNewRoutine) existing.push(blankRoutine());
     return existing;
   });
   const [openKey, setOpenKey] = useState<string | null>(() => startWithNewRoutine
