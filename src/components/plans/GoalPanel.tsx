@@ -128,7 +128,7 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
             <EditActions onSave={saveGoal} onCancel={() => setEditing(null)} saving={update.isPending} />
           </div>
         ) : (
-          <button type="button" onClick={startGoal} disabled={update.isPending} className={`block max-w-full rounded-lg text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${plan.goal ? "text-2xl font-bold break-words" : "text-sm muted"}`}>
+          <button type="button" onClick={startGoal} disabled={update.isPending} className={`block max-w-full cursor-text rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${plan.goal ? "text-2xl font-bold break-words" : "text-sm muted"}`}>
             {plan.goal || "＋ 到達目標を設定"}
           </button>
         )}
@@ -160,7 +160,7 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
           <div>
             <ul tabIndex={0} title="クリックで編集" onClick={startVision} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); startVision(); }
-            }} className="list-disc cursor-text space-y-1 rounded-lg pl-5 text-sm break-words hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+            }} className="list-disc cursor-text space-y-1 rounded-lg pl-5 text-sm break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
               {(expanded ? vision : vision.slice(0, PREVIEW_ITEMS)).map((item, index) => <li key={index}>{item}</li>)}
             </ul>
             {vision.length > PREVIEW_ITEMS && <button type="button" onClick={() => setExpanded(!expanded)} className="mt-1 text-xs text-notion-blue hover:underline">{expanded ? "閉じる" : "続きを表示"}</button>}

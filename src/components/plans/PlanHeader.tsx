@@ -83,7 +83,7 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
           </div>
         ) : (
           <button type="button" disabled={update.isPending} onClick={() => { update.reset(); setNameDraft(plan.name); setNameError(""); setEditingName(true); }}
-            className="min-w-0 flex-1 basis-[180px] rounded-lg text-left text-2xl font-bold tracking-tight break-words hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue sm:text-3xl">
+            className="min-w-0 flex-1 basis-[180px] cursor-text rounded-lg text-left text-2xl font-bold tracking-tight break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue sm:text-3xl">
             {plan.name}
           </button>
         )}
