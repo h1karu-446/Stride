@@ -3,7 +3,6 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
-import ExecutionSquares from "@/components/plans/ExecutionSquares";
 import GoalPanel from "@/components/plans/GoalPanel";
 import MaterialList from "@/components/plans/MaterialList";
 import PhaseBar from "@/components/plans/PhaseBar";
@@ -15,7 +14,6 @@ import ScheduleList from "@/components/plans/ScheduleList";
 import { addDaysISO, todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import {
-  executionCells,
   formatDateLabel,
   initialPhase,
   shouldShowOverdueNotice,
@@ -73,10 +71,6 @@ export default function PlanDetail() {
   // Fall back to the initial choice when nothing (or a deleted phase) is selected.
   const selected =
     phases.find((p) => p.id === selectedId) ?? initialPhase(phases, today);
-  const exec = useMemo(
-    () => (plan ? executionCells(tasks, plan.id, today, 14) : undefined),
-    [tasks, plan, today]
-  );
 
   // Keep a draft when the user accidentally switches phases or editors.
   const setEditing = useCallback((e: Editing) => {
@@ -97,7 +91,7 @@ export default function PlanDetail() {
   const closeEditing = useCallback(() => setEditing(null), [setEditing]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
-  if (!plan || !selected || !exec) {
+  if (!plan || !selected) {
     return (
       <div className="py-24 text-center space-y-3">
         <p className="muted">計画が見つかりません</p>
@@ -237,8 +231,7 @@ export default function PlanDetail() {
           />
         )}
 
-        {editing?.kind !== "phase-edit" && <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="min-w-0 space-y-3">
+        {editing?.kind !== "phase-edit" && <div className="min-w-0 space-y-3">
             {selected.routines.map((r) =>
               // The ✎ on a menu edits only that menu; phase name and dates stay in the phase settings.
               editing?.kind === "routine-edit" && editing.id === r.id ? (
@@ -287,20 +280,6 @@ export default function PlanDetail() {
                 ＋ メニューを追加
               </button>
             )}
-          </div>
-
-          <div className="min-w-0 rounded-lg border border-slate-200 p-4 flex flex-col gap-4 dark:border-notion-border">
-            <div className="flex items-start justify-between">
-              <span className="text-sm muted">直近14日</span>
-              <span>
-                <span className="text-xl font-bold">{exec.done}</span>
-                <span className="text-xs muted"> / {exec.target}日</span>
-              </span>
-            </div>
-            <div className="mt-auto overflow-x-auto">
-              <ExecutionSquares cells={exec.cells} color={color} today={today} size="lg" showNone />
-            </div>
-          </div>
         </div>}
       </section>
 
