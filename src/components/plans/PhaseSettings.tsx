@@ -160,12 +160,12 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
               </div> : <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <div className="flex items-center gap-2">
+                    <button type="button" aria-expanded={true} disabled={saving} onClick={() => setOpenKey(null)}
+                      title="閉じる" aria-label="閉じる" className="rounded px-1.5 py-1.5 text-xs muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▾</button>
                     <input aria-label={`メニュー ${index + 1} の名前`} autoFocus={!row.input.title}
                       className="input flex-1 font-medium" maxLength={40} value={row.input.title} disabled={saving}
                       placeholder={`メニュー ${index + 1}：例）IELTSのListeningを30分解く`}
                       onChange={(event) => updateRoutine(row.key, { title: event.target.value })} />
-                    <button type="button" aria-expanded={true} disabled={saving} onClick={() => setOpenKey(null)}
-                      title="閉じる" aria-label="閉じる" className="rounded px-2 py-1.5 text-sm muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▴</button>
                     <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
                       aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
                       title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
