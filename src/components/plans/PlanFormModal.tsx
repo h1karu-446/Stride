@@ -46,7 +46,7 @@ export default function PlanFormModal({
           />
         </Field>
         <Field group label="色">
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {PLAN_COLORS.map((c) => (
               <button
                 key={c.key}
@@ -54,12 +54,11 @@ export default function PlanFormModal({
                 aria-label={c.label}
                 aria-pressed={v.color === c.key}
                 onClick={() => setV({ ...v, color: c.key })}
-                className="w-7 h-7 rounded-full border-2 transition"
-                style={{
-                  background: c.hex,
-                  borderColor: v.color === c.key ? "currentColor" : "transparent",
-                }}
-              />
+                className={`flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${v.color === c.key ? "border-slate-700 bg-slate-100 font-semibold ring-1 ring-slate-700 dark:border-slate-300 dark:bg-notion-panel-hover dark:ring-slate-300" : "border-slate-200 hover:bg-slate-50 dark:border-notion-border dark:hover:bg-notion-panel-hover"}`}
+              >
+                <span className="h-5 w-5 shrink-0 rounded-full border border-black/10" style={{ background: c.hex }} aria-hidden="true" />
+                <span>{c.label}</span>
+              </button>
             ))}
           </div>
         </Field>
