@@ -80,7 +80,7 @@ export default function PlanCard({
     >
       <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 opacity-70" style={{ background: color }} />
       <div className="flex items-start justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-3">
+        <span className="flex min-w-0 items-center gap-2.5">
           <PlanIcon plan={plan} />
           <span className="truncate text-[15px] font-semibold">{plan.name}</span>
         </span>

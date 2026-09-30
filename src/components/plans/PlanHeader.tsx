@@ -51,7 +51,7 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
           <button type="button" aria-label="計画の色を変更" aria-expanded={colorOpen}
             onClick={() => setColorOpen(!colorOpen)}
             title="色を変更"
-            className="rounded-xl transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+            className="flex h-8 w-8 items-center justify-center rounded-lg transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:hover:bg-notion-panel-hover">
             <PlanIcon plan={plan} size="lg" />
           </button>
           {colorOpen && (

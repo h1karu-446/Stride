@@ -167,7 +167,7 @@ function StatusColumn({ status, plans }: { status: PlanStatus; plans: Plan[] }) 
               className="group flex items-center justify-between gap-2 px-3 py-2 text-sm transition hover:bg-slate-50 dark:hover:bg-notion-panel-hover"
             >
               <Link to={`/plans/${p.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
-                <span className={p.status === "done" ? "" : "opacity-70"}><PlanIcon plan={p} size="sm" /></span>
+                <span className={p.status === "done" ? "" : "opacity-60"}><PlanIcon plan={p} size="sm" /></span>
                 <span className="truncate">{p.name}</span>
                 {status === "done" && <span className="text-xs text-emerald-600 dark:text-emerald-400" aria-label="完了">✓</span>}
                 {status === "done" && (
