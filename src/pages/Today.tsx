@@ -18,7 +18,12 @@ import {
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
 import { normalizeRecordedTime } from "@/lib/recordedTime";
 import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
-import { isLockedSchedule, memoOneLine } from "@/lib/plans/logic";
+import {
+  formatMinutes,
+  isLockedSchedule,
+  memoOneLine,
+  taskDurationMinutes,
+} from "@/lib/plans/logic";
 import { planHex } from "@/lib/plans/colors";
 import {
   calculateScore,
@@ -673,6 +678,7 @@ function TaskRow({ task }: { task: Task }) {
     ? plans?.find((p) => p.id === task.plan_id)
     : undefined;
   const memoLine = plan ? memoOneLine(task.memo) : "";
+  const duration = taskDurationMinutes(task);
   // A past schedule keeps its completion, importance and existence (BR-04).
   const locked = isLockedSchedule(task, todayISO());
   const [editing, setEditing] = useState(false);
@@ -750,6 +756,14 @@ function TaskRow({ task }: { task: Task }) {
           </div>
         )}
       </div>
+      {duration != null && (
+        <span
+          className="flex-shrink-0 text-xs muted tabular-nums"
+          title="所要時間"
+        >
+          {formatMinutes(duration)}
+        </span>
+      )}
       <ImportanceMenu
         value={task.importance}
         disabled={locked}
