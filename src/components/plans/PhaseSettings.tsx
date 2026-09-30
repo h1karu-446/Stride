@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
+import { todayISO } from "@/lib/date";
 import { hasErrors, validatePhase, validateRoutine } from "@/lib/plans/logic";
 import type { PhaseInput, PhaseRoutineInput } from "@/lib/plans/queries";
 import type { Importance, Phase } from "@/types";
@@ -40,6 +41,7 @@ export default function PhaseSettings({ initial, siblings, selfId, existingRouti
     ? routines[routines.length - 1]?.key ?? null
     : openRoutineId ?? routines[0]?.key ?? null);
   const [dirty, setDirty] = useState(false);
+  const today = todayISO();
   const phaseErrors = validatePhase(phase, siblings, selfId);
   const routineErrors = routines.map(({ input }) => validateRoutine(input));
   const canSave = !hasErrors(phaseErrors) && routineErrors.every((errors) => !hasErrors(errors));
@@ -105,6 +107,15 @@ export default function PhaseSettings({ initial, siblings, selfId, existingRouti
         </div>
         {phaseErrors.start_date && <p className="text-xs text-rose-600">{phaseErrors.start_date}</p>}
         {phaseErrors.end_date && <p className="text-xs text-rose-600">{phaseErrors.end_date}</p>}
+        {selfId && phase.start_date <= today && phase.end_date > today && (
+          <button type="button" disabled={saving} onClick={() => updatePhase({ end_date: today })}
+            className="text-sm text-notion-blue hover:underline disabled:opacity-50">
+            今日でこのフェーズを終える
+          </button>
+        )}
+        {selfId && initial.end_date > today && phase.end_date === today && (
+          <p className="text-xs muted">保存すると明日からこのメニューは生成されません。次のフェーズの開始日は変わりません。</p>
+        )}
       </div>
       <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-notion-border">
         <div className="flex flex-wrap items-center justify-between gap-2">
