@@ -263,10 +263,11 @@ export default function PlanDetail() {
                   onEdit={() => setEditing({ kind: "routine-edit", id: r.id })} />
               )
             )}
-            {selected.is_implicit && editing?.kind === "routine-add" ? (
+            {/* Adding a menu edits only the new menu, in any phase. */}
+            {editing?.kind === "routine-add" ? (
               <RoutineForm
                 initial={{
-                  title: plan.name, minutes: 30, weekdays: [1, 2, 3, 4, 5, 6, 7],
+                  title: selected.is_implicit ? plan.name : "", minutes: 30, weekdays: [1, 2, 3, 4, 5, 6, 7],
                   importance: "中", menu: "",
                 }}
                 saving={saveRoutine.isPending}
@@ -278,14 +279,10 @@ export default function PlanDetail() {
               />
             ) : selected.routines.length === 0 ? (
               <EmptyAddButton label="メニューを追加"
-                onClick={() => selected.is_implicit
-                  ? setEditing({ kind: "routine-add" })
-                  : setEditing({ kind: "phase-edit", addRoutine: true })} />
+                onClick={() => setEditing({ kind: "routine-add" })} />
             ) : (
               <button type="button" className="text-sm muted hover:underline"
-                onClick={() => selected.is_implicit
-                  ? setEditing({ kind: "routine-add" })
-                  : setEditing({ kind: "phase-edit", addRoutine: true })}>
+                onClick={() => setEditing({ kind: "routine-add" })}>
                 ＋ メニューを追加
               </button>
             )}
