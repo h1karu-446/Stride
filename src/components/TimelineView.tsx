@@ -6,7 +6,12 @@ import {
   useUpdateTask,
 } from "@/lib/queries";
 import { usePlans } from "@/lib/plans/queries";
-import { dropTimes, formatMinutes, isLockedSchedule } from "@/lib/plans/logic";
+import {
+  dropTimes,
+  formatMinutes,
+  isLockedSchedule,
+  taskDurationMinutes,
+} from "@/lib/plans/logic";
 import { todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
@@ -808,6 +813,9 @@ function TimelineBlock({
   onDelete: () => void;
 }) {
   const handleSize = Math.min(10, Math.max(6, Math.floor(height / 4)));
+  const showTimes = height > 32;
+  const duration = taskDurationMinutes(task);
+  const durationLabel = duration != null ? formatMinutes(duration) : null;
   return (
     <div
       className={
@@ -839,17 +847,25 @@ function TimelineBlock({
           onClick={(e) => e.stopPropagation()}
         />
         <div className="flex-1 min-w-0">
-          <div
-            className={
-              "truncate font-medium " +
-              (task.completed ? "line-through" : "")
-            }
-          >
-            {task.title}
+          <div className="flex items-baseline gap-1.5 min-w-0">
+            <span
+              className={
+                "truncate font-medium " +
+                (task.completed ? "line-through" : "")
+              }
+            >
+              {task.title}
+            </span>
+            {!showTimes && durationLabel && (
+              <span className="flex-shrink-0 text-[10px] opacity-70 tabular-nums">
+                {durationLabel}
+              </span>
+            )}
           </div>
-          {height > 32 && (
-            <div className="text-[10px] opacity-70 tabular-nums">
+          {showTimes && (
+            <div className="truncate text-[10px] opacity-70 tabular-nums">
               {task.start_time} - {task.end_time}
+              {durationLabel && ` · ${durationLabel}`}
             </div>
           )}
         </div>
