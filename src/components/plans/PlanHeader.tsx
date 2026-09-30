@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import PlanIcon from "./PlanIcon";
 import { Link } from "react-router-dom";
 import DatePicker from "@/components/common/DatePicker";
 import StatusMenu from "@/components/plans/StatusMenu";
@@ -44,13 +45,14 @@ export default function PlanHeader({ plan, today, onDelete, deleteFailed }: {
 
   return (
     <header>
-      <Link to="/plans" className="text-sm muted hover:underline">‹ 計画</Link>
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+      <Link to="/plans" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 -ml-1.5 text-sm muted transition hover:bg-slate-100 dark:hover:bg-notion-panel-hover">‹ 計画</Link>
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <div ref={colorRef} className="relative">
           <button type="button" aria-label="計画の色を変更" aria-expanded={colorOpen}
             onClick={() => setColorOpen(!colorOpen)}
-            className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:hover:bg-notion-panel-hover">
-            <span className="h-5 w-5 rounded-full border border-black/10" style={{ background: planHex(plan.color) }} />
+            title="色を変更"
+            className="rounded-xl transition hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+            <PlanIcon plan={plan} size="lg" />
           </button>
           {colorOpen && (
             <div role="group" aria-label="計画の色" className="absolute left-0 top-10 z-30 grid w-[min(18rem,calc(100vw-2rem))] grid-cols-2 gap-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-notion-border dark:bg-notion-panel">

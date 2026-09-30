@@ -111,8 +111,9 @@ export default function GoalPanel({ plan }: { plan: Plan }) {
   }
 
   return (
-    <section className="rounded-xl border px-4 py-5 sm:px-6 grid gap-5 md:grid-cols-2"
-      style={{ background: `${planHex(plan.color)}1F`, borderColor: `${planHex(plan.color)}55` }}>
+    <section className="relative grid gap-5 overflow-hidden rounded-xl border border-slate-200 bg-white px-5 py-5 dark:border-notion-border dark:bg-notion-panel sm:px-7 md:grid-cols-2"
+      style={{ backgroundImage: `linear-gradient(120deg, ${planHex(plan.color)}14, transparent 55%)` }}>
+      <span aria-hidden className="absolute inset-y-0 left-0 w-1" style={{ background: planHex(plan.color) }} />
       <div className="min-w-0">
         <h2 className="label">到達目標</h2>
         {editing === "goal" ? (

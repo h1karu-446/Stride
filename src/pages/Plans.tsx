@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
 import PlanCard from "@/components/plans/PlanCard";
 import PlanFormModal from "@/components/plans/PlanFormModal";
+import PlanIcon from "@/components/plans/PlanIcon";
 import { planHex } from "@/lib/plans/colors";
 import {
   defaultPlanColor,
@@ -48,9 +49,16 @@ export default function Plans() {
     setCreating(true);
   };
 
+  const counts = [
+    ["進行中", groups.active.length], ["休止中", groups.paused.length],
+    ["構想中", groups.idea.length], ["完了", groups.done.length],
+  ] as const;
   const header = (
-    <div className="flex items-center justify-between">
-      <h1 className="text-3xl font-bold tracking-tight">計画</h1>
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">計画</h1>
+        <p className="mt-1 text-sm muted">{counts.filter(([, n]) => n > 0).map(([label, n]) => `${label} ${n}`).join(" · ")}</p>
+      </div>
       <button type="button" className="btn-primary" onClick={openCreate}>
         ＋ 新しい計画
       </button>
@@ -60,8 +68,10 @@ export default function Plans() {
   return (
     <div className="space-y-8">
       {(plans ?? []).length === 0 ? (
-        <div className="py-24 text-center space-y-4">
-          <p className="muted">まだ計画がありません</p>
+        <div className="mx-auto max-w-md space-y-4 rounded-2xl border border-dashed border-slate-300 py-20 text-center dark:border-notion-border">
+          <p className="text-4xl" aria-hidden>🗺️</p>
+          <p className="font-semibold">まだ計画がありません</p>
+          <p className="text-sm muted">目標と期間を決めて、毎日のメニューにつなげましょう</p>
           <button type="button" className="btn-primary" onClick={openCreate}>
             ＋ 新しい計画
           </button>
@@ -70,37 +80,40 @@ export default function Plans() {
         <>
           {header}
           {summary.totalMinutes > 0 && (
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <div className="flex items-baseline gap-3">
-                <span className="text-sm muted">今日の学習予定</span>
-                <span className="text-2xl font-bold">{formatMinutes(summary.totalMinutes)}</span>
+            <section aria-label="今日の学習予定" className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-xl border border-slate-200 bg-white px-5 py-4 dark:border-notion-border dark:bg-notion-panel">
+              <div>
+                <p className="section-title">今日の学習予定</p>
+                <p className="mt-0.5 text-2xl font-bold tabular-nums">{formatMinutes(summary.totalMinutes)}</p>
               </div>
-              <div className="flex-1 min-w-[240px] max-w-xl space-y-1.5">
-                <div className="flex h-1.5 gap-0.5 rounded-full overflow-hidden">
+              <div className="min-w-[240px] flex-1 space-y-2">
+                <div className="flex h-2 gap-0.5 overflow-hidden rounded-full bg-slate-100 dark:bg-notion-border">
                   {summary.byPlan.map(({ plan, minutes }) => (
-                    <div
-                      key={plan.id}
-                      style={{ flexGrow: minutes, background: planHex(plan.color) }}
-                    />
+                    <div key={plan.id} style={{ flexGrow: minutes, background: planHex(plan.color) }} />
                   ))}
                 </div>
-                <div className="flex flex-wrap gap-x-4 text-xs muted">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs muted">
                   {summary.byPlan.map(({ plan, minutes }) => (
-                    <span key={plan.id}>{plan.name} {minutes}分</span>
+                    <span key={plan.id} className="inline-flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full" style={{ background: planHex(plan.color) }} />
+                      {plan.name} <span className="tabular-nums">{minutes}分</span>
+                    </span>
                   ))}
                 </div>
               </div>
-            </div>
+            </section>
           )}
 
           {groups.active.length === 0 ? (
-            <p className="card text-sm muted">進行中の計画はありません</p>
+            <p className="rounded-xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm muted dark:border-notion-border">進行中の計画はありません</p>
           ) : (
+            <section aria-label="進行中" className="space-y-3">
+            <h2 className="section-title">進行中</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {groups.active.map((p) => (
                 <PlanCard key={p.id} plan={p} tasks={tasks} today={today} />
               ))}
             </div>
+            </section>
           )}
 
           <div className="grid gap-6 md:grid-cols-3">
@@ -140,21 +153,23 @@ function StatusColumn({ status, plans }: { status: PlanStatus; plans: Plan[] }) 
 
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-semibold muted">
-        {PLAN_STATUS_LABEL[status]}　{plans.length}
+      <h2 className="section-title flex items-center gap-2">
+        {PLAN_STATUS_LABEL[status]}
+        <span className="rounded-full bg-slate-100 px-1.5 text-[11px] font-medium tabular-nums dark:bg-notion-panel-hover">{plans.length}</span>
       </h2>
       {plans.length === 0 ? (
-        <p className="text-sm muted px-1">なし</p>
+        <p className="rounded-lg border border-dashed border-slate-200 px-4 py-3 text-xs muted dark:border-notion-border">なし</p>
       ) : (
-        <div className="rounded-xl border border-slate-200 dark:border-notion-border divide-y divide-slate-200 dark:divide-notion-border overflow-hidden">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
           {shown.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover"
+              className="group flex items-center justify-between gap-2 px-3 py-2 text-sm transition hover:bg-slate-50 dark:hover:bg-notion-panel-hover"
             >
-              <Link to={`/plans/${p.id}`} className="flex flex-1 items-center gap-2.5 min-w-0">
-                <Marker plan={p} />
+              <Link to={`/plans/${p.id}`} className="flex min-w-0 flex-1 items-center gap-2.5">
+                <span className={p.status === "done" ? "" : "opacity-70"}><PlanIcon plan={p} size="sm" /></span>
                 <span className="truncate">{p.name}</span>
+                {status === "done" && <span className="text-xs text-emerald-600 dark:text-emerald-400" aria-label="完了">✓</span>}
                 {status === "done" && (
                   <span className="ml-auto text-xs muted shrink-0">{planSpanLabel(p)}</span>
                 )}
@@ -162,7 +177,7 @@ function StatusColumn({ status, plans }: { status: PlanStatus; plans: Plan[] }) 
               {status !== "done" && (
                 <button
                   type="button"
-                  className="btn-outline !py-1 !px-2.5 text-xs"
+                  className="rounded-md px-2 py-1 text-xs font-medium text-notion-blue opacity-70 transition hover:bg-notion-blue/10 group-hover:opacity-100 focus-visible:opacity-100"
                   disabled={update.isPending}
                   onClick={() => update.mutate({ id: p.id, patch: { status: "active" } })}
                 >
@@ -187,13 +202,4 @@ function StatusColumn({ status, plans }: { status: PlanStatus; plans: Plan[] }) 
       )}
     </section>
   );
-}
-
-function Marker({ plan }: { plan: Plan }) {
-  const hex = planHex(plan.color);
-  if (plan.status === "done") return <span className="text-emerald-500 text-xs">✓</span>;
-  if (plan.status === "idea") {
-    return <span className="w-2 h-2 rounded-full border shrink-0" style={{ borderColor: hex }} />;
-  }
-  return <span className="w-2 h-2 rounded-full shrink-0 opacity-50" style={{ background: hex }} />;
 }

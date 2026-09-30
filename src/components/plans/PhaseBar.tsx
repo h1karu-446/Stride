@@ -142,7 +142,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
 
   return <section aria-label="フェーズの期間" className="space-y-2">
     <div className="flex items-end justify-between gap-3">
-      <h2 className="text-sm font-semibold">フェーズ</h2>
+      <h2 className="section-title">フェーズ</h2>
       <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整</p>
     </div>
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">

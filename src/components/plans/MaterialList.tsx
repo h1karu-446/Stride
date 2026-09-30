@@ -231,7 +231,7 @@ export default function MaterialList({
   return (
     <section className="card flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">教材</h2>
+        <h2 className="section-title">教材</h2>
         <div className="flex items-center gap-2">
           <span className="text-xs muted">
             {groups.done.length} / {materials.length} 完了

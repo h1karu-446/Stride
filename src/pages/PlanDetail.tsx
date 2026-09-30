@@ -187,7 +187,7 @@ export default function PlanDetail() {
         {!selected.is_implicit && editing?.kind !== "phase-edit" && (
           <div className="flex items-center justify-between gap-2">
             <button type="button" onClick={() => setEditing({ kind: "phase-edit" })}
-              className="rounded-lg text-left text-lg font-semibold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+              className="cursor-pointer rounded-lg text-left text-lg font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
               {selected.name}
             </button>
             <div className="flex items-center gap-2 text-sm muted">

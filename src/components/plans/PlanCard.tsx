@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import ExecutionSquares from "./ExecutionSquares";
+import PlanIcon from "./PlanIcon";
 import { planHex } from "@/lib/plans/colors";
 import {
   daysLeftLabel,
@@ -75,15 +76,16 @@ export default function PlanCard({
   return (
     <Link
       to={`/plans/${plan.id}`}
-      className="card !p-5 flex flex-col gap-4 hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition"
+      className="group relative flex flex-col gap-4 overflow-hidden rounded-xl border border-slate-200 bg-white p-5 transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_8px_24px_-12px_rgba(15,23,42,0.25)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel dark:hover:border-notion-border-strong"
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2 font-semibold min-w-0">
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-          <span className="truncate">{plan.name}</span>
+      <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 opacity-70" style={{ background: color }} />
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-3">
+          <PlanIcon plan={plan} />
+          <span className="truncate text-[15px] font-semibold">{plan.name}</span>
         </span>
         {plan.due_date && (
-          <span className="text-xs muted shrink-0">
+          <span className="mt-1 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium tabular-nums muted dark:bg-notion-panel-hover">
             {daysLeftLabel(plan.due_date, today)}
           </span>
         )}
@@ -93,7 +95,8 @@ export default function PlanCard({
         {routineLine}
         <ExecutionSquares cells={exec.cells} color={color} today={today} />
       </div>
-      <div className="mt-auto border-t border-slate-200 dark:border-notion-border pt-3 text-sm flex gap-2 min-w-0">
+      <div className="mt-auto flex min-w-0 items-center gap-2 border-t border-slate-100 pt-3 text-sm dark:border-notion-border">
+        <span aria-hidden className="text-xs muted">◷</span>
         {next ? (
           <>
             <span className="shrink-0"
@@ -112,7 +115,7 @@ export default function PlanCard({
 
 function Bar({ ratio, color }: { ratio: number; color: string }) {
   return (
-    <div className="h-1.5 rounded-full bg-slate-200 dark:bg-notion-border overflow-hidden">
+    <div className="h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-notion-border">
       <div className="h-full" style={{ width: `${Math.round(ratio * 100)}%`, background: color }} />
     </div>
   );

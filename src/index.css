@@ -46,6 +46,11 @@
   }
 }
 
+/* Plans: small section headings with a consistent rhythm */
+@layer components {
+  .section-title { @apply text-xs font-semibold tracking-wide text-slate-500 dark:text-notion-muted; }
+}
+
 /* Achievement reel / Journey feed (luxury accents) */
 @layer utilities {
   .font-display { font-family: "Cormorant Garamond", "Times New Roman", serif; }

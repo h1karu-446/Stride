@@ -185,7 +185,7 @@ export default function ScheduleList({
   return (
     <section className="card flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">予定</h2>
+        <h2 className="section-title">予定</h2>
         <button type="button" aria-label="予定を追加" onClick={() => open("new")}
           className="btn-ghost !px-2 !py-0.5 text-lg leading-none muted">＋</button>
       </div>
