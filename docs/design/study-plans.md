@@ -150,6 +150,7 @@ erDiagram
 | plan_id | uuid | × | — | `references plans(id) on delete cascade` |
 | title | text | × | — | 1〜100文字 |
 | url | text | ○ | — | `^https?://` に一致 |
+| note | text | ○ | — | 学ぶこと・メモ。1000文字まで（`materials_note_length`、migration 0017、Issue #53）。空は NULL で保存 |
 | status | text | × | `'todo'` | `todo / in_progress / done` |
 | completed_at | date | ○ | — | トリガーで設定（4.4） |
 

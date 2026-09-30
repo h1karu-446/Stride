@@ -1,13 +1,10 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import clsx from "clsx";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
-import { FoldButton, SAVE_ERROR_MESSAGE } from "@/components/common/FormParts";
+import { FoldButton } from "@/components/common/FormParts";
 import MaterialForm from "./MaterialForm";
-import {
-  formatDateLabel,
-  MATERIAL_STATUS_LABEL,
-  materialGroups,
-  nextMaterialStatus,
-} from "@/lib/plans/logic";
+import MaterialStatusMenu from "./MaterialStatusMenu";
+import { materialGroups } from "@/lib/plans/logic";
 import {
   MaterialSaveError,
   type MaterialInput,
@@ -15,7 +12,47 @@ import {
   useSaveMaterial,
   useSetMaterialStatus,
 } from "@/lib/plans/queries";
-import type { Material, Phase, Plan } from "@/types";
+import type { Material, MaterialStatus, Phase, Plan } from "@/types";
+
+const STATUS_ERROR_MESSAGE = "状態を変更できませんでした。もう一度お試しください";
+
+/**
+ * 「学ぶこと・メモ」 in a row: at most two lines, with a toggle to read the
+ * whole note that appears only when the note is actually cut off.
+ */
+function MaterialNote({ note }: { note: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+  const id = useId();
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || expanded) return;
+    const check = () => setClipped(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [note, expanded]);
+
+  return (
+    <div className="mt-0.5">
+      <p ref={ref} id={id}
+        className={clsx("whitespace-pre-line text-xs muted [overflow-wrap:anywhere]",
+          !expanded && "line-clamp-2")}>
+        {note}
+      </p>
+      {(clipped || expanded) && (
+        <button type="button" aria-expanded={expanded} aria-controls={id}
+          onClick={() => setExpanded((x) => !x)}
+          className="mt-0.5 rounded text-xs text-blue-600 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:text-notion-blue dark:focus-visible:ring-notion-blue">
+          {expanded ? "閉じる" : "全文を表示"}
+        </button>
+      )}
+    </div>
+  );
+}
 
 /**
  * 教材 on the plan detail screen (spec 4.2, BR-05).
@@ -53,7 +90,7 @@ export default function MaterialList({
   // the input is restored from here instead of from the saved row.
   const [draft, setDraft] = useState<{ id: string; input: MaterialInput } | null>(null);
   // Materials whose status change is in flight: their badge is disabled so
-  // two clicks can never be applied out of order.
+  // two changes can never be applied out of order.
   const [statusPending, setStatusPending] = useState<ReadonlySet<string>>(new Set());
   const materials = plan.materials;
   const groups = materialGroups(materials, selectedPhaseId);
@@ -96,7 +133,7 @@ export default function MaterialList({
     const target: Material | undefined =
       m ??
       (id && own
-        ? { id, plan_id: plan.id, title: own.title, status: own.status, phase_ids: [], created_at: "" }
+        ? { id, plan_id: plan.id, title: own.title, note: own.note, status: own.status, phase_ids: [], created_at: "" }
         : undefined);
     return (
       <MaterialForm
@@ -104,8 +141,8 @@ export default function MaterialList({
         initial={
           own ??
           (m
-            ? { title: m.title, url: m.url ?? "", status: m.status, phase_ids: m.phase_ids }
-            : { title: "", url: "", status: "todo", phase_ids: [] })
+            ? { title: m.title, url: m.url ?? "", note: m.note ?? "", status: m.status, phase_ids: m.phase_ids }
+            : { title: "", url: "", note: "", status: "todo", phase_ids: [] })
         }
         phases={phases}
         color={color}
@@ -118,12 +155,12 @@ export default function MaterialList({
     );
   };
 
-  const cycleStatus = (m: Material) => {
-    if (statusPending.has(m.id)) return;
+  const changeStatus = (m: Material, status: MaterialStatus) => {
+    if (statusPending.has(m.id) || status === m.status) return;
     setStatusPending((s) => new Set(s).add(m.id));
     setStatus
-      .mutateAsync({ id: m.id, status: nextMaterialStatus(m.status) })
-      .catch(() => undefined) // shown via setStatus.isError
+      .mutateAsync({ id: m.id, status })
+      .catch(() => undefined) // shown via setStatus.isError; the cache is rolled back
       .finally(() =>
         setStatusPending((s) => {
           const next = new Set(s);
@@ -133,46 +170,38 @@ export default function MaterialList({
       );
   };
 
-  const badge = (m: Material) => (
-    <button type="button"
-      aria-label={`状態: ${MATERIAL_STATUS_LABEL[m.status]}（押して切り替え）`}
-      disabled={statusPending.has(m.id)}
-      onClick={() => cycleStatus(m)}
-      className="shrink-0 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-60 disabled:cursor-wait"
-      style={
-        m.status === "in_progress"
-          ? { background: `${color}33`, color }
-          : m.status === "done"
-            ? { background: "#4DAB9A26", color: "#4DAB9A" }
-            : { background: "#8A898526", color: "#8A8985" }
-      }>
-      {m.status === "done" && m.completed_at
-        ? `${formatDateLabel(m.completed_at, today)} 完了`
-        : MATERIAL_STATUS_LABEL[m.status]}
-    </button>
-  );
-
+  // Title (a link that opens a new tab when there is a URL), note, status
+  // menu and the edit button at the right edge. Their hit areas never overlap.
   const row = (m: Material) => {
     if (editing === m.id) return form(m);
     const done = m.status === "done";
+    const titleTone = done || m.status === "todo" ? "muted" : undefined;
     return (
-      <div key={m.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
-        <span className="flex min-w-0 items-center gap-2">
-          {done && <span aria-label="完了" className="shrink-0 text-teal-500">✓</span>}
-          <button type="button" onClick={() => open(m.id)}
-            className={done || m.status === "todo"
-              ? "truncate text-left muted hover:underline"
-              : "truncate text-left hover:underline"}>
-            {m.title}
-          </button>
-          {m.url && (
-            <a href={m.url} target="_blank" rel="noopener noreferrer"
-              aria-label="リンクを開く" className="shrink-0 muted hover:opacity-70">
-              ↗
-            </a>
-          )}
-        </span>
-        {badge(m)}
+      <div key={m.id} className="flex items-start gap-2 py-1.5 text-sm">
+        {done && <span aria-label="完了" className="mt-0.5 shrink-0 text-teal-500">✓</span>}
+        <div className="min-w-0 flex-1 pt-0.5">
+          <p className="line-clamp-2 [overflow-wrap:anywhere]" title={m.title}>
+            {m.url ? (
+              <a href={m.url} target="_blank" rel="noopener noreferrer"
+                className={clsx("rounded underline decoration-slate-300 underline-offset-2 hover:decoration-current focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:decoration-notion-border-strong dark:focus-visible:ring-notion-blue", titleTone)}>
+                {m.title}
+                <span aria-hidden="true" className="ml-0.5 text-xs">↗</span>
+                <span className="sr-only">（新しいタブで開く）</span>
+              </a>
+            ) : (
+              <span className={titleTone}>{m.title}</span>
+            )}
+          </p>
+          {m.note && <MaterialNote note={m.note} />}
+        </div>
+        <MaterialStatusMenu material={m} color={color} today={today}
+          pending={statusPending.has(m.id)}
+          onChange={(s) => changeStatus(m, s)} />
+        <button type="button" onClick={() => open(m.id)}
+          aria-label={`「${m.title}」を編集`}
+          className="shrink-0 rounded px-2 py-1 text-xs leading-none muted hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:bg-notion-panel-hover dark:hover:text-notion-fg dark:focus-visible:ring-notion-blue">
+          編集
+        </button>
       </div>
     );
   };
@@ -211,7 +240,9 @@ export default function MaterialList({
             className="btn-ghost !px-2 !py-0.5 text-lg leading-none muted">＋</button>
         </div>
       </div>
-      {setStatus.isError && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
+      {setStatus.isError && (
+        <p role="alert" className="text-xs text-red-500">{STATUS_ERROR_MESSAGE}</p>
+      )}
       <div className="flex flex-col">
         {topForm}
         {groups.main.map(row)}
