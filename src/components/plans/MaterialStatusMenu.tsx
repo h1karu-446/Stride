@@ -19,7 +19,11 @@ export default function MaterialStatusMenu({
   material: Material;
   color: string;
   today: string;
-  /** A change is in flight: the badge is disabled so clicks cannot race. */
+  /**
+   * A change is in flight: the badge ignores presses so changes cannot race.
+   * It uses aria-disabled, not disabled, so keyboard focus stays on it after
+   * a choice (a disabled button would drop focus to the page).
+   */
   pending: boolean;
   onChange: (s: MaterialStatus) => void;
 }) {
@@ -110,15 +114,18 @@ export default function MaterialStatusMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-label={`状態: ${label}（押して変更）`}
-        disabled={pending}
-        onClick={() => setOpen((o) => !o)}
+        aria-disabled={pending || undefined}
+        onClick={() => {
+          if (!pending) setOpen((o) => !o);
+        }}
         onKeyDown={(e) => {
+          if (pending) return;
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault();
             setOpen(true);
           }
         }}
-        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] leading-none transition hover:ring-1 hover:ring-current focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-notion-blue disabled:cursor-wait disabled:opacity-60"
+        className="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] leading-none transition hover:ring-1 hover:ring-current focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-notion-blue aria-disabled:cursor-wait aria-disabled:opacity-60"
         style={badgeStyle}
       >
         {status === "done" && material.completed_at
