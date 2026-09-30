@@ -102,7 +102,6 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
       }}>
       <div>
         <h2 className="text-lg font-semibold">{selfId ? "フェーズを設定" : "新しいフェーズ"}</h2>
-        <p className="mt-1 text-xs muted">期間と、その期間中に繰り返すメニューを一緒に設定します。</p>
       </div>
       <Field label="フェーズ名" error={attempted ? phaseErrors.name : undefined}>
         <input autoFocus className="input text-lg font-semibold" maxLength={30}
@@ -145,26 +144,33 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
             const open = openKey === row.key;
             const errors = attempted ? routineErrors[index] : {};
             return <div key={row.key} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex items-center gap-2">
-                <button type="button" aria-expanded={open} disabled={saving}
-                  onClick={() => setOpenKey(open ? null : row.key)}
+              {/* Closed: one summary line. Open: the name field itself is the heading (no second label). */}
+              {!open ? <div className="flex items-center gap-2">
+                <button type="button" aria-expanded={false} disabled={saving}
+                  onClick={() => setOpenKey(row.key)}
                   className="min-w-0 flex-1 rounded-lg py-1.5 text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
-                  <span className="mr-2 text-xs muted">{open ? "▾" : "▸"}</span>
+                  <span className="mr-2 text-xs muted">▸</span>
                   {row.input.title || <span className="muted">メニュー {index + 1}</span>}
-                  {!open && <span className="ml-2 text-xs font-normal muted">{formatMinutes(row.input.minutes)} · {weekdaysLabel(row.input.weekdays)} · {row.input.importance}</span>}
-                  {hasErrors(errors) && <span className="ml-2 text-xs text-rose-600">要確認</span>}
+                  <span className="ml-2 text-xs font-normal muted">{formatMinutes(row.input.minutes)} · {weekdaysLabel(row.input.weekdays)} · {row.input.importance}</span>
+                  {hasErrors(routineErrors[index]) && attempted && <span className="ml-2 text-xs text-rose-600">要確認</span>}
                 </button>
                 <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
                   aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
                   title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
-              </div>
-              {open && <div className="grid gap-3 pt-3 sm:grid-cols-2">
+              </div> : <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
-                  <Field label="メニュー（必須）" error={errors.title}>
-                    <input className="input" maxLength={40} value={row.input.title} disabled={saving}
-                      placeholder="例：IELTSのListeningを30分解く"
+                  <div className="flex items-center gap-2">
+                    <input aria-label={`メニュー ${index + 1} の名前`} autoFocus={!row.input.title}
+                      className="input flex-1 font-medium" maxLength={40} value={row.input.title} disabled={saving}
+                      placeholder={`メニュー ${index + 1}：例）IELTSのListeningを30分解く`}
                       onChange={(event) => updateRoutine(row.key, { title: event.target.value })} />
-                  </Field>
+                    <button type="button" aria-expanded={true} disabled={saving} onClick={() => setOpenKey(null)}
+                      title="閉じる" aria-label="閉じる" className="rounded px-2 py-1.5 text-sm muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▴</button>
+                    <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
+                      aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
+                      title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
+                  </div>
+                  {errors.title && <p className="mt-1 text-xs text-rose-600">{errors.title}</p>}
                 </div>
                 <Field group label="所要時間" error={errors.minutes}>
                   <div className="flex flex-wrap items-center gap-1.5">
