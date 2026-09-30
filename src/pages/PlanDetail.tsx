@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from "react";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
@@ -15,6 +15,7 @@ import { addDaysISO, todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import {
   formatDateLabel,
+  formatMinutes,
   initialPhase,
   shouldShowOverdueNotice,
   sortedPhases,
@@ -118,6 +119,17 @@ export default function PlanDetail() {
       : "終了";
   };
 
+  // Elapsed share of the phase, for the thin progress line under its heading.
+  const phaseProgress = (() => {
+    if (!selected.start_date || !selected.end_date || selected.start_date > today) return 0;
+    const total = differenceInCalendarDays(parseISO(selected.end_date), parseISO(selected.start_date)) + 1;
+    const elapsed = differenceInCalendarDays(parseISO(today), parseISO(selected.start_date)) + 1;
+    return Math.min(1, elapsed / total);
+  })();
+  const phaseDays = selected.start_date && selected.end_date
+    ? differenceInCalendarDays(parseISO(selected.end_date), parseISO(selected.start_date)) + 1 : 0;
+  const weeklyMinutes = selected.routines.reduce((sum, r) => sum + r.minutes * r.weekdays.length, 0);
+
   const lastEnd = explicit.reduce<string | undefined>((end, phase) =>
     !end || phase.end_date! > end ? phase.end_date! : end, undefined);
   const newPhaseStart = lastEnd && lastEnd >= today ? addDaysISO(lastEnd, 1) : today;
@@ -188,15 +200,28 @@ export default function PlanDetail() {
       <section id="phase-activity" className={`card space-y-4 ${editing?.kind === "phase-add" && !hasPhases ? "hidden" : ""}`}>
         {/* While editing, the form's own name field is the heading; don't show the name twice. */}
         {!selected.is_implicit && editing?.kind !== "phase-edit" && (
-          <div className="flex items-center justify-between gap-2">
-            <button type="button" onClick={() => setEditing({ kind: "phase-edit" })}
-              className="cursor-pointer rounded-lg text-left text-lg font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
-              {selected.name}
-            </button>
-            <div className="flex items-center gap-2 text-sm muted">
-              <span>{phaseHeading()}</span>
-              <button type="button" aria-label="フェーズを編集" className="btn-ghost !p-1.5"
-                onClick={() => setEditing({ kind: "phase-edit" })}>✎</button>
+          <div className="space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <button type="button" onClick={() => setEditing({ kind: "phase-edit" })}
+                  className="cursor-pointer rounded-lg text-left text-xl font-bold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
+                  {selected.name}
+                </button>
+                {selected.start_date && selected.end_date && (
+                  <p className="mt-1 text-xs tabular-nums muted">
+                    {format(parseISO(selected.start_date), "M/d")} – {format(parseISO(selected.end_date), "M/d")} · {phaseDays}日間
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums"
+                  style={{ background: `${color}1f`, color }}>{phaseHeading()}</span>
+                <button type="button" aria-label="フェーズを編集" className="btn-ghost !p-1.5 muted"
+                  onClick={() => setEditing({ kind: "phase-edit" })}>✎</button>
+              </div>
+            </div>
+            <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-notion-panel-hover">
+              <div className="h-full rounded-full" style={{ width: `${phaseProgress * 100}%`, background: color }} />
             </div>
           </div>
         )}
@@ -232,11 +257,16 @@ export default function PlanDetail() {
         )}
 
         {editing?.kind !== "phase-edit" && <div className="min-w-0 space-y-3">
+          {selected.routines.length > 0 && <div className="flex items-baseline justify-between gap-2">
+            <h3 className="section-title">メニュー</h3>
+            <span className="text-xs tabular-nums muted">{selected.routines.length}件 · 週 {formatMinutes(weeklyMinutes)}</span>
+          </div>}
+          {/* Menus sit side by side on wide screens; a form being edited keeps the card size. */}
+          <div className="grid gap-3 md:grid-cols-2">
             {selected.routines.map((r) =>
               // The ✎ on a menu edits only that menu; phase name and dates stay in the phase settings.
               editing?.kind === "routine-edit" && editing.id === r.id ? (
-                <RoutineForm
-                  key={r.id}
+                <RoutineForm key={r.id}
                   initial={{ ...r, menu: r.menu ?? "" }}
                   saving={saveRoutine.isPending}
                   failed={saveRoutine.isError || deleteRoutine.isError}
@@ -272,14 +302,15 @@ export default function PlanDetail() {
                 }
               />
             ) : selected.routines.length === 0 ? (
-              <EmptyAddButton label="メニューを追加"
-                onClick={() => setEditing({ kind: "routine-add" })} />
+              <div className="md:col-span-2"><EmptyAddButton label="メニューを追加"
+                onClick={() => setEditing({ kind: "routine-add" })} /></div>
             ) : (
-              <button type="button" className="text-sm muted hover:underline"
-                onClick={() => setEditing({ kind: "routine-add" })}>
+              <button type="button" onClick={() => setEditing({ kind: "routine-add" })}
+                className="flex min-h-12 items-center justify-center rounded-lg border border-dashed md:min-h-24 border-slate-300 text-sm muted transition hover:border-notion-blue hover:text-notion-blue dark:border-notion-border-strong">
                 ＋ メニューを追加
               </button>
             )}
+          </div>
         </div>}
       </section>
 

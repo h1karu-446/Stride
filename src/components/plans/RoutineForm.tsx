@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import clsx from "clsx";
-import { Field, FormActions } from "@/components/common/FormParts";
+import { FormActions } from "@/components/common/FormParts";
 import { hasErrors, validateRoutine } from "@/lib/plans/logic";
 import type { RoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { formatMinutes } from "@/lib/plans/logic";
-import { chip, MINUTE_PRESETS, sameDays, WEEKDAY_PRESETS } from "./routinePresets";
+import { MINUTE_PRESETS, sameDays, WEEKDAY_PRESETS } from "./routinePresets";
 
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
 
@@ -50,70 +51,77 @@ export default function RoutineForm({
     });
 
   return (
-    <form
-      className="space-y-4 rounded-xl border border-slate-200 p-4 dark:border-notion-border"
+    // Same footprint as a menu card, so editing one keeps the grid in place.
+    <form aria-label="メニューを編集"
+      className="flex min-w-0 flex-col gap-3 rounded-lg border border-notion-blue/60 p-4 ring-1 ring-notion-blue/20"
       onSubmit={(e) => {
         e.preventDefault();
         if (canSave && !saving) onSubmit({ ...v, minutes });
       }}
     >
-      <Field label="メニュー（必須）" error={v.title ? errors.title : undefined}>
-        <input autoFocus className="input text-base font-medium" value={v.title} disabled={saving}
-          placeholder="例：IELTSのListeningを30分解く"
+      <div>
+        <input autoFocus aria-label="メニュー（必須）" className="input font-semibold" value={v.title} disabled={saving}
+          placeholder="メニュー名：例）Listeningを30分解く"
           onChange={(e) => setV({ ...v, title: e.target.value })} />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field group label="所要時間" error={errors.minutes}>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {MINUTE_PRESETS.map((m) => <button key={m} type="button" disabled={saving} aria-pressed={minutes === m}
-              className={chip(minutes === m)} onClick={() => setMinutesText(String(m))}>{formatMinutes(m)}</button>)}
-            <label className="flex items-center gap-1 text-xs muted">
-              <input type="number" step={5} min={5} max={600} aria-label="所要時間（分）" className="input !w-20 !py-1 text-sm" disabled={saving}
-                value={minutesText} onChange={(e) => setMinutesText(e.target.value)} />分
-            </label>
-          </div>
-        </Field>
-        <Field group label="重要度">
-          <div className="flex gap-1.5">
-            {IMPORTANCES.map((i) => (
-              <button key={i} type="button" disabled={saving} onClick={() => setV({ ...v, importance: i })}
-                className={clsx("flex-1 rounded-md border px-2 py-2 text-sm",
-                  v.importance === i
-                    ? "border-notion-blue bg-notion-blue/10"
-                    : "border-slate-300 dark:border-notion-border")}>
-                {i}
-              </button>
-            ))}
-          </div>
-        </Field>
+        {v.title && errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
       </div>
-      <Field group label="曜日" error={errors.weekdays}>
-        <div className="mb-2 flex gap-1.5">
-          {WEEKDAY_PRESETS.map((p) => <button key={p.label} type="button" disabled={saving} aria-pressed={sameDays(v.weekdays, p.days)}
-            className={chip(sameDays(v.weekdays, p.days))} onClick={() => setV({ ...v, weekdays: p.days })}>{p.label}</button>)}
-        </div>
-        <div className="flex gap-1.5">
+      <Row label="時間" error={errors.minutes}>
+        {MINUTE_PRESETS.map((m) => <button key={m} type="button" disabled={saving} aria-pressed={minutes === m}
+          className={pill(minutes === m)} onClick={() => setMinutesText(String(m))}>{formatMinutes(m)}</button>)}
+        <label className="flex items-center gap-1 text-xs muted">
+          <input type="number" step={5} min={5} max={600} aria-label="所要時間（分）" className="input !w-16 !px-2 !py-0.5 text-xs" disabled={saving}
+            value={minutesText} onChange={(e) => setMinutesText(e.target.value)} />分
+        </label>
+      </Row>
+      <Row label="曜日" error={errors.weekdays}>
+        {WEEKDAY_PRESETS.map((p) => <button key={p.label} type="button" disabled={saving} aria-pressed={sameDays(v.weekdays, p.days)}
+          className={pill(sameDays(v.weekdays, p.days))} onClick={() => setV({ ...v, weekdays: p.days })}>{p.label}</button>)}
+        <span className="flex gap-1">
           {ISO_WEEKDAYS_IN_ORDER.map((d) => {
-            const label = ISO_WEEKDAY_CHAR[d];
             const on = v.weekdays.includes(d);
             return (
               <button key={d} type="button" aria-pressed={on} disabled={saving} onClick={() => toggle(d)}
-                className={clsx("flex-1 rounded-md border py-1.5 text-sm",
+                className={clsx("h-6 w-6 rounded border text-xs",
                   on ? "border-notion-blue bg-notion-blue/10"
                      : "border-slate-300 dark:border-notion-border muted")}>
-                {label}
+                {ISO_WEEKDAY_CHAR[d]}
               </button>
             );
           })}
-        </div>
-      </Field>
-      <Field label="メニューの詳細（任意）" error={errors.menu}>
-        <textarea className="input min-h-[96px]" value={v.menu ?? ""} disabled={saving}
-          placeholder="例：公式問題集10のTest 2。間違えた設問は聞き直す"
+        </span>
+      </Row>
+      <Row label="重要度">
+        {IMPORTANCES.map((i) => (
+          <button key={i} type="button" disabled={saving} aria-pressed={v.importance === i}
+            onClick={() => setV({ ...v, importance: i })} className={pill(v.importance === i)}>
+            {i}
+          </button>
+        ))}
+      </Row>
+      <div className="border-t border-slate-100 pt-3 dark:border-notion-border">
+        <textarea aria-label="メニューの詳細（任意）" className="input min-h-[72px] text-sm" value={v.menu ?? ""} disabled={saving}
+          placeholder="詳細（任意）：例）公式問題集10のTest 2"
           onChange={(e) => setV({ ...v, menu: e.target.value })} />
-      </Field>
+        {errors.menu && <p className="mt-1 text-xs text-red-500">{errors.menu}</p>}
+      </div>
       <FormActions onDelete={onDelete} onCancel={onCancel}
         canSave={canSave} saving={saving} error={failed} />
     </form>
+  );
+}
+
+/** Small toggle, the size of the chips on a menu card. */
+const pill = (active: boolean) => clsx("rounded-full border px-2.5 py-0.5 text-xs transition", active
+  ? "border-notion-blue bg-notion-blue text-white" : "border-slate-300 hover:border-slate-400 dark:border-notion-border");
+
+function Row({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+  return (
+    <div role="group" aria-label={label} className="flex items-start gap-2">
+      <span className="w-12 shrink-0 pt-0.5 text-xs muted">{label}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">{children}</div>
+        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      </div>
+    </div>
   );
 }
