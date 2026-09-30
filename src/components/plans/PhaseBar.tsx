@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import { phaseDatesAfterDrag, sortedPhases } from "@/lib/plans/logic";
@@ -39,6 +39,19 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
   const [createPreview, setCreatePreview] = useState<Dates | null>(null);
   const hex = planHex(color);
+
+  // Month dividers make the axis readable at a glance.
+  const months: { date: string; label: string }[] = [];
+  for (let m = startOfMonth(addMonths(parseISO(axisStart), 1)); format(m, "yyyy-MM-dd") <= axisEnd; m = addMonths(m, 1)) {
+    const date = format(m, "yyyy-MM-dd");
+    months.push({ date, label: m.getMonth() === 0 ? format(m, "yyyy/M月") : `${m.getMonth() + 1}月` });
+  }
+  // Phases that do not overlap share a row; overlapping ones go to the next free row.
+  const lanes: Phase[][] = [];
+  for (const phase of ordered) {
+    const lane = lanes.find((row) => row[row.length - 1].end_date! < phase.start_date!);
+    if (lane) lane.push(phase); else lanes.push([phase]);
+  }
 
   const gaps: { start: string; end: string; days: number }[] = [];
   let coveredUntil = first?.end_date ?? today;
@@ -128,47 +141,52 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   };
 
   return <section aria-label="フェーズの期間" className="space-y-2">
-    <p className="text-xs muted">帯の中央をドラッグして移動、両端で日付を調整。最下段をドラッグすると新しいフェーズを作れます。</p>
-    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-notion-border">
+    <div className="flex items-end justify-between gap-3">
+      <h2 className="text-sm font-semibold">フェーズ</h2>
+      <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整</p>
+    </div>
+    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
       <div className="relative" style={{ width }}>
-        <div className="flex h-7 items-center justify-between bg-slate-50 px-2 text-xs muted dark:bg-notion-panel-hover">
-          <span>{md(axisStart)}</span><span>{md(axisEnd)}</span>
+        <div className="relative h-7 border-b border-slate-200 bg-slate-50 text-[11px] muted dark:border-notion-border dark:bg-notion-panel-hover">
+          {months.map((m) => <span key={m.date} className="absolute top-1.5 pl-1.5 font-medium" style={{ left: xFor(m.date) }}>{m.label}</span>)}
         </div>
+        {months.map((m) => <div key={m.date} aria-hidden="true" className="pointer-events-none absolute bottom-0 top-0 border-l border-slate-200 dark:border-notion-border" style={{ left: xFor(m.date) }} />)}
         {gaps.map((gap) => <div key={gap.start} aria-hidden="true"
           className="pointer-events-none absolute bottom-0 top-7 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
           style={{ left: xFor(gap.start), width: gap.days * dayWidth }} />)}
-        {ordered.map((phase) => {
+        {lanes.map((lane, laneIndex) => <div key={laneIndex} className="relative h-12 border-b border-slate-100 dark:border-notion-border/60">
+          {lane.map((phase) => {
           const dates = preview?.id === phase.id ? preview.dates : {
-            start_date: phase.start_date!, end_date: phase.end_date!,
-          };
-          const days = differenceInCalendarDays(parseISO(dates.end_date), parseISO(dates.start_date)) + 1;
-          const selected = phase.id === selectedId;
-          return <div key={phase.id} className="relative h-12 border-t border-slate-200/70 dark:border-notion-border">
-            <div className="absolute top-1.5 z-10 flex h-9 min-w-12 overflow-hidden rounded-md border"
-              style={{ left: xFor(dates.start_date), width: Math.max(48, days * dayWidth),
-                borderColor: selected ? hex : undefined,
-                background: selected ? `${hex}38` : `${hex}1d`,
-                boxShadow: selected ? `inset 0 -2px 0 ${hex}` : undefined }}>
-              <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
-                title="開始日をドラッグ（左右キーでも1日ずつ調整）"
-                className="w-3 shrink-0 cursor-ew-resize border-r border-current/20 touch-none"
-                onPointerDown={(event) => pointerDown(event, phase, "start")}
-                onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
-              <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}、ドラッグで移動`}
-                title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}`}
-                className="min-w-0 flex-1 cursor-grab truncate px-1 text-left text-xs font-medium touch-none active:cursor-grabbing"
-                onPointerDown={(event) => pointerDown(event, phase, "move")}
-                onKeyDown={(event) => keyAdjust(event, phase, "move")}
-                onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}
-                {...dragEvents}>{phase.name}</button>
-              <button type="button" aria-label={`${phase.name}の終了日 ${md(dates.end_date)} を調整`}
-                title="終了日をドラッグ（左右キーでも1日ずつ調整）"
-                className="w-3 shrink-0 cursor-ew-resize border-l border-current/20 touch-none"
-                onPointerDown={(event) => pointerDown(event, phase, "end")}
-                onKeyDown={(event) => keyAdjust(event, phase, "end")} {...dragEvents} />
-            </div>
-          </div>;
-        })}
+              start_date: phase.start_date!, end_date: phase.end_date!,
+            };
+            const days = differenceInCalendarDays(parseISO(dates.end_date), parseISO(dates.start_date)) + 1;
+            const selected = phase.id === selectedId;
+            const wide = days * dayWidth >= 130;
+            return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 min-w-12 overflow-hidden rounded-md border transition-shadow"
+                style={{ left: xFor(dates.start_date), width: Math.max(48, days * dayWidth),
+                  borderColor: selected ? hex : `${hex}55`,
+                  background: selected ? `${hex}38` : `${hex}1d`,
+                  boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
+                <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
+                  title="開始日をドラッグ（左右キーでも1日ずつ調整）"
+                  className="w-3 shrink-0 cursor-ew-resize border-r border-current/20 touch-none"
+                  onPointerDown={(event) => pointerDown(event, phase, "start")}
+                  onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
+                <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}、ドラッグで移動`}
+                  title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}`}
+                  className="min-w-0 flex-1 cursor-grab truncate px-1 text-left text-xs font-medium touch-none active:cursor-grabbing"
+                  onPointerDown={(event) => pointerDown(event, phase, "move")}
+                  onKeyDown={(event) => keyAdjust(event, phase, "move")}
+                  onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}
+                  {...dragEvents}><span className="truncate">{phase.name}</span>{wide && <span className="ml-1.5 font-normal tabular-nums opacity-60">{md(dates.start_date)}–{md(dates.end_date)}</span>}</button>
+                <button type="button" aria-label={`${phase.name}の終了日 ${md(dates.end_date)} を調整`}
+                  title="終了日をドラッグ（左右キーでも1日ずつ調整）"
+                  className="w-3 shrink-0 cursor-ew-resize border-l border-current/20 touch-none"
+                  onPointerDown={(event) => pointerDown(event, phase, "end")}
+                  onKeyDown={(event) => keyAdjust(event, phase, "end")} {...dragEvents} />
+              </div>
+          })}
+        </div>)}
         <div title="ドラッグして新しいフェーズの期間を選択"
           className="relative h-12 cursor-crosshair touch-none border-t border-slate-200/70 bg-slate-50/60 dark:border-notion-border dark:bg-notion-panel-hover/40"
           onPointerDown={createPointerDown} onPointerMove={createPointerMove}
@@ -181,16 +199,18 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
               borderColor: hex, background: `${hex}38` }} />}
           <button type="button" onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onAdd()}
-            className="sticky left-2 z-10 ml-2 mt-1.5 rounded-md bg-slate-50/95 px-2 py-1.5 text-sm font-medium text-notion-blue hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:bg-notion-panel-hover">
-            ＋ 新規
+            className="sticky left-2 z-10 ml-2 mt-2 rounded-full border border-dashed border-slate-300 bg-white/95 px-3 py-1 text-xs font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
+            ＋ フェーズを追加
           </button>
+          {!createPreview && <span className="pointer-events-none sticky left-40 ml-3 text-[11px] muted">またはドラッグして期間を選ぶ</span>}
           {createPreview && <span className="pointer-events-none absolute right-2 top-3 z-10 rounded bg-white/90 px-1.5 text-xs tabular-nums dark:bg-notion-panel-hover">
             {md(createPreview.start_date)}–{md(createPreview.end_date)}
           </span>}
         </div>
-        {axisStart <= today && today <= axisEnd && <span aria-label="今日"
-          className="pointer-events-none absolute bottom-0 top-7 z-20 w-px bg-slate-900 dark:bg-white"
-          style={{ left: xFor(today) + dayWidth / 2 }} />}
+        {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
+          <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
+          <span className="absolute bottom-0 top-6 w-px bg-rose-500/70" />
+        </div>}
       </div>
     </div>
     {gaps.length > 0 && <p className="text-xs muted">{gaps.map((gap) =>

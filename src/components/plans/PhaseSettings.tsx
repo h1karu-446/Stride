@@ -2,13 +2,21 @@ import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
-import { hasErrors, validatePhase, validateRoutine } from "@/lib/plans/logic";
+import { formatMinutes, hasErrors, validatePhase, validateRoutine, weekdaysLabel } from "@/lib/plans/logic";
 import type { PhaseInput, PhaseRoutineInput } from "@/lib/plans/queries";
 import type { Importance } from "@/types";
 
 type Draft = { key: string; id?: string; input: PhaseRoutineInput };
 const DAYS = ["月", "火", "水", "木", "金", "土", "日"];
 const IMPORTANCES: Importance[] = ["重", "中", "軽"];
+const MINUTE_PRESETS = [15, 30, 45, 60, 90];
+const WEEKDAY_PRESETS: { label: string; days: number[] }[] = [
+  { label: "毎日", days: [1, 2, 3, 4, 5, 6, 7] },
+  { label: "平日", days: [1, 2, 3, 4, 5] },
+  { label: "週末", days: [6, 7] },
+];
+const chip = (active: boolean) => `rounded-full border px-3 py-1 text-xs transition ${active
+  ? "border-notion-blue bg-notion-blue text-white" : "border-slate-300 hover:border-slate-400 dark:border-notion-border"}`;
 
 const blankRoutine = (): Draft => ({
   key: crypto.randomUUID(),
@@ -42,6 +50,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
     ? routines[routines.length - 1]?.key ?? null
     : openRoutineId ?? routines[0]?.key ?? null);
   const [dirty, setDirty] = useState(!!initialDirty);
+  // Errors stay hidden until the first save attempt, so an empty new form is not all red.
+  const [attempted, setAttempted] = useState(false);
   const today = todayISO();
   const phaseErrors = validatePhase(phase);
   const routineErrors = routines.map(({ input }) => validateRoutine(input));
@@ -86,13 +96,14 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
       className="rounded-xl bg-slate-50 p-4 shadow-sm dark:bg-notion-panel-hover sm:p-5 space-y-5"
       onSubmit={(event) => {
         event.preventDefault();
+        setAttempted(true);
         if (canSave && !saving) onSave(phase, routines.map(({ id, input }) => ({ ...input, ...(id ? { id } : {}) })));
       }}>
       <div>
         <h2 className="text-lg font-semibold">{selfId ? "フェーズを設定" : "新しいフェーズ"}</h2>
         <p className="mt-1 text-xs muted">期間と、その期間中に繰り返すメニューを一緒に設定します。</p>
       </div>
-      <Field label="フェーズ名" error={phaseErrors.name}>
+      <Field label="フェーズ名" error={attempted ? phaseErrors.name : undefined}>
         <input autoFocus className="input text-lg font-semibold" maxLength={30}
           value={phase.name} placeholder="例：基礎を身につける" disabled={saving}
           onChange={(event) => updatePhase({ name: event.target.value })} />
@@ -106,8 +117,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
           <DatePicker label="フェーズの終了日" value={phase.end_date}
             emptyLabel="終了日を選ぶ" disabled={saving} onChange={(date) => updatePhase({ end_date: date })} />
         </div>
-        {phaseErrors.start_date && <p className="text-xs text-rose-600">{phaseErrors.start_date}</p>}
-        {phaseErrors.end_date && <p className="text-xs text-rose-600">{phaseErrors.end_date}</p>}
+        {(attempted || phase.start_date) && phaseErrors.start_date && <p className="text-xs text-rose-600">{phaseErrors.start_date}</p>}
+        {(attempted || phase.end_date) && phaseErrors.end_date && <p className="text-xs text-rose-600">{phaseErrors.end_date}</p>}
         {selfId && phase.start_date <= today && phase.end_date > today && (
           <button type="button" disabled={saving} onClick={() => updatePhase({ end_date: today })}
             className="text-sm text-notion-blue hover:underline disabled:opacity-50">
@@ -131,19 +142,20 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
         <div className="divide-y divide-slate-200 dark:divide-notion-border">
           {routines.map((row, index) => {
             const open = openKey === row.key;
-            const errors = routineErrors[index];
+            const errors = attempted ? routineErrors[index] : {};
             return <div key={row.key} className="py-3 first:pt-0 last:pb-0">
               <div className="flex items-center gap-2">
                 <button type="button" aria-expanded={open} disabled={saving}
                   onClick={() => setOpenKey(open ? null : row.key)}
                   className="min-w-0 flex-1 rounded-lg py-1.5 text-left font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue">
                   <span className="mr-2 text-xs muted">{open ? "▾" : "▸"}</span>
-                  {row.input.title || `メニュー ${index + 1} を入力`}
+                  {row.input.title || <span className="muted">メニュー {index + 1}</span>}
+                  {!open && <span className="ml-2 text-xs font-normal muted">{formatMinutes(row.input.minutes)} · {weekdaysLabel(row.input.weekdays)} · {row.input.importance}</span>}
                   {hasErrors(errors) && <span className="ml-2 text-xs text-rose-600">要確認</span>}
                 </button>
                 <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
                   aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
-                  className="rounded px-2 py-1.5 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10">削除</button>
+                  title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
               </div>
               {open && <div className="grid gap-3 pt-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
@@ -153,10 +165,17 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                       onChange={(event) => updateRoutine(row.key, { title: event.target.value })} />
                   </Field>
                 </div>
-                <Field label="所要時間（分）" error={errors.minutes}>
-                  <input type="number" min={5} max={600} step={5} className="input" disabled={saving}
-                    value={row.input.minutes}
-                    onChange={(event) => updateRoutine(row.key, { minutes: Number(event.target.value) })} />
+                <Field group label="所要時間" error={errors.minutes}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {MINUTE_PRESETS.map((minutes) => <button key={minutes} type="button" disabled={saving}
+                      aria-pressed={row.input.minutes === minutes} className={chip(row.input.minutes === minutes)}
+                      onClick={() => updateRoutine(row.key, { minutes })}>{formatMinutes(minutes)}</button>)}
+                    <label className="flex items-center gap-1 text-xs muted">
+                      <input type="number" min={5} max={600} step={5} aria-label="所要時間（分）" disabled={saving}
+                        className="input !w-20 !py-1 text-sm" value={row.input.minutes}
+                        onChange={(event) => updateRoutine(row.key, { minutes: Number(event.target.value) })} />分
+                    </label>
+                  </div>
                 </Field>
                 <Field group label="重要度">
                   <div className="flex gap-1.5">
@@ -170,6 +189,13 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                 </Field>
                 <div className="sm:col-span-2">
                   <Field group label="曜日" error={errors.weekdays}>
+                    <div className="mb-2 flex gap-1.5">
+                      {WEEKDAY_PRESETS.map((preset) => {
+                        const active = [...row.input.weekdays].sort().join() === preset.days.join();
+                        return <button key={preset.label} type="button" disabled={saving} aria-pressed={active}
+                          className={chip(active)} onClick={() => updateRoutine(row.key, { weekdays: preset.days })}>{preset.label}</button>;
+                      })}
+                    </div>
                     <div className="flex gap-1.5">
                       {DAYS.map((day, i) => {
                         const number = i + 1;
@@ -196,8 +222,12 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
           })}
         </div>
       </div>
-      <FormActions onDelete={onDelete} onCancel={onCancel} canSave={canSave}
-        saving={saving} error={failed} saveLabel="まとめて保存" />
+      {/* Keep the actions reachable on a long form. */}
+      <div className="sticky bottom-0 -mx-4 -mb-4 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur dark:border-notion-border dark:bg-notion-panel-hover/95 sm:-mx-5 sm:-mb-5 sm:px-5">
+        {attempted && !canSave && <p role="alert" className="mb-2 text-xs text-rose-600">未入力の項目があります</p>}
+        <FormActions onDelete={onDelete} onCancel={onCancel} canSave
+          saving={saving} error={failed} saveLabel="保存" />
+      </div>
     </form>
   );
 }
