@@ -114,6 +114,29 @@ export function formatMinutes(min: number): string {
   return `${h}h${String(m).padStart(2, "0")}m`;
 }
 
+function clockMinutes(time?: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(time ?? "");
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+/**
+ * How long a task takes, for the compact label in the list and timeline
+ * (Issue #59). A placed task uses the length of its frame (end - start) so
+ * the label matches what the timeline shows; otherwise the routine's
+ * planned_minutes. null when neither is known.
+ */
+export function taskDurationMinutes(
+  task: Pick<Task, "start_time" | "end_time" | "planned_minutes">
+): number | null {
+  const start = clockMinutes(task.start_time);
+  const end = clockMinutes(task.end_time);
+  if (start != null && end != null && end > start) return end - start;
+  if (task.planned_minutes && task.planned_minutes > 0) {
+    return task.planned_minutes;
+  }
+  return null;
+}
+
 // --- execution squares (BR-06) ----------------------------------------
 
 export type CellState = "done" | "missed" | "today" | "none";
