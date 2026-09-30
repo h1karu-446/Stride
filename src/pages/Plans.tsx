@@ -113,7 +113,6 @@ export default function Plans() {
 
       {creating && (
         <PlanFormModal
-          mode="create"
           initial={{
             name: "",
             color: defaultPlanColor(plans ?? []),

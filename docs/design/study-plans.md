@@ -101,8 +101,8 @@ erDiagram
 | color | text | × | — | `pink / orange / yellow / green / teal / blue / purple / gray / coral / lime / indigo / brown` のいずれか |
 | status | text | × | `'active'` | `idea / active / paused / done`（構想中／進行中／休止中／完了） |
 | due_date | date | ○ | — | 期日 |
-| goal | text | ○ | — | 目標。60文字まで |
-| goal_note | text | ○ | — | 補足。1000文字まで |
+| goal | text | ○ | — | 到達目標。1行、60文字まで |
+| goal_note | text | ○ | — | 目指す姿。1行1項目の箇条書き、合計1000文字まで。既存データは表示時に解釈 |
 | completed_at | date | ○ | — | 完了日。トリガーで設定（4.4） |
 | overdue_notice_dismissed_for | date | ○ | — | 期日超過の案内を閉じたときの期日。`due_date` と等しい間は案内を出さない |
 

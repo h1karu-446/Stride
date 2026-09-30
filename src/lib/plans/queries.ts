@@ -184,6 +184,7 @@ export type PlanPatch = Partial<
 export function useUpdatePlan() {
   const qc = useQueryClient();
   return useMutation({
+    scope: { id: "plan-update" },
     mutationFn: async ({ id, patch }: { id: string; patch: PlanPatch }) => {
       const db: Record<string, unknown> = { ...patch };
       if ("name" in patch && patch.name !== undefined) db.name = patch.name.trim();
