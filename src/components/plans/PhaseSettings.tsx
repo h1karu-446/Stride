@@ -85,10 +85,26 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
     setDirty(true);
   }
 
+  // The last removed menu can be put back (the form is a draft until saved).
+  const [removed, setRemoved] = useState<{ row: Draft; index: number } | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const timer = window.setTimeout(() => setRemoved(null), 8000);
+    return () => window.clearTimeout(timer);
+  }, [removed]);
+
   function removeRoutine(key: string) {
+    const index = routines.findIndex((row) => row.key === key);
+    if (index >= 0) setRemoved({ row: routines[index], index });
     setRoutines((rows) => rows.filter((row) => row.key !== key));
     if (openKey === key) setOpenKey(null);
     setDirty(true);
+  }
+
+  function undoRemove() {
+    if (!removed) return;
+    setRoutines((rows) => [...rows.slice(0, removed.index), removed.row, ...rows.slice(removed.index)]);
+    setRemoved(null);
   }
 
   return (
@@ -138,6 +154,10 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
           <button type="button" onClick={addRoutine} disabled={saving}
             className="btn-outline !py-1.5 text-sm">＋ メニューを追加</button>
         </div>
+        {removed && <div role="status" className="flex items-center gap-3 rounded-lg bg-slate-100 px-3 py-2 text-sm dark:bg-notion-panel-hover">
+          <span className="min-w-0 flex-1 truncate">「{removed.row.input.title || `メニュー ${removed.index + 1}`}」を削除しました</span>
+          <button type="button" disabled={saving} onClick={undoRemove} className="shrink-0 text-sm font-medium text-notion-blue hover:underline">元に戻す</button>
+        </div>}
         {routines.length === 0 && <p className="py-3 text-sm muted">メニューはまだありません。フェーズだけ先に保存することもできます。</p>}
         <div className="divide-y divide-slate-200 dark:divide-notion-border">
           {routines.map((row, index) => {
