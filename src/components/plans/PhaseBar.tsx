@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
@@ -29,10 +29,31 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   const lastEnd = ordered.reduce((end, phase) => phase.end_date! > end ? phase.end_date! : end,
     first?.end_date ?? today);
   const axisStart = addDaysISO(first?.start_date ?? today, -7);
-  const axisEnd = addDaysISO(lastEnd > today ? lastEnd : today, 37);
-  const totalDays = differenceInCalendarDays(parseISO(axisEnd), parseISO(axisStart)) + 1;
-  const width = Math.max(360, totalDays * (totalDays > 180 ? 8 : totalDays > 60 ? 10 : 14));
-  const dayWidth = width / totalDays;
+  // The scale comes from the phases alone, so it stays put while the axis grows.
+  const baseDays = differenceInCalendarDays(parseISO(addDaysISO(lastEnd > today ? lastEnd : today, 37)),
+    parseISO(axisStart)) + 1;
+  const dayWidth = baseDays > 180 ? 8 : baseDays > 60 ? 10 : 14;
+  // The axis has no fixed end: it fills the box and grows as the user scrolls toward the future.
+  const scroller = useRef<HTMLDivElement>(null);
+  const [viewWidth, setViewWidth] = useState(0);
+  const [extraDays, setExtraDays] = useState(0);
+  useEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setViewWidth(element.clientWidth));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  // Always leave room past the visible area, so there is something to scroll into.
+  const totalDays = Math.max(baseDays, Math.ceil(viewWidth / dayWidth)) + 90 + extraDays;
+  const axisEnd = addDaysISO(axisStart, totalDays - 1);
+  const width = totalDays * dayWidth;
+  function extendNearEnd() {
+    const element = scroller.current;
+    if (element && element.scrollLeft + element.clientWidth > element.scrollWidth - 240) {
+      setExtraDays((days) => days + 90);
+    }
+  }
   const xFor = (date: string) => differenceInCalendarDays(parseISO(date), parseISO(axisStart)) * dayWidth;
   const drag = useRef<Drag | null>(null);
   const createDrag = useRef<CreateDrag | null>(null);
@@ -166,7 +187,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
       <h2 className="section-title">フェーズ</h2>
       <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整・空いている所をドラッグで追加</p>
     </div>
-    <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
+    <div ref={scroller} onScroll={extendNearEnd} className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
       <div className="relative" style={{ width }}>
         <div className="relative h-7 border-b border-slate-200 bg-slate-50 text-[11px] muted dark:border-notion-border dark:bg-notion-panel-hover">
           {months.map((m) => <span key={m.date} className="absolute top-1.5 pl-1.5 font-medium" style={{ left: xFor(m.date) }}>{m.label}</span>)}
@@ -216,11 +237,11 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
           {...createEvents(-1)}>
           {createOverlay(-1)}
           <button type="button" onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => onAdd()}
-            className="sticky left-2 z-10 ml-2 mt-2 rounded-full border border-dashed border-slate-300 bg-white/95 px-3 py-1 text-xs font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
-            ＋ フェーズを追加
+            onClick={() => onAdd()} aria-label="フェーズを追加" title="フェーズを追加"
+            className="sticky left-2 z-10 ml-2 mt-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white/95 text-sm font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
+            ＋
           </button>
-          {createPreview?.row !== -1 && <span className="pointer-events-none sticky left-40 ml-3 text-[11px] muted">またはドラッグして期間を選ぶ</span>}
+          {createPreview?.row !== -1 && <span className="pointer-events-none sticky left-11 ml-2 text-[11px] muted">ドラッグで期間を選んで追加</span>}
         </div>
         {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
           <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
