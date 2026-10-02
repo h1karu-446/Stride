@@ -167,11 +167,6 @@ export default function Today() {
     scheduleWakeSave(wakeTime, v);
   }
 
-  function handleWakeTargetReset() {
-    setWakeTargetOverride("");
-    scheduleWakeSave(wakeTime, "");
-  }
-
   function scheduleBedSave(nextBedTime: string, nextBedTargetOverride: string) {
     updateBedFieldsMut.mutate({
       date,
@@ -188,11 +183,6 @@ export default function Today() {
   function handleBedTargetChange(v: string) {
     setBedTargetOverride(v);
     scheduleBedSave(bedTime, v);
-  }
-
-  function handleBedTargetReset() {
-    setBedTargetOverride("");
-    scheduleBedSave(bedTime, "");
   }
 
   const wakeTarget = wakeTargetOverride || globalWakeTarget;
@@ -289,17 +279,13 @@ export default function Today() {
             wakeScore={preview.wake_score}
             wakeTime={wakeTime}
             wakeTarget={wakeTarget}
-            isWakeTargetOverridden={!!wakeTargetOverride}
             onWakeTimeChange={handleWakeTimeChange}
             onWakeTargetChange={handleWakeTargetChange}
-            onWakeTargetReset={handleWakeTargetReset}
             bedScore={preview.bed_score}
             bedTime={bedTime}
             bedTarget={bedTarget}
-            isBedTargetOverridden={!!bedTargetOverride}
             onBedTimeChange={handleBedTimeChange}
             onBedTargetChange={handleBedTargetChange}
-            onBedTargetReset={handleBedTargetReset}
             totalScore={preview.total_score}
             cluster={preview.cluster}
             streak={streak}
@@ -802,14 +788,10 @@ function TaskRow({ task }: { task: Task }) {
 
 function TargetTimeEditor({
   target,
-  isOverridden,
   onChange,
-  onReset,
 }: {
   target: string;
-  isOverridden: boolean;
   onChange: (v: string) => void;
-  onReset: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(target);
@@ -838,19 +820,8 @@ function TargetTimeEditor({
           className="text-[11px] muted hover:text-notion-blue tabular-nums underline-offset-2 hover:underline"
           title="この日の目標時刻を変更"
         >
-          目標 {target}
-          {isOverridden && "・カスタム"} ✎
+          目標 {target} ✎
         </button>
-        {isOverridden && (
-          <button
-            type="button"
-            onClick={onReset}
-            className="text-[11px] muted hover:text-notion-blue underline-offset-2 hover:underline"
-            title="設定の目標時刻に戻す"
-          >
-            既定に戻す
-          </button>
-        )}
       </span>
     );
   }
@@ -883,17 +854,13 @@ function WakeTimeInput({
   target,
   onChange,
   isToday,
-  isTargetOverridden,
   onTargetChange,
-  onTargetReset,
 }: {
   value: string;
   target: string;
   onChange: (v: string) => void;
   isToday: boolean;
-  isTargetOverridden: boolean;
   onTargetChange: (v: string) => void;
-  onTargetReset: () => void;
 }) {
   const wakeMin = toMinutes(value);
   const targetMin = toMinutes(target);
@@ -940,9 +907,7 @@ function WakeTimeInput({
         </span>
         <TargetTimeEditor
           target={target}
-          isOverridden={isTargetOverridden}
           onChange={onTargetChange}
-          onReset={onTargetReset}
         />
       </div>
 
@@ -966,17 +931,13 @@ function BedTimeInput({
   target,
   onChange,
   isToday,
-  isTargetOverridden,
   onTargetChange,
-  onTargetReset,
 }: {
   value: string;
   target: string;
   onChange: (v: string) => void;
   isToday: boolean;
-  isTargetOverridden: boolean;
   onTargetChange: (v: string) => void;
-  onTargetReset: () => void;
 }) {
   const bedMin = toMinutes(value);
   const targetMin = toMinutes(target);
@@ -1025,9 +986,7 @@ function BedTimeInput({
         </span>
         <TargetTimeEditor
           target={target}
-          isOverridden={isTargetOverridden}
           onChange={onTargetChange}
-          onReset={onTargetReset}
         />
       </div>
 
@@ -1144,17 +1103,13 @@ function SummaryPanel({
   wakeScore,
   wakeTime,
   wakeTarget,
-  isWakeTargetOverridden,
   onWakeTimeChange,
   onWakeTargetChange,
-  onWakeTargetReset,
   bedScore,
   bedTime,
   bedTarget,
-  isBedTargetOverridden,
   onBedTimeChange,
   onBedTargetChange,
-  onBedTargetReset,
   totalScore,
   cluster,
   streak,
@@ -1175,17 +1130,13 @@ function SummaryPanel({
   wakeScore: number;
   wakeTime: string;
   wakeTarget: string;
-  isWakeTargetOverridden: boolean;
   onWakeTimeChange: (v: string) => void;
   onWakeTargetChange: (v: string) => void;
-  onWakeTargetReset: () => void;
   bedScore: number;
   bedTime: string;
   bedTarget: string;
-  isBedTargetOverridden: boolean;
   onBedTimeChange: (v: string) => void;
   onBedTargetChange: (v: string) => void;
-  onBedTargetReset: () => void;
   totalScore: number;
   cluster: import("@/types").Cluster;
   streak: number;
@@ -1264,9 +1215,7 @@ function SummaryPanel({
           value={wakeTime}
           target={wakeTarget}
           onChange={onWakeTimeChange}
-          isTargetOverridden={isWakeTargetOverridden}
           onTargetChange={onWakeTargetChange}
-          onTargetReset={onWakeTargetReset}
         />
 
         <BedTimeInput
@@ -1274,9 +1223,7 @@ function SummaryPanel({
           value={bedTime}
           target={bedTarget}
           onChange={onBedTimeChange}
-          isTargetOverridden={isBedTargetOverridden}
           onTargetChange={onBedTargetChange}
-          onTargetReset={onBedTargetReset}
         />
       </div>
 
