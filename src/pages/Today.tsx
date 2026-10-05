@@ -665,7 +665,7 @@ function TaskRow({ task }: { task: Task }) {
   const plan = task.plan_id
     ? plans?.find((p) => p.id === task.plan_id)
     : undefined;
-  const memoLine = plan && !task.routine_id ? memoOneLine(task.memo) : "";
+  const memoLine = plan && !task.from_routine ? memoOneLine(task.memo) : "";
   const [detailOpen, setDetailOpen] = useState(false);
   const duration = taskDurationMinutes(task);
   // A past schedule keeps its completion, importance and existence (BR-04).
@@ -744,7 +744,7 @@ function TaskRow({ task }: { task: Task }) {
             )}
           </div>
         )}
-        {task.routine_id && task.memo && (
+        {task.from_routine && task.memo && (
           <div className="mt-1 text-xs">
             <button type="button" aria-expanded={detailOpen}
               onClick={() => setDetailOpen(!detailOpen)}

@@ -44,7 +44,7 @@ const plan = (over: Partial<Plan> = {}): Plan => ({
 });
 const task = (date: string, completed: boolean, over: Partial<Task> = {}): Task => ({
   id: `${date}-${Math.random()}`, user_id: "u", title: "t", importance: "中",
-  scheduled_date: date, completed, plan_id: "p1", routine_id: "r1",
+  scheduled_date: date, completed, plan_id: "p1", routine_id: "r1", from_routine: true,
   is_milestone: false, created_at: "", updated_at: "", ...over,
 });
 
@@ -183,11 +183,16 @@ describe("UT-06 executionCells", () => {
   it("ignores other plans and non-routine tasks", () => {
     const tasks = [
       task("2026-09-29", true, { plan_id: "other" }),
-      task("2026-09-29", true, { routine_id: undefined }),
+      task("2026-09-29", true, { routine_id: undefined, from_routine: false }),
     ];
     const r = executionCells(tasks, "p1", TODAY, 3);
     expect(r.cells.every((c) => c.state === "none")).toBe(true);
     expect(r.target).toBe(0);
+  });
+  it("still counts routine tasks whose menu was deleted", () => {
+    const r = executionCells([task("2026-09-29", true, { routine_id: undefined })], "p1", TODAY, 2);
+    expect(r.cells[0].state).toBe("done");
+    expect(r.done).toBe(1);
   });
   it("a fully completed today is shown done but not counted", () => {
     const r = executionCells([task(TODAY, true)], "p1", TODAY, 2);

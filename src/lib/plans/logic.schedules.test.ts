@@ -22,6 +22,7 @@ const sched = (date: string, over: Partial<Task> = {}): Task => {
   return {
     id: `s${seq}`, user_id: "u", title: `予定${seq}`, importance: "中",
     scheduled_date: date, completed: false, plan_id: "p1",
+    from_routine: false,
     is_milestone: false, created_at: `2026-01-01T00:00:${String(seq).padStart(2, "0")}Z`,
     updated_at: "", ...over,
   };
@@ -74,12 +75,22 @@ describe("UT-07 scheduleGroups", () => {
   it("ignores routine tasks, manual tasks, and other plans", () => {
     const tasks = [
       sched(TODAY, { id: "mine" }),
-      sched(TODAY, { routine_id: "r1" }),
+      sched(TODAY, { routine_id: "r1", from_routine: true }),
       sched(TODAY, { plan_id: undefined }),
       sched(TODAY, { plan_id: "p2" }),
     ];
     const g = scheduleGroups(tasks, "p1");
     expect([...g.visible, ...g.hidden, ...g.done].map((t) => t.id)).toEqual(["mine"]);
+  });
+
+  it("keeps routine tasks out after their menu is deleted (routine_id cleared)", () => {
+    const tasks = [
+      sched("2026-09-28", { id: "orphan", routine_id: undefined, from_routine: true }),
+      sched(TODAY, { id: "mine" }),
+    ];
+    const g = scheduleGroups(tasks, "p1");
+    expect([...g.visible, ...g.hidden, ...g.done].map((t) => t.id)).toEqual(["mine"]);
+    expect(nextSchedule(tasks, "p1", TODAY)?.task.id).toBe("mine");
   });
 
   it("isOverdue: before today and not completed", () => {
@@ -118,7 +129,7 @@ describe("UT-08 nextSchedule", () => {
     expect(
       nextSchedule([sched(TODAY, { completed: true })], "p1", TODAY)
     ).toBeUndefined();
-    expect(nextSchedule([sched(TODAY, { routine_id: "r1" })], "p1", TODAY)).toBeUndefined();
+    expect(nextSchedule([sched(TODAY, { routine_id: "r1", from_routine: true })], "p1", TODAY)).toBeUndefined();
   });
 });
 

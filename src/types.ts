@@ -11,7 +11,8 @@ export interface Task {
   completed: boolean;
   memo?: string;
   plan_id?: string; // set on plan schedules and routine tasks
-  routine_id?: string; // set only on tasks generated from a routine
+  routine_id?: string; // the routine a generated task came from; cleared when the routine is deleted
+  from_routine: boolean; // generated from a routine; stays true after the routine is deleted
   planned_minutes?: number; // duration, used by routine tasks
   is_milestone: boolean; // milestone mark on plan schedules
   carried_from?: string; // the overdue schedule this task was copied from (BR-04)

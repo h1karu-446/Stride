@@ -26,6 +26,7 @@ const sched = (date: string, over: Partial<Task> = {}): Task => {
   return {
     id: `c${seq}`, user_id: "u", title: `予定${seq}`, importance: "中",
     scheduled_date: date, completed: false, plan_id: "p1",
+    from_routine: false,
     is_milestone: false, created_at: `2026-01-01T00:00:${String(seq).padStart(2, "0")}Z`,
     updated_at: "", ...over,
   };
@@ -40,7 +41,9 @@ describe("UT-21 isLockedSchedule", () => {
   });
 
   it("does not lock routine tasks or manual tasks", () => {
-    expect(isLockedSchedule(sched(PAST, { routine_id: "r1" }), TODAY)).toBe(false);
+    expect(isLockedSchedule(sched(PAST, { routine_id: "r1", from_routine: true }), TODAY)).toBe(false);
+    // The menu was deleted: routine_id is cleared, but it is still a routine task.
+    expect(isLockedSchedule(sched(PAST, { from_routine: true }), TODAY)).toBe(false);
     expect(isLockedSchedule(sched(PAST, { plan_id: undefined }), TODAY)).toBe(false);
   });
 });

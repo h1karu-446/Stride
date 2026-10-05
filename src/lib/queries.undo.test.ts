@@ -32,6 +32,7 @@ const task: Task = {
   scheduled_date: "2026-09-30",
   completed: false,
   routine_id: "r1",
+  from_routine: true,
   plan_id: "p1",
   is_milestone: false,
   created_at: "2026-09-30T00:00:00Z",

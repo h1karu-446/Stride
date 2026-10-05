@@ -38,6 +38,7 @@ interface TaskRow {
   memo: string | null;
   plan_id: string | null;
   routine_id: string | null;
+  from_routine?: boolean;
   planned_minutes: number | null;
   is_milestone: boolean;
   carried_from: string | null;
@@ -80,6 +81,8 @@ function rowToTask(r: TaskRow): Task {
     memo: r.memo ?? undefined,
     plan_id: r.plan_id ?? undefined,
     routine_id: r.routine_id ?? undefined,
+    // Before migration 0021 the column is missing; routine_id is the old signal.
+    from_routine: r.from_routine ?? !!r.routine_id,
     planned_minutes: r.planned_minutes ?? undefined,
     is_milestone: r.is_milestone ?? false,
     carried_from: r.carried_from ?? undefined,

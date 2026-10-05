@@ -41,6 +41,20 @@ describe("useTasks pagination", () => {
   });
 });
 
+describe("useTasks from_routine", () => {
+  it("reads the column, and falls back to routine_id before migration 0021", async () => {
+    const rows = [
+      { ...taskRow(0), from_routine: true },
+      { ...taskRow(1), from_routine: false },
+      { ...taskRow(2), routine_id: "r1" },
+      taskRow(3),
+    ];
+    queryMock(rows.length, (n) => rows[n]);
+    const tasks = await run<{ from_routine: boolean }>(useTasks());
+    expect(tasks.map((t) => t.from_routine)).toEqual([true, false, true, false]);
+  });
+});
+
 describe("useReviews pagination", () => {
   it("loads every review beyond the 1000-row API cap, newest date first", async () => {
     const q = queryMock(1234, reviewRow);

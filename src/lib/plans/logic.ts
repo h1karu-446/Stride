@@ -178,7 +178,7 @@ export function executionCells(
 ): Execution {
   const byDate = new Map<string, Task[]>();
   for (const t of tasks) {
-    if (t.plan_id !== planId || !t.routine_id) continue;
+    if (t.plan_id !== planId || !t.from_routine) continue;
     const list = byDate.get(t.scheduled_date) ?? [];
     list.push(t);
     byDate.set(t.scheduled_date, list);
@@ -370,9 +370,12 @@ export const hasErrors = (e: object) => Object.keys(e).length > 0;
 
 // --- schedules (予定, spec 4.2 / BR-04) --------------------------------
 
-/** A plan's schedules are its tasks that were not generated from a routine. */
+/**
+ * A plan's schedules are its tasks that were not generated from a routine.
+ * from_routine, not routine_id: deleting a menu clears routine_id (migration 0021).
+ */
 export function planSchedules(tasks: Task[], planId: string): Task[] {
-  return tasks.filter((t) => t.plan_id === planId && !t.routine_id);
+  return tasks.filter((t) => t.plan_id === planId && !t.from_routine);
 }
 
 /**
@@ -400,7 +403,7 @@ export function isOverdue(
  * record (BR-04). Routine tasks and manual tasks are not schedules.
  */
 export function isLockedSchedule(task: Task, today: string): boolean {
-  return !!task.plan_id && !task.routine_id && task.scheduled_date < today;
+  return !!task.plan_id && !task.from_routine && task.scheduled_date < today;
 }
 
 /** An overdue schedule that can still be carried over (once per original). */
