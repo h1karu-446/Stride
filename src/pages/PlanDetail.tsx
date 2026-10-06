@@ -18,6 +18,7 @@ import {
   formatDateLabel,
   formatMinutes,
   initialPhase,
+  scheduleDays,
   shouldShowOverdueNotice,
   sortedPhases,
 } from "@/lib/plans/logic";
@@ -192,6 +193,7 @@ export default function PlanDetail() {
 
       <PhaseBar
           phases={explicit}
+          schedules={scheduleDays(tasks.filter((task) => !hidden.has(`task:${task.id}`)), plan.id, today)}
           color={plan.color}
           selectedId={selected.id}
           today={today}

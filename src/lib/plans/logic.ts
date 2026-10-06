@@ -597,6 +597,64 @@ export function scheduleGroups(
   };
 }
 
+export type ScheduleMarkState = "overdue" | "open" | "done";
+
+export interface ScheduleDay {
+  date: string;
+  /** The last day covered; later than `date` only after mergeNearbyDays. */
+  end: string;
+  items: { task: Task; state: ScheduleMarkState }[];
+  /** The day's most urgent state: overdue, then open, then done. */
+  state: ScheduleMarkState;
+  milestone: boolean;
+}
+
+/**
+ * A plan's schedules grouped by day for the phase timeline (Issue #79), oldest
+ * day first. Every schedule is shown, done ones too; a carried-over original
+ * is left out because its copy stands for it.
+ */
+export function scheduleDays(
+  tasks: Task[],
+  planId: string,
+  today: string,
+  carried: Set<string> = carriedIds(tasks)
+): ScheduleDay[] {
+  const days = new Map<string, ScheduleDay>();
+  const shown = planSchedules(tasks, planId).filter((t) => !carried.has(t.id)).sort(byDateThenCreated);
+  for (const task of shown) {
+    const state: ScheduleMarkState = task.completed ? "done" : isOverdue(task, today, carried) ? "overdue" : "open";
+    const day = days.get(task.scheduled_date)
+      ?? { date: task.scheduled_date, end: task.scheduled_date, items: [], state: "done", milestone: false };
+    day.items.push({ task, state });
+    if (state === "overdue" || (state === "open" && day.state === "done")) day.state = state;
+    if (task.is_milestone) day.milestone = true;
+    days.set(task.scheduled_date, day);
+  }
+  return [...days.values()];
+}
+
+/**
+ * Merges days that start fewer than `minDays` after the first day of the
+ * previous mark, so marks (and their counts) on a small scale do not overlap.
+ * Anchoring on the first day keeps a long daily run from becoming one mark.
+ */
+export function mergeNearbyDays(days: ScheduleDay[], minDays: number): ScheduleDay[] {
+  const merged: ScheduleDay[] = [];
+  for (const day of days) {
+    const last = merged[merged.length - 1];
+    if (last && differenceInCalendarDays(parseISO(day.date), parseISO(last.date)) < minDays) {
+      const state = last.state === "overdue" || day.state === "overdue" ? "overdue"
+        : last.state === "open" || day.state === "open" ? "open" : "done";
+      merged[merged.length - 1] = { ...last, end: day.end, items: [...last.items, ...day.items], state,
+        milestone: last.milestone || day.milestone };
+    } else {
+      merged.push(day);
+    }
+  }
+  return merged;
+}
+
 /**
  * The schedule shown on a plan card (spec 4.1): the oldest overdue one, else
  * the nearest open one. undefined means "予定なし". Carried-over originals

@@ -7,6 +7,8 @@ import {
   materialGroups,
   materialStatusPatch,
   nextSchedule,
+  mergeNearbyDays,
+  scheduleDays,
   scheduleGroups,
   validateMaterial,
   validateSchedule,
@@ -238,5 +240,56 @@ describe("UT-19 validation: schedules and materials", () => {
     expect(validateMaterial({ title: "x", note: "あ".repeat(1000) })).toEqual({});
     expect(validateMaterial({ title: "x", note: ` ${"あ".repeat(1000)}\n` })).toEqual({});
     expect(validateMaterial({ title: "x", note: "あ".repeat(1001) }).note).toBeDefined();
+  });
+});
+
+describe("scheduleDays (Issue #79)", () => {
+  it("groups a plan's schedules by day with the most urgent state first", () => {
+    const old = sched("2026-09-20");
+    const doneOld = sched("2026-09-20", { completed: true });
+    const future = sched("2026-10-05", { is_milestone: true });
+    const doneFuture = sched("2026-10-05", { completed: true });
+    const allDone = sched("2026-09-25", { completed: true });
+    const routine = sched("2026-09-21", { from_routine: true });
+    const other = sched("2026-09-22", { plan_id: "p2" });
+    const days = scheduleDays([future, doneFuture, allDone, old, doneOld, routine, other], "p1", TODAY);
+    expect(days.map((d) => [d.date, d.state, d.milestone, d.items.length])).toEqual([
+      ["2026-09-20", "overdue", false, 2],
+      ["2026-09-25", "done", false, 1],
+      ["2026-10-05", "open", true, 2],
+    ]);
+    expect(days[0].items.map((i) => [i.task.id, i.state])).toEqual([[old.id, "overdue"], [doneOld.id, "done"]]);
+  });
+
+  it("shows the copy of a carried-over schedule, not the original", () => {
+    const original = sched("2026-09-10");
+    const copy = sched(TODAY, { carried_from: original.id });
+    expect(scheduleDays([original, copy], "p1", TODAY)).toEqual([
+      { date: TODAY, end: TODAY, items: [{ task: copy, state: "open" }], state: "open", milestone: false },
+    ]);
+  });
+
+  it("returns nothing when the plan has no schedules", () => {
+    expect(scheduleDays([], "p1", TODAY)).toEqual([]);
+  });
+});
+
+describe("mergeNearbyDays (Issue #79)", () => {
+  it("merges days closer than minDays to the first day of the previous mark", () => {
+    const days = scheduleDays([
+      sched("2026-10-01", { completed: true }), sched("2026-10-02", { is_milestone: true }),
+      sched("2026-10-03"), sched("2026-10-04"), sched("2026-10-10"),
+    ], "p1", TODAY);
+    expect(mergeNearbyDays(days, 3).map((d) => [d.date, d.end, d.items.length, d.state, d.milestone])).toEqual([
+      ["2026-10-01", "2026-10-03", 3, "open", true],
+      ["2026-10-04", "2026-10-04", 1, "open", false],
+      ["2026-10-10", "2026-10-10", 1, "open", false],
+    ]);
+  });
+
+  it("keeps an overdue state when merging and leaves days apart when minDays is 1", () => {
+    const days = scheduleDays([sched("2026-09-28"), sched("2026-09-29", { completed: true })], "p1", TODAY);
+    expect(mergeNearbyDays(days, 2)).toMatchObject([{ state: "overdue", items: [{}, {}] }]);
+    expect(mergeNearbyDays(days, 1)).toHaveLength(2);
   });
 });
