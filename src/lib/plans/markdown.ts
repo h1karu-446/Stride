@@ -41,6 +41,12 @@ const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
 /** A table's delimiter row; it needs a "|" so that "---" stays a thematic break. */
 // Each cell already ends with [ \t]*, so the closing pipe's spaces must not repeat them (that backtracks quadratically).
 const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/;
+/**
+ * A table stops taking body rows past this many cells. Short rows are padded to the
+ * header's width, so without it a few KB of "a\n" under a wide header would make
+ * millions of cells and freeze the page.
+ */
+const MAX_TABLE_CELLS = 20000;
 /** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
 const MAX_DEPTH = 16;
 
@@ -82,6 +88,8 @@ function tableStart(lines: string[], i: number): Align[] | null {
   const header = lines[i];
   const delimiter = lines[i + 1];
   if (delimiter === undefined || !header.includes("|") || !TABLE_DELIMITER.test(delimiter)) return null;
+  // "- | -" starts a list item, as in GFM, which tries list items before tables.
+  if (LIST.test(delimiter) && delimiter.match(LIST)![3]?.trim()) return null;
   const align = splitRow(delimiter).map((cell): Align => {
     const left = cell.startsWith(":");
     const right = cell.endsWith(":");
@@ -146,7 +154,9 @@ function parseBlocks(lines: string[], depth = 0): Block[] {
       const header = splitRow(line).map((cell) => parseInline(cell));
       const rows: Inline[][][] = [];
       i += 2;
-      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)) {
+      let cellCount = align.length;
+      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)
+        && (cellCount += align.length) <= MAX_TABLE_CELLS) {
         const cells = splitRow(lines[i++]);
         // Pad short rows and drop extra cells so every row has the header's width.
         rows.push(align.map((_, c) => parseInline(cells[c] ?? "")));

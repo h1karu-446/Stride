@@ -97,6 +97,19 @@ describe("plan overview markdown: blocks", () => {
     expect(performance.now() - started).toBeLessThan(200);
   });
 
+  it("reads a delimiter row that starts like a list item as a list", () => {
+    expect(parseMarkdown("a | b\n- | -").map((b) => b.type)).toEqual(["paragraph", "list"]);
+    expect(parseMarkdown("a | b\n-|-")).toMatchObject([{ type: "table" }]);
+  });
+
+  it("caps the padded cells of a wide table and reads the rest as a paragraph", () => {
+    const blocks = parseMarkdown("|".repeat(1668) + "\n" + Array(1667).fill("-").join("|") + "\n" + "a\n".repeat(2500));
+    const table = blocks[0] as { type: "table"; align: unknown[]; rows: unknown[][] };
+    expect(table.type).toBe("table");
+    expect((table.rows.length + 1) * table.align.length).toBeLessThanOrEqual(20000);
+    expect(blocks[1]).toMatchObject({ type: "paragraph" });
+  });
+
   it("reads tables inside lists and blockquotes", () => {
     expect(parseMarkdown("> | a |\n> | - |\n> | 1 |")).toMatchObject([{ type: "blockquote", blocks: [{ type: "table" }] }]);
     expect(parseMarkdown("- 表\n  | a |\n  | - |")).toMatchObject([{ type: "list", items: [{ blocks: [
