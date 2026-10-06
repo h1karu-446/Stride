@@ -57,6 +57,31 @@ export function phaseBarWidth(days: number, dayWidth: number, roomToNext = Infin
   return Math.max(actual, Math.min(PHASE_BAR_MIN_WIDTH, roomToNext));
 }
 
+/**
+ * The date axis of the phase timeline. The scale (px per day) comes from the
+ * phases alone, so a far-off milestone does not shrink the bars; the axis still
+ * reaches every schedule (Issue #79). `viewStart` is where the view opens.
+ */
+export function timelineAxis(phases: Phase[], scheduleDates: string[], today: string) {
+  const ordered = sortedPhases(phases);
+  const viewStart = addDaysISO(ordered[0]?.start_date ?? today, -7);
+  let phaseEnd = today;
+  for (const phase of ordered) if (phase.end_date! > phaseEnd) phaseEnd = phase.end_date!;
+  const firstSchedule = scheduleDates.reduce((min, date) => date < min ? date : min, viewStart);
+  const lastSchedule = scheduleDates.reduce((max, date) => date > max ? date : max, phaseEnd);
+  const axisStart = addDaysISO(firstSchedule, firstSchedule < viewStart ? -7 : 0);
+  const span = (from: string, to: string) =>
+    differenceInCalendarDays(parseISO(addDaysISO(to, 37)), parseISO(from)) + 1;
+  const scaleDays = span(viewStart, phaseEnd);
+  return {
+    axisStart,
+    viewStart,
+    dayWidth: scaleDays > 180 ? 8 : scaleDays > 60 ? 10 : 14,
+    /** The fewest days the axis shows before it grows with the viewport and scrolling. */
+    baseDays: span(axisStart, lastSchedule),
+  };
+}
+
 export function sortedPhases(phases: Phase[]): Phase[] {
   return [...phases].sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")
@@ -595,6 +620,64 @@ export function scheduleGroups(
     done,
     carriedCount: done.filter((t) => !t.completed).length,
   };
+}
+
+export type ScheduleMarkState = "overdue" | "open" | "done";
+
+export interface ScheduleDay {
+  date: string;
+  /** The last day covered; later than `date` only after mergeNearbyDays. */
+  end: string;
+  items: { task: Task; state: ScheduleMarkState }[];
+  /** The day's most urgent state: overdue, then open, then done. */
+  state: ScheduleMarkState;
+  milestone: boolean;
+}
+
+/**
+ * A plan's schedules grouped by day for the phase timeline (Issue #79), oldest
+ * day first. Every schedule is shown, done ones too; a carried-over original
+ * is left out because its copy stands for it.
+ */
+export function scheduleDays(
+  tasks: Task[],
+  planId: string,
+  today: string,
+  carried: Set<string> = carriedIds(tasks)
+): ScheduleDay[] {
+  const days = new Map<string, ScheduleDay>();
+  const shown = planSchedules(tasks, planId).filter((t) => !carried.has(t.id)).sort(byDateThenCreated);
+  for (const task of shown) {
+    const state: ScheduleMarkState = task.completed ? "done" : isOverdue(task, today, carried) ? "overdue" : "open";
+    const day = days.get(task.scheduled_date)
+      ?? { date: task.scheduled_date, end: task.scheduled_date, items: [], state: "done", milestone: false };
+    day.items.push({ task, state });
+    if (state === "overdue" || (state === "open" && day.state === "done")) day.state = state;
+    if (task.is_milestone) day.milestone = true;
+    days.set(task.scheduled_date, day);
+  }
+  return [...days.values()];
+}
+
+/**
+ * Merges days that start fewer than `minDays` after the first day of the
+ * previous mark, so marks (and their counts) on a small scale do not overlap.
+ * Anchoring on the first day keeps a long daily run from becoming one mark.
+ */
+export function mergeNearbyDays(days: ScheduleDay[], minDays: number): ScheduleDay[] {
+  const merged: ScheduleDay[] = [];
+  for (const day of days) {
+    const last = merged[merged.length - 1];
+    if (last && differenceInCalendarDays(parseISO(day.date), parseISO(last.date)) < minDays) {
+      const state = last.state === "overdue" || day.state === "overdue" ? "overdue"
+        : last.state === "open" || day.state === "open" ? "open" : "done";
+      merged[merged.length - 1] = { ...last, end: day.end, items: [...last.items, ...day.items], state,
+        milestone: last.milestone || day.milestone };
+    } else {
+      merged.push(day);
+    }
+  }
+  return merged;
 }
 
 /**

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
-import { phaseBarWidth, phaseDatesAfterDrag, sortedPhases } from "@/lib/plans/logic";
-import type { PhaseDragEdge } from "@/lib/plans/logic";
+import { mergeNearbyDays, phaseBarWidth, phaseDatesAfterDrag, sortedPhases, timelineAxis } from "@/lib/plans/logic";
+import type { PhaseDragEdge, ScheduleDay } from "@/lib/plans/logic";
+import ScheduleMarker from "./ScheduleMarker";
 import type { Phase, PlanColor } from "@/types";
 
 const md = (d: string) => `${parseISO(d).getMonth() + 1}/${parseISO(d).getDate()}`;
@@ -15,8 +16,10 @@ type Drag = { id: string; pointerId: number; x: number; edge: PhaseDragEdge;
 type CreateDrag = { pointerId: number; startDay: number; row: number };
 
 /** A shared date axis keeps adjacent, empty, and overlapping periods honest. */
-export default function PhaseBar({ phases, color, selectedId, today, onSelect, onAdd, onAdjustDates }: {
+export default function PhaseBar({ phases, schedules = [], color, selectedId, today, onSelect, onAdd, onAdjustDates }: {
   phases: Phase[];
+  /** The plan's schedules by day (scheduleDays), shown in their own row under the months. */
+  schedules?: ScheduleDay[];
   color: PlanColor;
   selectedId?: string;
   today: string;
@@ -26,13 +29,9 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
 }) {
   const ordered = sortedPhases(phases);
   const first = ordered[0];
-  const lastEnd = ordered.reduce((end, phase) => phase.end_date! > end ? phase.end_date! : end,
-    first?.end_date ?? today);
-  const axisStart = addDaysISO(first?.start_date ?? today, -7);
-  // The scale comes from the phases alone, so it stays put while the axis grows.
-  const baseDays = differenceInCalendarDays(parseISO(addDaysISO(lastEnd > today ? lastEnd : today, 37)),
-    parseISO(axisStart)) + 1;
-  const dayWidth = baseDays > 180 ? 8 : baseDays > 60 ? 10 : 14;
+  // The axis also reaches schedules before or after every phase; the scale comes from the phases alone.
+  const { axisStart, viewStart, dayWidth, baseDays } = timelineAxis(phases,
+    schedules.flatMap((day) => [day.date, day.end]), today);
   // The axis has no fixed end: it fills the box and grows as the user scrolls toward the future.
   const scroller = useRef<HTMLDivElement>(null);
   const [viewWidth, setViewWidth] = useState(0);
@@ -44,6 +43,17 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
+  // Open at the phases even when older schedules extend the axis to the left, and keep
+  // the view in place when a new schedule moves the start of the axis.
+  const shownStart = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (!element) return;
+    const days = (from: string, to: string) => differenceInCalendarDays(parseISO(to), parseISO(from));
+    element.scrollLeft = shownStart.current === null ? days(axisStart, viewStart) * dayWidth
+      : element.scrollLeft + days(axisStart, shownStart.current) * dayWidth;
+    shownStart.current = axisStart;
+  }, [axisStart, viewStart, dayWidth]);
   // Always leave room past the visible area, so there is something to scroll into.
   const totalDays = Math.max(baseDays, Math.ceil(viewWidth / dayWidth)) + 90 + extraDays;
   const axisEnd = addDaysISO(axisStart, totalDays - 1);
@@ -61,6 +71,12 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
   const [createPreview, setCreatePreview] = useState<(Dates & { row: number }) | null>(null);
   const hex = planHex(color);
+  // Marks closer than about 24px are merged so they and their counts stay readable.
+  const marks = mergeNearbyDays(schedules, Math.ceil(24 / dayWidth));
+  const [openDay, setOpenDay] = useState<string | null>(null);
+  const closeDay = useCallback(() => setOpenDay(null), []);
+  // Rows below the month header start lower when the schedule row is shown.
+  const headerHeight = 28 + (schedules.length > 0 ? 24 : 0);
 
   // Month dividers make the axis readable at a glance.
   const months: { date: string; label: string }[] = [];
@@ -192,10 +208,18 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
         <div className="relative h-7 border-b border-slate-200 bg-slate-50 text-[11px] muted dark:border-notion-border dark:bg-notion-panel-hover">
           {months.map((m) => <span key={m.date} className="absolute top-1.5 pl-1.5 font-medium" style={{ left: xFor(m.date) }}>{m.label}</span>)}
         </div>
+        {schedules.length > 0 && <div role="group" aria-label="予定"
+          className="relative h-6 border-b border-slate-200 dark:border-notion-border">
+          {marks.map((day) => <ScheduleMarker key={day.date} day={day} left={xFor(day.date)}
+            width={(differenceInCalendarDays(parseISO(day.end), parseISO(day.date)) + 1) * dayWidth}
+            color={hex} today={today} open={openDay === day.date}
+            onToggle={() => setOpenDay((current) => current === day.date ? null : day.date)}
+            onClose={closeDay} />)}
+        </div>}
         {months.map((m) => <div key={m.date} aria-hidden="true" className="pointer-events-none absolute bottom-0 top-0 border-l border-slate-200 dark:border-notion-border" style={{ left: xFor(m.date) }} />)}
         {gaps.map((gap) => <div key={gap.start} aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 top-7 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
-          style={{ left: xFor(gap.start), width: gap.days * dayWidth }} />)}
+          className="pointer-events-none absolute bottom-0 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
+          style={{ top: headerHeight, left: xFor(gap.start), width: gap.days * dayWidth }} />)}
         {lanes.map((lane, laneIndex) => <div key={laneIndex} title="空いている所をドラッグして新しいフェーズの期間を選択"
           className="relative h-12 cursor-crosshair touch-none border-b border-slate-100 dark:border-notion-border/60"
           {...createEvents(laneIndex)}>
@@ -257,7 +281,8 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
         </div>
         {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
           <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
-          <span className="absolute bottom-0 top-6 w-px bg-rose-500/70" />
+          {/* Below the schedule row, so a mark for today is not crossed out. */}
+          <span className="absolute bottom-0 w-px bg-rose-500/70" style={{ top: schedules.length > 0 ? headerHeight : 24 }} />
         </div>}
       </div>
     </div>
