@@ -28,6 +28,7 @@ import {
   usePlans,
   useSavePhaseSettings,
   useSaveRoutine,
+  useSetPhaseCompletion,
   useUpdatePlan,
 } from "@/lib/plans/queries";
 import { useTasks } from "@/lib/queries";
@@ -54,6 +55,7 @@ export default function PlanDetail() {
   const deletePhase = useDeletePhase();
   const saveRoutine = useSaveRoutine();
   const deleteRoutine = useDeleteRoutine();
+  const setCompletion = useSetPhaseCompletion();
   const deferDelete = useDeferredDelete((state) => state.schedule);
   const hidden = useHiddenKeys();
 
@@ -110,7 +112,15 @@ export default function PlanDetail() {
   const settingsRoutines = selected.routines.map(({ id, title, minutes, weekdays, importance, menu }) =>
     ({ id, title, minutes, weekdays, importance, menu }));
 
+  // Early completion (Issue #50): the planned dates stay; menus stop after the completion day.
+  const completedAt = selected.completed_at;
+  const canComplete = !selected.is_implicit && !completedAt && !!selected.start_date && !!selected.end_date
+    && selected.start_date <= today && today <= selected.end_date;
+  const completeEarlyDays = completedAt && selected.end_date
+    ? differenceInCalendarDays(parseISO(selected.end_date), parseISO(completedAt)) : 0;
+
   const phaseHeading = () => {
+    if (completedAt) return `${format(parseISO(completedAt), "M/d")} 完了`;
     if (!selected.start_date || !selected.end_date) return "";
     if (selected.start_date <= today && today <= selected.end_date) {
       return `残り ${differenceInCalendarDays(parseISO(selected.end_date), parseISO(today))}日`;
@@ -122,6 +132,7 @@ export default function PlanDetail() {
 
   // Elapsed share of the phase, for the thin progress line under its heading.
   const phaseProgress = (() => {
+    if (completedAt) return 1;
     if (!selected.start_date || !selected.end_date || selected.start_date > today) return 0;
     const total = differenceInCalendarDays(parseISO(selected.end_date), parseISO(selected.start_date)) + 1;
     const elapsed = differenceInCalendarDays(parseISO(today), parseISO(selected.start_date)) + 1;
@@ -134,6 +145,12 @@ export default function PlanDetail() {
   const lastEnd = explicit.reduce<string | undefined>((end, phase) =>
     !end || phase.end_date! > end ? phase.end_date! : end, undefined);
   const newPhaseStart = lastEnd && lastEnd >= today ? addDaysISO(lastEnd, 1) : today;
+
+  // After an early completion, offer to start the next phase early. Its dates are never moved automatically.
+  const nextPhase = completedAt
+    ? explicit.find((p) => p.id !== selected.id && p.start_date! > completedAt) : undefined;
+  const earlyStart = completedAt && (addDaysISO(completedAt, 1) > today ? addDaysISO(completedAt, 1) : today);
+  const offerEarlyStart = nextPhase && earlyStart && nextPhase.start_date! > earlyStart ? nextPhase : undefined;
 
   return (
     <div className="space-y-6">
@@ -221,6 +238,47 @@ export default function PlanDetail() {
                   onClick={() => setEditing({ kind: "phase-edit" })}>✎</button>
               </div>
             </div>
+            {(canComplete || completedAt) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                {completedAt ? <>
+                  <span className="muted">
+                    {completeEarlyDays > 0 ? `予定より${completeEarlyDays}日早く完了しました。` : "完了しました。"}
+                    {completedAt < (selected.end_date ?? "") && "翌日以降、このフェーズのメニューは作られません"}
+                  </span>
+                  <button type="button" disabled={setCompletion.isPending}
+                    className="text-notion-blue hover:underline disabled:opacity-50"
+                    onClick={() => setCompletion.mutate({ phaseId: selected.id, date: null })}>
+                    完了を取り消す
+                  </button>
+                </> : (
+                  <button type="button" disabled={setCompletion.isPending}
+                    className="btn-outline !px-2.5 !py-1 text-xs"
+                    onClick={() => {
+                      if (window.confirm(`「${selected.name}」を今日で完了にしますか？ 予定の期間は残り、明日からこのフェーズのメニューは作られません（あとで取り消せます）`)) {
+                        setCompletion.mutate({ phaseId: selected.id, date: today });
+                      }
+                    }}>
+                    ✓ このフェーズを完了にする
+                  </button>
+                )}
+                {setCompletion.isError && <span role="alert" className="text-rose-600">保存できませんでした。もう一度操作してください</span>}
+              </div>
+            )}
+            {offerEarlyStart && earlyStart && (
+              <div className="flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-xs"
+                style={{ borderColor: `${color}55`, background: `${color}0f` }}>
+                <span>次のフェーズ「{offerEarlyStart.name}」は {format(parseISO(offerEarlyStart.start_date!), "M/d")} からの予定です。前倒しで始めますか？</span>
+                <button type="button" className="btn-outline !px-2.5 !py-1 text-xs"
+                  onClick={() => {
+                    if (setEditing({ kind: "phase-edit",
+                      initialDates: { start_date: earlyStart, end_date: offerEarlyStart.end_date! } })) {
+                      setSelectedId(offerEarlyStart.id);
+                    }
+                  }}>
+                  {format(parseISO(earlyStart), "M/d")} から始める（日付を確認して保存）
+                </button>
+              </div>
+            )}
             <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-notion-panel-hover">
               <div className="h-full rounded-full" style={{ width: `${phaseProgress * 100}%`, background: color }} />
             </div>
@@ -235,6 +293,7 @@ export default function PlanDetail() {
               end_date: editing.initialDates?.end_date ?? selected.end_date ?? "",
             }}
             selfId={selected.id}
+            completedAt={selected.completed_at}
             showMenus={false}
             existingRoutines={settingsRoutines}
             startWithNewRoutine={editing.addRoutine}

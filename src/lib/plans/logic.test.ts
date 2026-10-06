@@ -297,6 +297,12 @@ describe("UT-19 validation", () => {
     expect(validatePhase({ ...ok, start_date: "2026-10-31" })).toEqual({});
     expect(validatePhase({ ...ok, start_date: "2026-10-05", end_date: "2026-10-10" })).toEqual({});
   });
+  it("phase: the start cannot move past the completion day (Issue #50)", () => {
+    const ok = { name: "B", start_date: "2026-11-01", end_date: "2026-11-30" };
+    expect(validatePhase(ok, "2026-11-10")).toEqual({});
+    expect(validatePhase({ ...ok, start_date: "2026-11-10" }, "2026-11-10")).toEqual({});
+    expect(validatePhase({ ...ok, start_date: "2026-11-11" }, "2026-11-10").start_date).toContain("完了を取り消して");
+  });
   it("routine: title, minutes, weekdays, menu", () => {
     const ok = { title: "英語", minutes: 30, weekdays: [1], menu: "" };
     expect(validateRoutine(ok)).toEqual({});
@@ -339,5 +345,21 @@ describe("UT-20 dropTimes", () => {
     expect(dropTimes(23 * 60 + 45)).toEqual({ start: 1380, end: 1440 });
     expect(dropTimes(-15, 30)).toEqual({ start: 0, end: 30 });
     expect(dropTimes(1440, 600)).toEqual({ start: 840, end: 1440 });
+  });
+});
+
+describe("phase early completion (Issue #50)", () => {
+  // Planned until 10/10, completed on 9/30 (TODAY).
+  const done = phase({ start_date: "2026-09-01", end_date: "2026-10-10", completed_at: TODAY,
+    routines: [routine()] });
+  it("keeps the phase through its completion day and drops it afterwards", () => {
+    expect(phasesForDate([done], TODAY)).toHaveLength(1);
+    expect(phasesForDate([done], "2026-10-01")).toHaveLength(0);
+    expect(phasesForDate([{ ...done, completed_at: undefined }], "2026-10-01")).toHaveLength(1);
+  });
+  it("matches generate_routine_tasks: no routine after the completion day", () => {
+    const p = plan({ phases: [done] });
+    expect(routinesForDate(p, TODAY)).toHaveLength(1);
+    expect(routinesForDate(p, "2026-10-01")).toHaveLength(0);
   });
 });

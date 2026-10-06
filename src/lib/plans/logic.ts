@@ -26,10 +26,12 @@ export const PLAN_STATUS_LABEL: Record<PlanStatus, string> = {
 
 // --- phases ------------------------------------------------------------
 
+/** Same rule as generate_routine_tasks: a completed phase ends on its completion day. */
 export function isDateInPhase(phase: Phase, date: string): boolean {
   if (phase.is_implicit) return true;
   return !!phase.start_date && !!phase.end_date &&
-    phase.start_date <= date && date <= phase.end_date;
+    phase.start_date <= date && date <= phase.end_date &&
+    (!phase.completed_at || date <= phase.completed_at);
 }
 
 /** All phases covering `date`; overlapping phases can run together. */
@@ -333,7 +335,8 @@ export function validatePlan(v: {
 }
 
 export function validatePhase(
-  v: { name: string; start_date: string; end_date: string }
+  v: { name: string; start_date: string; end_date: string },
+  completedAt?: string
 ): Errors<"name" | "start_date" | "end_date"> {
   const e: Errors<"name" | "start_date" | "end_date"> = {};
   if (len(v.name) < 1) e.name = "名前を入力してください";
@@ -344,6 +347,10 @@ export function validatePhase(
     if (v.start_date > v.end_date) {
       e.end_date = "終了日は開始日以降にしてください";
     }
+  }
+  // Same as the DB check phases_completed_at_shape.
+  if (completedAt && v.start_date && v.start_date > completedAt && !e.start_date) {
+    e.start_date = `完了した日（${format(parseISO(completedAt), "M/d")}）より後には開始日を移せません。先に完了を取り消してください`;
   }
   return e;
 }
