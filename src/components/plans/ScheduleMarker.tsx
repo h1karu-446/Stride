@@ -71,6 +71,18 @@ export default function ScheduleMarker({ day, left, width, color, today, open, o
   // A tap target at least 16px wide, centred on the covered days.
   const hit = Math.max(width, 16);
 
+  // The hint is fixed too, so it goes away instead of drifting on scroll.
+  useEffect(() => {
+    if (!showHint) return;
+    const hide = () => setHint(false);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [showHint]);
+
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => {
@@ -85,8 +97,11 @@ export default function ScheduleMarker({ day, left, width, color, today, open, o
       event.stopImmediatePropagation();
       onClose();
     };
-    // A fixed popover would drift away from its marker, so close it instead.
-    const close = () => onClose();
+    // A fixed popover would drift away from its marker, so close it instead,
+    // but not when the popover itself scrolls (a long list of schedules).
+    const close = (event: Event) => {
+      if (!(event.target instanceof Node && popover.current?.contains(event.target))) onClose();
+    };
     document.addEventListener("pointerdown", outside, true);
     window.addEventListener("keydown", escape, true);
     window.addEventListener("scroll", close, true);
