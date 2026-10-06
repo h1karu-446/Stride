@@ -132,6 +132,8 @@ export interface Plan {
   due_date?: string;
   goal?: string;
   goal_note?: string;
+  /** Free-form Markdown overview of the plan (migration 0022). */
+  overview?: string;
   completed_at?: string;
   overdue_notice_dismissed_for?: string;
   phases: Phase[];
