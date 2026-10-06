@@ -13,7 +13,9 @@ export default function PlanOverview({ plan }: { plan: Plan }) {
   const [draft, setDraft] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saved = plan.overview ?? "";
-  const tooLong = draft.length > OVERVIEW_MAX;
+  // Count like the DB's char_length on the saved (end-trimmed) text: code points, not UTF-16 units.
+  const length = [...draft.trimEnd()].length;
+  const tooLong = length > OVERVIEW_MAX;
 
   // Grow the textarea with its content so long notes don't need an inner scroll.
   useEffect(() => {
@@ -62,7 +64,9 @@ export default function PlanOverview({ plan }: { plan: Plan }) {
   }
 
   return (
-    <section className="card space-y-3" aria-labelledby="plan-overview-title">
+    // While editing, the keys work from the preview tabs and pane too, not only the textarea.
+    <section className="card space-y-3" aria-labelledby="plan-overview-title"
+      onKeyDown={editing ? handleKey : undefined}>
       <div className="flex items-center justify-between gap-2">
         <h2 id="plan-overview-title" className="section-title">概要</h2>
         {editing ? (
@@ -81,9 +85,9 @@ export default function PlanOverview({ plan }: { plan: Plan }) {
       </div>
 
       {editing ? (
-        <div className="space-y-2" onKeyDown={handleKey}>
+        <div className="space-y-2">
           {preview ? (
-            <div className="min-h-[10rem] rounded-md border border-slate-200 px-3 py-2 dark:border-notion-border">
+            <div tabIndex={-1} className="min-h-[10rem] rounded-md border border-slate-200 px-3 py-2 dark:border-notion-border">
               {draft.trim() ? <Markdown source={draft} /> : <p className="text-sm muted">プレビューする内容がありません</p>}
             </div>
           ) : (
@@ -97,7 +101,7 @@ export default function PlanOverview({ plan }: { plan: Plan }) {
             <button type="button" onClick={cancel} disabled={update.isPending} className="btn-outline !px-3 !py-1">キャンセル</button>
             <span className="muted">Markdown 対応 · ⌘/Ctrl+Enter で保存</span>
             <span className={`ml-auto tabular-nums ${tooLong ? "font-medium text-rose-600" : "muted"}`}>
-              {draft.length.toLocaleString()} / {OVERVIEW_MAX.toLocaleString()}
+              {length.toLocaleString()} / {OVERVIEW_MAX.toLocaleString()}
             </span>
           </div>
           {tooLong && <p role="alert" className="text-xs text-rose-600">概要は{OVERVIEW_MAX.toLocaleString()}文字までです</p>}

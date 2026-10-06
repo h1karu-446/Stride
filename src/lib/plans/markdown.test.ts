@@ -48,6 +48,17 @@ describe("plan overview markdown: blocks", () => {
     expect(parseMarkdown("~~~\nx")).toEqual([{ type: "code", lang: "", text: "x" }]);
   });
 
+  it("reads very deep nesting as text instead of overflowing the stack", () => {
+    for (const source of [">".repeat(5000) + "a", "- ".repeat(5000) + "a", "1. ".repeat(3300) + "a"]) {
+      expect(() => parseMarkdown(source)).not.toThrow();
+    }
+    let block = parseMarkdown("> ".repeat(40) + "a")[0];
+    let depth = 0;
+    while (block.type === "blockquote") { block = block.blocks[0]; depth++; }
+    expect(depth).toBe(16);
+    expect(block.type).toBe("paragraph");
+  });
+
   it("returns nothing for blank input and handles CRLF", () => {
     expect(parseMarkdown("  \n\n")).toEqual([]);
     expect(parseMarkdown("a\r\nb")).toEqual([{ type: "paragraph", children: [text("a"), { type: "br" }, text("b")] }]);
@@ -92,6 +103,15 @@ describe("plan overview markdown: inline", () => {
     ]);
     expect(parseInline("(https://example.com).")).toEqual([
       text("("), { type: "link", href: "https://example.com", children: [text("https://example.com")] }, text(")."),
+    ]);
+  });
+
+  it("never puts a link inside a link label", () => {
+    expect(parseInline("[https://a.com](https://b.com)")).toEqual([
+      { type: "link", href: "https://b.com", children: [text("https://a.com")] },
+    ]);
+    expect(parseInline("[[a](https://x)](https://y)")).toEqual([
+      { type: "link", href: "https://y", children: [text("[a](https://x)")] },
     ]);
   });
 

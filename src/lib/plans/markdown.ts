@@ -35,6 +35,8 @@ const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const QUOTE = /^ {0,3}> ?(.*)$/;
 const LIST = /^( *)([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/;
 const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
+/** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
+const MAX_DEPTH = 16;
 
 export function parseMarkdown(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
@@ -45,12 +47,13 @@ const indentOf = (line: string) => line.length - line.trimStart().length;
 const isBlank = (line: string) => line.trim() === "";
 
 /** True when the line starts a block that interrupts a paragraph. */
-function startsBlock(line: string) {
-  return HEADING.test(line) || HR.test(line) || FENCE.test(line) || QUOTE.test(line)
-    || (LIST.test(line) && !!line.match(LIST)![3]?.trim());
+function startsBlock(line: string, nest: boolean) {
+  return HEADING.test(line) || HR.test(line) || FENCE.test(line)
+    || (nest && (QUOTE.test(line) || (LIST.test(line) && !!line.match(LIST)![3]?.trim())));
 }
 
-function parseBlocks(lines: string[]): Block[] {
+function parseBlocks(lines: string[], depth = 0): Block[] {
+  const nest = depth < MAX_DEPTH;
   const blocks: Block[] = [];
   let i = 0;
   while (i < lines.length) {
@@ -86,15 +89,15 @@ function parseBlocks(lines: string[]): Block[] {
 
     if (HR.test(line)) { blocks.push({ type: "hr" }); i++; continue; }
 
-    if (QUOTE.test(line)) {
+    if (nest && QUOTE.test(line)) {
       const inner: string[] = [];
       while (i < lines.length && QUOTE.test(lines[i])) inner.push(lines[i++].match(QUOTE)![1]);
-      blocks.push({ type: "blockquote", blocks: parseBlocks(inner) });
+      blocks.push({ type: "blockquote", blocks: parseBlocks(inner, depth + 1) });
       continue;
     }
 
-    if (LIST.test(line)) {
-      const [list, next] = parseList(lines, i);
+    if (nest && LIST.test(line)) {
+      const [list, next] = parseList(lines, i, depth);
       blocks.push(list);
       i = next;
       continue;
@@ -102,13 +105,13 @@ function parseBlocks(lines: string[]): Block[] {
 
     const text: string[] = [line.trim()];
     i++;
-    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i])) text.push(lines[i++].trim());
+    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)) text.push(lines[i++].trim());
     blocks.push({ type: "paragraph", children: parseInline(text.join("\n")) });
   }
   return blocks;
 }
 
-function parseList(lines: string[], start: number): [Block, number] {
+function parseList(lines: string[], start: number, depth: number): [Block, number] {
   const first = lines[start].match(LIST)!;
   const indent = first[1].length;
   const ordered = /\d/.test(first[2]);
@@ -141,7 +144,7 @@ function parseList(lines: string[], start: number): [Block, number] {
       body.push(lines[i].slice(strip));
       i++;
     }
-    items.push({ checked, blocks: parseBlocks(body) });
+    items.push({ checked, blocks: parseBlocks(body, depth + 1) });
 
     // A blank line between items keeps the list going.
     let j = i;
@@ -166,7 +169,8 @@ export function safeHref(href: string): string | null {
   return SAFE_HREF.test(trimmed) ? trimmed : null;
 }
 
-export function parseInline(text: string): Inline[] {
+/** `links` is false inside a link label: a link never contains another link. */
+export function parseInline(text: string, links = true): Inline[] {
   const out: Inline[] = [];
   let buffer = "";
   const flush = () => { if (buffer) { out.push({ type: "text", text: buffer }); buffer = ""; } };
@@ -195,11 +199,11 @@ export function parseInline(text: string): Inline[] {
       continue;
     }
 
-    if (ch === "[") {
+    if (links && ch === "[") {
       const link = matchLink(text, i);
       if (link) {
         const href = safeHref(link.href);
-        const children = parseInline(link.label);
+        const children = parseInline(link.label, false);
         if (href) push({ type: "link", href, children });
         else { flush(); out.push(...children); }
         i = link.end;
@@ -207,12 +211,12 @@ export function parseInline(text: string): Inline[] {
       }
     }
 
-    if (ch === "<") {
+    if (links && ch === "<") {
       const auto = text.slice(i).match(/^<((?:https?:\/\/|mailto:)[^\s<>]+)>/i);
       if (auto) { push({ type: "link", href: auto[1], children: [{ type: "text", text: auto[1] }] }); i += auto[0].length; continue; }
     }
 
-    if ((ch === "h" || ch === "H") && !/[A-Za-z0-9]/.test(text[i - 1] ?? "")) {
+    if (links && (ch === "h" || ch === "H") && !/[A-Za-z0-9]/.test(text[i - 1] ?? "")) {
       const bare = text.slice(i).match(BARE_URL);
       if (bare) {
         const url = trimUrl(bare[0]);
@@ -224,7 +228,7 @@ export function parseInline(text: string): Inline[] {
 
     const emphasis = matchEmphasis(text, i);
     if (emphasis) {
-      push({ type: emphasis.type, children: parseInline(text.slice(emphasis.innerStart, emphasis.innerEnd)) });
+      push({ type: emphasis.type, children: parseInline(text.slice(emphasis.innerStart, emphasis.innerEnd), links) });
       i = emphasis.end;
       continue;
     }
