@@ -139,10 +139,11 @@ export function restoreErrorMessage(err: unknown): string {
   switch (errorCode(err)) {
     case "23505":
       return "別の画面で同じタスク（または同じ日のルーティン）が既に戻されています";
+    // restore_deleted_task (0024) checks the plan, menu and carried-from source first.
     case "23503":
-      return "計画またはルーティンが削除されています";
+      return "計画・メニュー・持ち越し元の予定のいずれかが削除されています";
     case "42501":
-      return "権限がありません";
+      return "権限がありません。サインインし直してください";
     default:
       return "通信を確認して再試行してください";
   }

@@ -13,6 +13,27 @@ export function TaskUndoNotices() {
   const notices = useTaskUndoStore((s) => s.notices);
   const expire = useTaskUndoStore((s) => s.expire);
 
+  // Screen readers: one persistent polite region and one assertive region
+  // (nesting live regions, or adding them together with their text, is not
+  // announced reliably).
+  const deleted = notices.filter((n) => n.kind === "deleted" && n.status !== "failed")
+    .map((n) => `「${n.title}」を削除しました。元に戻せます`).join("。");
+  const failures = notices.filter((n) => n.kind === "delete-failed" || n.status === "failed")
+    .map(noticeText).join("。");
+
+  // A notice that held focus disappears after undo or expiry; keep focus on
+  // the page instead of letting it fall to <body>.
+  const listRef = useRef<HTMLUListElement>(null);
+  const hadFocus = useRef(false);
+  useEffect(() => {
+    if (!hadFocus.current) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    hadFocus.current = false;
+    const next = listRef.current?.querySelector<HTMLElement>("[data-undo-action]");
+    (next ?? document.getElementById("main"))?.focus({ preventScroll: true });
+  }, [notices]);
+
   useEffect(() => {
     const at = nextExpiry(notices);
     if (at === null) return;
@@ -29,10 +50,18 @@ export function TaskUndoNotices() {
       aria-label="タスクの削除"
       className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none"
     >
+      <p role="status" className="sr-only">{deleted}</p>
+      <p role="alert" className="sr-only">{failures}</p>
       <ul
-        role="status"
-        aria-live="polite"
+        ref={listRef}
         className="flex w-full max-w-md flex-col gap-2"
+        onFocus={() => { hadFocus.current = true; }}
+        onBlur={(event) => {
+          // relatedTarget is null when the focused button is removed; keep the flag then.
+          if (event.relatedTarget && !listRef.current?.contains(event.relatedTarget as Node)) {
+            hadFocus.current = false;
+          }
+        }}
       >
         {notices.map((n) => (
           <NoticeItem key={n.key} notice={n} />
@@ -82,11 +111,11 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
     >
       <span className="flex-1 min-w-0">
         {notice.kind === "delete-failed" ? (
-          <span role="alert">
+          <span>
             「<span className="break-all">{notice.title}</span>」を削除できませんでした。{notice.error}
           </span>
         ) : notice.status === "failed" ? (
-          <span role="alert">
+          <span>
             「<span className="break-all">{notice.title}</span>」を元に戻せませんでした。{notice.error}
           </span>
         ) : (
@@ -98,6 +127,7 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
       {notice.kind === "deleted" && (
         <button
           ref={actionRef}
+          data-undo-action
           type="button"
           className="shrink-0 font-semibold text-notion-blue hover:underline disabled:opacity-50"
           disabled={notice.status === "restoring"}
@@ -124,4 +154,10 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
       )}
     </li>
   );
+}
+
+function noticeText(n: UndoNotice): string {
+  return n.kind === "delete-failed"
+    ? `「${n.title}」を削除できませんでした。${n.error}`
+    : `「${n.title}」を元に戻せませんでした。${n.kind === "deleted" ? n.error ?? "" : ""}`;
 }

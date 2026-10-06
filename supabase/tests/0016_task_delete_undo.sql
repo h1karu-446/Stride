@@ -210,7 +210,8 @@ begin
       || jsonb_build_object('user_id', auth.uid(),
                             'plan_id', 'a1600000-0000-0000-0000-000000000011'));
     raise exception 'B restored a task onto A plan';
-  exception when insufficient_privilege then null; end;
+  -- 0024 checks the parent first: A's plan is invisible to B, so 23503.
+  exception when insufficient_privilege or foreign_key_violation then null; end;
   begin
     perform public.restore_deleted_task(v_snapshot
       || jsonb_build_object('user_id', auth.uid(),

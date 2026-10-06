@@ -119,7 +119,7 @@ describe("undo notices", () => {
 describe("error messages", () => {
   it("explains restore conflicts without claiming success", () => {
     expect(restoreErrorMessage({ code: "23505" })).toContain("既に");
-    expect(restoreErrorMessage({ code: "23503" })).toContain("削除されています");
+    expect(restoreErrorMessage({ code: "23503" })).toContain("持ち越し元の予定のいずれかが削除されています");
     expect(restoreErrorMessage({ code: "42501" })).toContain("権限");
     expect(restoreErrorMessage(new Error("offline"))).toContain("再試行");
   });
