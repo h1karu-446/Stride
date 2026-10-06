@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
-import { choiceClass, Field, FormActions } from "@/components/common/FormParts";
+import { choiceClass, Field, FormActions, FOCUS_RING, TOUCH_TARGET } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { chip, MINUTE_PRESETS, WEEKDAY_PRESETS } from "./routinePresets";
@@ -174,19 +174,19 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                 </button>
                 <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
                   aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
-                  title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
+                  title="削除" className={`rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 ${TOUCH_TARGET} ${FOCUS_RING}`}>✕</button>
               </div> : <div className="grid gap-3 sm:grid-cols-2">
                 <div className="sm:col-span-2">
                   <div className="flex items-center gap-2">
                     <button type="button" aria-expanded={true} disabled={saving} onClick={() => setOpenKey(null)}
-                      title="閉じる" aria-label="閉じる" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▾</button>
+                      title="閉じる" aria-label="閉じる" className="flex h-9 w-9 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 shrink-0 items-center justify-center rounded-lg text-base muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover">▾</button>
                     <input aria-label={`メニュー ${index + 1} の名前`} autoFocus={row.key === focusKey}
                       className="input flex-1 font-medium" maxLength={40} value={row.input.title} disabled={saving}
                       placeholder={`メニュー ${index + 1}：例）IELTSのListeningを30分解く`}
                       onChange={(event) => updateRoutine(row.key, { title: event.target.value })} />
                     <button type="button" disabled={saving} onClick={() => removeRoutine(row.key)}
                       aria-label={`${row.input.title || `メニュー ${index + 1}`}を削除`}
-                      title="削除" className="rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10">✕</button>
+                      title="削除" className={`rounded px-2 py-1.5 text-sm muted hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 ${TOUCH_TARGET} ${FOCUS_RING}`}>✕</button>
                   </div>
                   {errors.title && <p className="mt-1 text-xs text-rose-600">{errors.title}</p>}
                 </div>
@@ -229,7 +229,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                           onClick={() => updateRoutine(row.key, { weekdays: selected
                             ? row.input.weekdays.filter((value) => value !== number)
                             : [...row.input.weekdays, number] })}
-                          className={`flex-1 rounded-md border py-2 text-sm ${selected ? "border-notion-blue bg-notion-blue/10" : "border-slate-300 muted dark:border-notion-border"}`}>{day}</button>;
+                          className={`flex-1 rounded-md border py-2 text-sm ${TOUCH_TARGET} ${FOCUS_RING} ${selected ? "border-notion-blue bg-notion-blue/10 font-semibold" : "border-slate-300 muted dark:border-notion-border"}`}>{day}</button>;
                       })}
                     </div>
                   </Field>

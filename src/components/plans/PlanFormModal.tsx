@@ -87,6 +87,7 @@ export default function PlanFormModal({
         <FormActions
           onCancel={onClose}
           saveLabel="作成"
+          savingLabel="作成中…"
           canSave={canSave}
           saving={saving}
           error={failed}

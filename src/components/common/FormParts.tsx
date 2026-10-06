@@ -10,12 +10,16 @@ import clsx from "clsx";
 /** Larger hit area on touch screens without changing the desktop layout. */
 export const TOUCH_TARGET = "[@media(pointer:coarse)]:min-h-11";
 
+/** Same visible focus ring as .btn / the color buttons. */
+export const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue";
+
 /** One option of a segmented choice (importance, status). */
 export const choiceClass = (active: boolean) => clsx(
   "flex-1 rounded-md border px-2 py-2 text-sm transition disabled:opacity-60",
-  TOUCH_TARGET,
+  TOUCH_TARGET, FOCUS_RING,
+  // The text keeps the body color for contrast; border and fill show the choice.
   active
-    ? "border-notion-blue bg-notion-blue/10 font-medium text-notion-blue"
+    ? "border-notion-blue bg-notion-blue/10 font-semibold"
     : "border-slate-300 hover:border-slate-400 dark:border-notion-border muted"
 );
 
@@ -92,6 +96,7 @@ export function FormActions({
   onDelete,
   onCancel,
   saveLabel = "保存",
+  savingLabel = "保存中…",
   canSave,
   saving,
   error,
@@ -99,6 +104,7 @@ export function FormActions({
   onDelete?: () => void;
   onCancel: () => void;
   saveLabel?: string;
+  savingLabel?: string;
   canSave: boolean;
   saving?: boolean;
   error?: boolean;
@@ -112,7 +118,7 @@ export function FormActions({
             type="button"
             onClick={onDelete}
             disabled={saving}
-            className={clsx("rounded-md px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10", TOUCH_TARGET)}
+            className={clsx("rounded-md px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10", TOUCH_TARGET, FOCUS_RING)}
           >
             削除
           </button>
@@ -128,7 +134,7 @@ export function FormActions({
             disabled={!canSave || saving}
             className={clsx("btn-primary !py-1.5", TOUCH_TARGET)}
           >
-            {saving ? "保存中…" : saveLabel}
+            {saving ? savingLabel : saveLabel}
           </button>
         </div>
       </div>
