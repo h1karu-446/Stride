@@ -8,6 +8,7 @@ import MaterialList from "@/components/plans/MaterialList";
 import PhaseBar from "@/components/plans/PhaseBar";
 import PhaseSettings from "@/components/plans/PhaseSettings";
 import PlanHeader from "@/components/plans/PlanHeader";
+import PlanOverview from "@/components/plans/PlanOverview";
 import RoutineCard from "@/components/plans/RoutineCard";
 import RoutineForm from "@/components/plans/RoutineForm";
 import ScheduleList from "@/components/plans/ScheduleList";
@@ -336,6 +337,7 @@ export default function PlanDetail() {
         />
       </div>
 
+      <PlanOverview key={`overview-${plan.id}`} plan={plan} />
     </div>
   );
 }

@@ -44,6 +44,7 @@ interface PlanRow {
   due_date: string | null;
   goal: string | null;
   goal_note: string | null;
+  overview?: string | null; // undefined until migration 0022 is applied
   completed_at: string | null;
   overdue_notice_dismissed_for: string | null;
   created_at: string;
@@ -112,6 +113,7 @@ function rowToPlan(r: PlanRow): Plan {
     due_date: r.due_date ?? undefined,
     goal: r.goal ?? undefined,
     goal_note: r.goal_note ?? undefined,
+    overview: r.overview ?? undefined,
     completed_at: r.completed_at ?? undefined,
     overdue_notice_dismissed_for: r.overdue_notice_dismissed_for ?? undefined,
     phases: (r.phases ?? []).map(rowToPhase),
@@ -178,7 +180,7 @@ export function useCreatePlan() {
 }
 
 export type PlanPatch = Partial<
-  PlanInput & { overdue_notice_dismissed_for: string | null }
+  PlanInput & { overdue_notice_dismissed_for: string | null; overview: string }
 >;
 
 export function useUpdatePlan() {
@@ -191,6 +193,8 @@ export function useUpdatePlan() {
       for (const k of ["due_date", "goal", "goal_note"] as const) {
         if (k in patch) db[k] = patch[k]?.trim?.() || null;
       }
+      // Leading spaces can be Markdown (indentation), so only the end is trimmed.
+      if ("overview" in patch) db.overview = patch.overview?.trimEnd() || null;
       // The client sends its local date so completed_at is not shifted by UTC.
       if (patch.status === "done") db.completed_at = todayISO();
       const { error } = await supabase.from("plans").update(db).eq("id", id);
