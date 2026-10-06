@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Modal from "@/components/common/Modal";
 import DatePicker from "@/components/common/DatePicker";
-import { Field, FormActions } from "@/components/common/FormParts";
+import { choiceClass, Field, FormActions } from "@/components/common/FormParts";
 import { PLAN_COLORS } from "@/lib/plans/colors";
 import { hasErrors, PLAN_STATUS_LABEL, validatePlan } from "@/lib/plans/logic";
 import type { PlanInput } from "@/lib/plans/queries";
@@ -37,7 +37,10 @@ export default function PlanFormModal({
         <Field label="計画名" error={v.name ? errors.name : undefined}>
           <input
             autoFocus
-            className="input"
+            className="input text-base font-medium"
+            maxLength={40}
+            placeholder="例：IELTS 7.0"
+            disabled={saving}
             value={v.name}
             onChange={(e) => setV({ ...v, name: e.target.value })}
           />
@@ -50,6 +53,7 @@ export default function PlanFormModal({
                 type="button"
                 aria-label={c.label}
                 aria-pressed={v.color === c.key}
+                disabled={saving}
                 onClick={() => setV({ ...v, color: c.key })}
                 className={`flex min-w-0 items-center gap-2 rounded-lg border px-2 py-1.5 text-left text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue ${v.color === c.key ? "border-slate-700 bg-slate-100 font-semibold ring-1 ring-slate-700 dark:border-slate-300 dark:bg-notion-panel-hover dark:ring-slate-300" : "border-slate-200 hover:bg-slate-50 dark:border-notion-border dark:hover:bg-notion-panel-hover"}`}
               >
@@ -59,28 +63,27 @@ export default function PlanFormModal({
             ))}
           </div>
         </Field>
-        <Field label="状態">
-          <select
-            className="input"
-            value={v.status}
-            onChange={(e) => setV({ ...v, status: e.target.value as PlanStatus })}
-          >
+        <Field group label="状態">
+          <div className="flex gap-1.5">
             {(Object.keys(PLAN_STATUS_LABEL) as PlanStatus[]).map((s) => (
-              <option key={s} value={s}>{PLAN_STATUS_LABEL[s]}</option>
+              <button key={s} type="button" aria-pressed={v.status === s} disabled={saving}
+                onClick={() => setV({ ...v, status: s })} className={choiceClass(v.status === s)}>
+                {PLAN_STATUS_LABEL[s]}
+              </button>
             ))}
-          </select>
+          </div>
         </Field>
-        <div>
-          <span className="label">期日</span>
+        <Field group optional label="期日">
           <DatePicker
             label="計画の期日"
             value={v.due_date ?? ""}
+            disabled={saving}
             onChange={(date) => setV({ ...v, due_date: date || undefined })}
             emptyLabel="＋ 期日を設定"
             allowClear
           />
           {!v.due_date && <p className="mt-1 text-xs muted">期限なし</p>}
-        </div>
+        </Field>
         <FormActions
           onCancel={onClose}
           saveLabel="作成"

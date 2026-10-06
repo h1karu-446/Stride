@@ -1,6 +1,6 @@
 import { useState } from "react";
 import clsx from "clsx";
-import { Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
+import { choiceClass, Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
 import {
   hasErrors,
   MATERIAL_STATUS_LABEL,
@@ -59,18 +59,18 @@ export default function MaterialForm({
           disabled={saving}
           onChange={(e) => { const title = e.target.value; setV((cur) => ({ ...cur, title })); }} />
       </Field>
-      <Field label="リンク（任意）" error={errors.url}>
+      <Field optional label="リンク" error={errors.url}>
         <input type="url" className="input" placeholder="https://" value={v.url ?? ""} disabled={saving}
           onChange={(e) => { const url = e.target.value; setV((cur) => ({ ...cur, url })); }} />
       </Field>
-      <Field label="学ぶこと・メモ（任意）" error={errors.note}>
+      <Field optional label="学ぶこと・メモ" error={errors.note}>
         {/* Enter adds a line break here; save with the button (IME-safe). */}
         <textarea className="input min-h-[4.5rem] resize-y" rows={3} disabled={saving}
           placeholder="例：第3章の非同期処理を理解する" value={v.note ?? ""}
           onChange={(e) => { const note = e.target.value; setV((cur) => ({ ...cur, note })); }} />
       </Field>
       {phases.length > 0 && (
-        <Field group label="関連するフェーズ">
+        <Field group optional label="関連するフェーズ">
           <div className="flex flex-wrap gap-1.5">
             {phases.map((p) => {
               const on = v.phase_ids.includes(p.id);
@@ -92,10 +92,7 @@ export default function MaterialForm({
           {MATERIAL_STATUSES.map((s) => (
             <button key={s} type="button" aria-pressed={v.status === s} disabled={saving}
               onClick={() => setV((cur) => ({ ...cur, status: s }))}
-              className={clsx("flex-1 rounded-md border px-2 py-1.5 text-sm",
-                v.status === s
-                  ? "border-blue-500 bg-blue-500/10"
-                  : "border-slate-300 dark:border-notion-border")}>
+              className={choiceClass(v.status === s)}>
               {MATERIAL_STATUS_LABEL[s]}
             </button>
           ))}

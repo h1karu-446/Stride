@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import clsx from "clsx";
-import { Field, FormActions } from "@/components/common/FormParts";
+import { useState } from "react";
+import { choiceClass, Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
 import DatePicker from "@/components/common/DatePicker";
 import { todayISO } from "@/lib/date";
 import { IMPORTANCE_LIST } from "@/types";
@@ -11,26 +10,23 @@ export default function WishForm({ initial, onSubmit, onDelete, onRestore, onCan
   onCancel: () => void; saving: boolean; failed: boolean;
 }) {
   const [value, setValue] = useState(initial);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => { if (event.key === "Escape" && !saving) onCancel(); };
-    window.addEventListener("keydown", cancel);
-    return () => window.removeEventListener("keydown", cancel);
-  }, [onCancel, saving]);
+  // Esc while converting Japanese input only cancels the conversion.
+  useEscToCancel(onCancel, saving);
   const futureDate = !!value.achieved_at && value.achieved_at > todayISO();
   const valid = value.title.trim().length > 0 && value.title.trim().length <= 60 && value.note.length <= 100 && !futureDate;
-  return <form className="space-y-3 rounded-lg border border-slate-200 dark:border-notion-border p-3" onSubmit={(event) => {
+  return <form className="space-y-3 rounded-xl bg-slate-50/70 p-4 dark:bg-notion-panel-hover" onSubmit={(event) => {
     event.preventDefault(); if (valid && !saving) onSubmit(value);
   }}>
-    <Field label="タイトル"><input autoFocus className="input" maxLength={60} value={value.title} disabled={saving} onChange={(e) => setValue({ ...value, title: e.target.value })} /></Field>
-    <Field label="補足"><input className="input" maxLength={100} value={value.note} disabled={saving} onChange={(e) => setValue({ ...value, note: e.target.value })} /></Field>
+    <Field label="やりたいこと"><input autoFocus className="input text-base font-medium" maxLength={60} placeholder="例：富士山に登る" value={value.title} disabled={saving} onChange={(e) => setValue({ ...value, title: e.target.value })} /></Field>
+    <Field optional label="補足"><input className="input" maxLength={100} value={value.note} disabled={saving} onChange={(e) => setValue({ ...value, note: e.target.value })} /></Field>
     <Field group label="重要度">
       <div className="flex gap-1.5">
         {IMPORTANCE_LIST.map((i) => <button key={i} type="button" aria-pressed={value.importance === i} disabled={saving} onClick={() => setValue({ ...value, importance: i })}
-          className={clsx("flex-1 rounded-md border px-2 py-2 text-sm", value.importance === i ? "border-blue-500 bg-blue-500/10" : "border-slate-300 dark:border-notion-border")}>{i}</button>)}
+          className={choiceClass(value.importance === i)}>{i}</button>)}
       </div>
     </Field>
     {initial.achieved_at && <Field group label="達成日">
-      <DatePicker label="達成日" value={value.achieved_at ?? ""} onChange={(achieved_at) => { if (achieved_at) setValue({ ...value, achieved_at }); }} />
+      <DatePicker label="達成日" value={value.achieved_at ?? ""} disabled={saving} onChange={(achieved_at) => { if (achieved_at) setValue({ ...value, achieved_at }); }} />
       {futureDate && <p role="alert" className="mt-1 text-xs text-rose-600">未来の日付は選べません</p>}
     </Field>}
     <label className="flex items-center gap-2 text-sm">

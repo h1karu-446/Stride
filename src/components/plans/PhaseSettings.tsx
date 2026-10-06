@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
-import { Field, FormActions } from "@/components/common/FormParts";
+import { choiceClass, Field, FormActions } from "@/components/common/FormParts";
 import { todayISO } from "@/lib/date";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { chip, MINUTE_PRESETS, WEEKDAY_PRESETS } from "./routinePresets";
@@ -207,7 +207,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                     {IMPORTANCES.map((importance) => <button key={importance} type="button"
                       disabled={saving} aria-pressed={row.input.importance === importance}
                       onClick={() => updateRoutine(row.key, { importance })}
-                      className={`flex-1 rounded-md border px-2 py-2 text-sm ${row.input.importance === importance ? "border-notion-blue bg-notion-blue/10" : "border-slate-300 dark:border-notion-border"}`}>
+                      className={choiceClass(row.input.importance === importance)}>
                       {importance}
                     </button>)}
                   </div>
@@ -235,7 +235,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
                   </Field>
                 </div>
                 <div className="sm:col-span-2">
-                  <Field label="メニューの詳細（任意）" error={errors.menu}>
+                  <Field optional label="メニューの詳細" error={errors.menu}>
                     <textarea className="input min-h-24" maxLength={2000} disabled={saving}
                       placeholder="例：公式問題集10のTest 2。間違えた設問は聞き直す"
                       value={row.input.menu ?? ""}
