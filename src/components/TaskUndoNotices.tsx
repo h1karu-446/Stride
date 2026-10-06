@@ -24,7 +24,10 @@ export function TaskUndoNotices() {
     const next = noticeAnnouncements(previous.current, notices);
     previous.current = notices;
     if (next.polite || next.alert) {
-      setAnnounce((cur) => ({ polite: next.polite || cur.polite, alert: next.alert || cur.alert }));
+      // The same text twice is no DOM change and is not read again; vary it invisibly.
+      const fresh = (text: string, cur: string) => !text ? cur : text === cur.replace(/\u200b$/, "")
+        ? (cur.endsWith("\u200b") ? text : `${text}\u200b`) : text;
+      setAnnounce((cur) => ({ polite: fresh(next.polite, cur.polite), alert: fresh(next.alert, cur.alert) }));
     }
   }, [notices]);
 
