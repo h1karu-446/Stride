@@ -44,6 +44,25 @@ function renderBlocks(blocks: Block[]): ReactNode {
         return <pre key={i} className="overflow-x-auto rounded-md bg-slate-100 px-3 py-2 text-xs dark:bg-notion-panel-hover">
           <code>{block.text}</code>
         </pre>;
+      case "table": {
+        const cell = "border border-slate-200 px-2 py-1 align-top dark:border-notion-border";
+        const align = (c: number) => (block.align[c] ? { textAlign: block.align[c]! } : undefined);
+        // Only the table scrolls sideways on narrow screens, never the whole page.
+        return <div key={i} className="overflow-x-auto">
+          <table className="border-collapse text-left">
+            <thead className="bg-slate-50 dark:bg-notion-panel-hover">
+              <tr>{block.header.map((nodes, c) => (
+                <th key={c} scope="col" style={align(c)} className={`${cell} whitespace-nowrap font-semibold`}>{renderInline(nodes)}</th>
+              ))}</tr>
+            </thead>
+            {block.rows.length > 0 && <tbody>{block.rows.map((row, r) => (
+              <tr key={r}>{row.map((nodes, c) => (
+                <td key={c} style={align(c)} className={cell}>{renderInline(nodes)}</td>
+              ))}</tr>
+            ))}</tbody>}
+          </table>
+        </div>;
+      }
       case "hr":
         return <hr key={i} className="border-slate-200 dark:border-notion-border" />;
     }

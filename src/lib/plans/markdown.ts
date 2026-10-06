@@ -5,7 +5,7 @@
 //
 // Supported: ATX headings, paragraphs (a newline is a line break), bullet /
 // ordered / task lists (nested by indentation), blockquotes, fenced code,
-// thematic breaks; inline code, **strong**, *em*, ~~del~~, [links](url),
+// thematic breaks, GFM tables (Issue #77); inline code, **strong**, *em*, ~~del~~, [links](url),
 // <autolinks>, bare http(s) URLs and backslash escapes.
 
 export type Inline =
@@ -21,12 +21,15 @@ export interface ListItem {
   blocks: Block[];
 }
 
+export type Align = "left" | "center" | "right" | null;
+
 export type Block =
   | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; children: Inline[] }
   | { type: "paragraph"; children: Inline[] }
   | { type: "list"; ordered: boolean; start: number; items: ListItem[] }
   | { type: "blockquote"; blocks: Block[] }
   | { type: "code"; lang: string; text: string }
+  | { type: "table"; align: Align[]; header: Inline[][]; rows: Inline[][][] }
   | { type: "hr" };
 
 const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
@@ -35,11 +38,23 @@ const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const QUOTE = /^ {0,3}> ?(.*)$/;
 const LIST = /^( *)([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/;
 const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
+/** A table's delimiter row; it needs a "|" so that "---" stays a thematic break. */
+// Each cell already ends with [ \t]*, so the closing pipe's spaces must not repeat them (that backtracks quadratically).
+const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/;
+/**
+ * Table cells allowed in one document. Short rows are padded to the header's width,
+ * so without it a few KB of "a\n" under wide headers would make millions of cells and
+ * freeze the page. Past it, lines are read as paragraphs.
+ */
+const MAX_TABLE_CELLS = 20000;
+/** Cells still allowed in the document being parsed (parsing is synchronous). */
+let cellBudget = MAX_TABLE_CELLS;
 /** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
 const MAX_DEPTH = 16;
 
 export function parseMarkdown(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
+  cellBudget = MAX_TABLE_CELLS;
   return parseBlocks(lines);
 }
 
@@ -50,6 +65,40 @@ const isBlank = (line: string) => line.trim() === "";
 function startsBlock(line: string, nest: boolean) {
   return HEADING.test(line) || HR.test(line) || FENCE.test(line)
     || (nest && (QUOTE.test(line) || (LIST.test(line) && !!line.match(LIST)![3]?.trim())));
+}
+
+/** Splits a table row into raw cells; "\|" is a pipe inside a cell, "\\|" a backslash then a separator. */
+function splitRow(line: string): string[] {
+  const cells: string[] = [];
+  let cell = "";
+  for (let i = 0; i < line.length; i++) {
+    // Keep other escapes ("\\", "\*") for the inline parser.
+    if (line[i] === "\\" && line[i + 1] === "|") { cell += "|"; i++; continue; }
+    if (line[i] === "\\" && i + 1 < line.length) { cell += line[i] + line[i + 1]; i++; continue; }
+    if (line[i] === "|") { cells.push(cell.trim()); cell = ""; continue; }
+    cell += line[i];
+  }
+  cells.push(cell.trim());
+  // Outer pipes are optional: drop the empty cells they leave at either end
+  // (an escaped outer pipe leaves "|" in the cell, so that cell is not empty).
+  if (cells.length > 1 && cells[0] === "" && line.trimStart().startsWith("|")) cells.shift();
+  if (cells.length > 1 && cells[cells.length - 1] === "" && line.trimEnd().endsWith("|")) cells.pop();
+  return cells;
+}
+
+/** The column alignments when lines[i] and lines[i + 1] start a table, else null. */
+function tableStart(lines: string[], i: number): Align[] | null {
+  const header = lines[i];
+  const delimiter = lines[i + 1];
+  if (delimiter === undefined || !header.includes("|") || !TABLE_DELIMITER.test(delimiter)) return null;
+  // "- | -" starts a list item, as in GFM, which tries list items before tables.
+  if (LIST.test(delimiter) && delimiter.match(LIST)![3]?.trim()) return null;
+  const align = splitRow(delimiter).map((cell): Align => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    return left && right ? "center" : right ? "right" : left ? "left" : null;
+  });
+  return splitRow(header).length === align.length && align.length <= cellBudget ? align : null;
 }
 
 function parseBlocks(lines: string[], depth = 0): Block[] {
@@ -103,9 +152,27 @@ function parseBlocks(lines: string[], depth = 0): Block[] {
       continue;
     }
 
+    const align = tableStart(lines, i);
+    if (align) {
+      const header = splitRow(line).map((cell) => parseInline(cell));
+      const rows: Inline[][][] = [];
+      i += 2;
+      cellBudget -= align.length;
+      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest) && align.length <= cellBudget) {
+        cellBudget -= align.length;
+        const cells = splitRow(lines[i++]);
+        // Pad short rows and drop extra cells so every row has the header's width.
+        rows.push(align.map((_, c) => parseInline(cells[c] ?? "")));
+      }
+      blocks.push({ type: "table", align, header, rows });
+      continue;
+    }
+
     const text: string[] = [line.trim()];
     i++;
-    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)) text.push(lines[i++].trim());
+    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest) && !tableStart(lines, i)) {
+      text.push(lines[i++].trim());
+    }
     blocks.push({ type: "paragraph", children: parseInline(text.join("\n")) });
   }
   return blocks;

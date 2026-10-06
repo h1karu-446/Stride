@@ -59,6 +59,78 @@ describe("plan overview markdown: blocks", () => {
     expect(block.type).toBe("paragraph");
   });
 
+  it("reads tables with alignment, inline marks and escaped pipes", () => {
+    expect(parseMarkdown("| 教材 | 進度 | 時間 |\n| :--- | :-: | --: |\n| **単語帳** | `a\\|b` | 30 |")).toEqual([{
+      type: "table", align: ["left", "center", "right"],
+      header: [[text("教材")], [text("進度")], [text("時間")]],
+      rows: [[[{ type: "strong", children: [text("単語帳")] }], [{ type: "code", text: "a|b" }], [text("30")]]],
+    }]);
+    // Outer pipes are optional; a table may have no body rows.
+    expect(parseMarkdown("a | b\n--- | ---")).toEqual([{
+      type: "table", align: [null, null], header: [[text("a")], [text("b")]], rows: [],
+    }]);
+  });
+
+  it("pads short table rows, drops extra cells and ends the table at a blank line or another block", () => {
+    const [table, ...rest] = parseMarkdown("前\n| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |\n- 後\n\n後");
+    expect(parseMarkdown("前\n| a | b |\n|---|---|")[0]).toEqual({ type: "paragraph", children: [text("前")] });
+    expect(table).toMatchObject({ type: "paragraph" });
+    expect(rest[0]).toMatchObject({ type: "table", rows: [[[text("1")], []], [[text("1")], [text("2")]]] });
+    expect(rest.slice(1).map((b) => b.type)).toEqual(["list", "paragraph"]);
+  });
+
+  it("does not read a table without a matching delimiter row", () => {
+    // "---" without a pipe stays a thematic break, and the column counts must match.
+    expect(parseMarkdown("a | b\n---").map((b) => b.type)).toEqual(["paragraph", "hr"]);
+    expect(parseMarkdown("| a | b |\n| --- |").map((b) => b.type)).toEqual(["paragraph"]);
+    expect(parseMarkdown("| a |\n| - |")).toMatchObject([{ type: "table", align: [null] }]);
+  });
+
+  it("splits an escaped backslash before a pipe as a cell separator", () => {
+    expect(parseMarkdown("a \\\\| b\n|-|-|")).toMatchObject([{ type: "table", header: [[text("a \\")], [text("b")]] }]);
+    expect(parseMarkdown("| a \\| |\n|-|")).toMatchObject([{ type: "table", header: [[text("a |")]] }]);
+  });
+
+  it("checks long runs of spaces in a delimiter-like row quickly", () => {
+    const started = performance.now();
+    parseMarkdown("|a\n|-" + "\t".repeat(10000) + "x");
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
+  it("reads a delimiter row that starts like a list item as a list", () => {
+    expect(parseMarkdown("a | b\n- | -").map((b) => b.type)).toEqual(["paragraph", "list"]);
+    expect(parseMarkdown("a | b\n-|-")).toMatchObject([{ type: "table" }]);
+  });
+
+  it("caps the table cells of the whole document and reads the rest as paragraphs", () => {
+    const blocks = parseMarkdown("|".repeat(1668) + "\n" + Array(1667).fill("-").join("|") + "\n" + "a\n".repeat(2500));
+    const table = blocks[0] as { type: "table"; align: unknown[]; rows: unknown[][] };
+    expect(table.type).toBe("table");
+    expect((table.rows.length + 1) * table.align.length).toBeLessThanOrEqual(20000);
+    expect(blocks[1]).toMatchObject({ type: "paragraph" });
+    // Exactly at the cap every row fits; one more row is left out.
+    const rows = (n: number) => "a|b\n-|-\n" + "1|2\n".repeat(n);
+    expect((parseMarkdown(rows(9999))[0] as { rows: unknown[] }).rows).toHaveLength(9999);
+    expect(parseMarkdown(rows(10000)).map((b) => b.type)).toEqual(["table", "paragraph"]);
+    // Tables placed one after another share the cap.
+    const wide = "|".repeat(116) + "\n" + Array(115).fill("-").join("|") + "\n" + "a\n".repeat(171);
+    const cells = parseMarkdown(wide.repeat(14)).reduce((sum, b) =>
+      b.type === "table" ? sum + (b.rows.length + 1) * b.align.length : sum, 0);
+    expect(cells).toBeLessThanOrEqual(20000);
+  });
+
+  it("starts with a full cell budget on every parse", () => {
+    parseMarkdown("a|b\n-|-\n" + "1|2\n".repeat(9999));
+    expect(parseMarkdown("a|b\n-|-")).toMatchObject([{ type: "table" }]);
+  });
+
+  it("reads tables inside lists and blockquotes", () => {
+    expect(parseMarkdown("> | a |\n> | - |\n> | 1 |")).toMatchObject([{ type: "blockquote", blocks: [{ type: "table" }] }]);
+    expect(parseMarkdown("- 表\n  | a |\n  | - |")).toMatchObject([{ type: "list", items: [{ blocks: [
+      { type: "paragraph" }, { type: "table" },
+    ] }] }]);
+  });
+
   it("returns nothing for blank input and handles CRLF", () => {
     expect(parseMarkdown("  \n\n")).toEqual([]);
     expect(parseMarkdown("a\r\nb")).toEqual([{ type: "paragraph", children: [text("a"), { type: "br" }, text("b")] }]);
