@@ -18,7 +18,7 @@
 
 ## 技術・構造
 
-- 言語 / フレームワーク: TypeScript 5、React 18、Vite 5、React Router 6、Tailwind CSS 3。
+- 言語 / フレームワーク: TypeScript 5、React 18、Vite 8、React Router 7、Tailwind CSS 3。
 - 状態・データ取得: TanStack Query 5（サーバー状態）、Zustand 5（UI状態 `src/lib/uiStore.ts`）。グラフは Recharts、日付は date-fns 4。
 - パッケージマネージャー / ロックファイル: npm / `package-lock.json`。Node 24（ローカルで確認済み、CI も同じ）。
 - テンプレートの補助スクリプト: Python 3.10以上（標準ライブラリのみ）。
@@ -62,7 +62,7 @@
 | --- | --- |
 | install | `npm install`（CI は `npm ci`） |
 | dev | `npm run dev`（`.env.local` に Supabase の値が必要） |
-| test | `npm test`（Vitest 3。`src/**/*.test.ts`）。テンプレート補助スクリプトの変更時は `python3 -m unittest discover -s tests -v` も |
+| test | `npm test`（Vitest 5。`src/**/*.test.ts`）。テンプレート補助スクリプトの変更時は `python3 -m unittest discover -s tests -v` も |
 | lint | N/A：ESLint などのリンターは未導入。導入するまでは typecheck で代替 |
 | typecheck | `npm run lint`（中身は `tsc --noEmit`。スクリプト名は lint だが実体は型検査） |
 | build | `npm run build`（`tsc -b && vite build`。ビルド時に Supabase の環境変数が必要。検証目的ならダミー値でよい: `VITE_SUPABASE_URL=x VITE_SUPABASE_ANON_KEY=x npm run build`） |
@@ -131,7 +131,7 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 
 ## 未決事項
 
-- `npm audit` の指摘（メジャー更新なしで直る分は `npm audit fix`、Vite などのメジャー更新は別作業）。
+- `npm audit` の残り（Issue #41 の後）: 7件（high 5 / moderate 2）。すべて tailwindcss 3 が依存する braces / micromatch / chokidar / fast-glob / postcss-nested / postcss-selector-parser（`npm audit --omit=dev` は0件）。開発・ビルド時の道具だけで、本番の配信物には入らない。直すには Tailwind CSS 4 への移行が必要（別作業）。
 - デプロイ先、ESLint の導入。
 
 ### Journey のデータ（Issue #11）
