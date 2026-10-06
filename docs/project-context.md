@@ -129,7 +129,7 @@ CI: `.github/workflows/ci.yml`（typecheck・test・build）と `.github/workflo
 
 ## 未決事項
 
-- `npm audit` の残り（Issue #41 の後）: tailwindcss 3 が依存する braces / micromatch / chokidar / fast-glob / postcss-selector-parser。開発・ビルド時の道具だけで、本番の配信物には入らない。直すには Tailwind CSS 4 への移行が必要（別作業）。
+- `npm audit` の残り（Issue #41 の後）: 7件（high 5 / moderate 2）。すべて tailwindcss 3 が依存する braces / micromatch / chokidar / fast-glob / postcss-nested / postcss-selector-parser（`npm audit --omit=dev` は0件）。開発・ビルド時の道具だけで、本番の配信物には入らない。直すには Tailwind CSS 4 への移行が必要（別作業）。
 - デプロイ先、ESLint の導入。
 
 ### Journey のデータ（Issue #11）
