@@ -216,7 +216,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
                   borderColor: selected ? hex : `${hex}55`,
                   background: selected ? `${hex}38` : `${hex}1d`,
                   boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
-                {restDays > 0 && <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 top-0"
+                {restDays > 0 && <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 top-0 z-0"
                   style={{ width: restDays * dayWidth,
                     background: `repeating-linear-gradient(135deg, transparent 0 4px, ${hex}26 4px 6px)` }} />}
                 <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
@@ -226,7 +226,7 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
                   onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
                 <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}${done ? `、${md(done)}に完了` : ""}、ドラッグで移動`}
                   title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}${done ? `（${md(done)} 完了）` : ""}`}
-                  className="min-w-0 flex-1 cursor-grab truncate px-1 text-left text-xs font-medium touch-none active:cursor-grabbing"
+                  className="relative min-w-0 flex-1 cursor-grab truncate px-1 text-left text-xs font-medium touch-none active:cursor-grabbing"
                   onPointerDown={(event) => pointerDown(event, phase, "move")}
                   onKeyDown={(event) => keyAdjust(event, phase, "move")}
                   onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}

@@ -86,12 +86,13 @@ export default function PlanDetail() {
         && !window.confirm("保存していないフェーズの変更を破棄しますか？")) return false;
     savePhase.reset();
     saveRoutine.reset();
+    setCompletion.reset();
     deletePhase.reset();
     deleteRoutine.reset();
     setPhaseDirty(false);
     setEditingRaw(e);
     return true;
-  }, [editing, phaseDirty, savePhase, saveRoutine, deletePhase, deleteRoutine]);
+  }, [editing, phaseDirty, savePhase, saveRoutine, deletePhase, deleteRoutine, setCompletion]);
   const closeEditing = useCallback(() => setEditing(null), [setEditing]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
@@ -147,9 +148,14 @@ export default function PlanDetail() {
   const newPhaseStart = lastEnd && lastEnd >= today ? addDaysISO(lastEnd, 1) : today;
 
   // After an early completion, offer to start the next phase early. Its dates are never moved automatically.
-  const nextPhase = completedAt
-    ? explicit.find((p) => p.id !== selected.id && p.start_date! > completedAt) : undefined;
-  const earlyStart = completedAt && (addDaysISO(completedAt, 1) > today ? addDaysISO(completedAt, 1) : today);
+  // Shown on the completed phase and on the next one (selected by default from the next day).
+  const nextAfter = (done: typeof selected) => done.completed_at
+    ? explicit.find((p) => p.id !== done.id && p.start_date! > done.completed_at!) : undefined;
+  const finished = selected.completed_at ? selected
+    : explicit.find((p) => p.completed_at && nextAfter(p)?.id === selected.id);
+  const nextPhase = finished && nextAfter(finished);
+  const earlyStart = finished?.completed_at
+    && (addDaysISO(finished.completed_at, 1) > today ? addDaysISO(finished.completed_at, 1) : today);
   const offerEarlyStart = nextPhase && earlyStart && nextPhase.start_date! > earlyStart ? nextPhase : undefined;
 
   return (

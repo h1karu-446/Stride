@@ -1,8 +1,8 @@
 -- Stride: フェーズの早期完了 (Issue #50)
 -- - phases.completed_at: the day the phase was actually finished (date, the
 --   client sends its local date). The planned start / end dates are kept.
---   NULL = not completed. Only explicit phases can be completed, and never
---   before they start.
+--   NULL = not completed. Only explicit phases can be completed, and only
+--   within their planned period (so the period cannot be moved past it).
 -- - set_phase_completion(p_phase_id, p_date): completes (p_date) or undoes
 --   (NULL) the completion. p_date must be within the phase's planned period
 --   and no later than the DB date + 1 (time zones), like generate_routine_tasks.
@@ -25,7 +25,7 @@ alter table public.phases
 alter table public.phases
   add constraint phases_completed_at_shape check (
     completed_at is null
-    or (not is_implicit and completed_at >= start_date)
+    or (not is_implicit and completed_at between start_date and end_date)
   );
 
 create or replace function public.set_phase_completion(p_phase_id uuid, p_date date)

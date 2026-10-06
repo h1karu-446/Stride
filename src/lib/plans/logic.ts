@@ -349,8 +349,12 @@ export function validatePhase(
     }
   }
   // Same as the DB check phases_completed_at_shape.
+  const doneLabel = completedAt && format(parseISO(completedAt), "M/d");
   if (completedAt && v.start_date && v.start_date > completedAt && !e.start_date) {
-    e.start_date = `完了した日（${format(parseISO(completedAt), "M/d")}）より後には開始日を移せません。先に完了を取り消してください`;
+    e.start_date = `完了した日（${doneLabel}）より後には開始日を移せません。先に完了を取り消してください`;
+  }
+  if (completedAt && v.end_date && v.end_date < completedAt && !e.end_date) {
+    e.end_date = `完了した日（${doneLabel}）より前には終了日を移せません。先に完了を取り消してください`;
   }
   return e;
 }

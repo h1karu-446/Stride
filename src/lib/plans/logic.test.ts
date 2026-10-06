@@ -302,6 +302,7 @@ describe("UT-19 validation", () => {
     expect(validatePhase(ok, "2026-11-10")).toEqual({});
     expect(validatePhase({ ...ok, start_date: "2026-11-10" }, "2026-11-10")).toEqual({});
     expect(validatePhase({ ...ok, start_date: "2026-11-11" }, "2026-11-10").start_date).toContain("完了を取り消して");
+    expect(validatePhase({ ...ok, end_date: "2026-11-09" }, "2026-11-10").end_date).toContain("完了を取り消して");
   });
   it("routine: title, minutes, weekdays, menu", () => {
     const ok = { title: "英語", minutes: 30, weekdays: [1], menu: "" };

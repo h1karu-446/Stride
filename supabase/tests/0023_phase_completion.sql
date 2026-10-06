@@ -109,11 +109,15 @@ begin
     raise exception 'phase A must generate again after the undo (B is completed today)';
   end if;
 
-  -- Moving the start after the completion day is rejected.
+  -- Moving the start after, or the end before, the completion day is rejected.
   perform public.set_phase_completion(a, current_date);
   begin
     perform public.save_phase_settings(p, a, 'Phase A', current_date + 1, current_date + 5, menu);
     raise exception 'start moved after the completion day';
+  exception when check_violation then null; end;
+  begin
+    perform public.save_phase_settings(p, a, 'Phase A', current_date - 1, current_date - 1, menu);
+    raise exception 'end moved before the completion day';
   exception when check_violation then null; end;
 
   -- Deleting B, then A (the last phase) falls back to the implicit phase without a completion.
