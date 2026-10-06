@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRestoreDeletedTask } from "@/lib/queries";
 import {
   canUndo,
   nextExpiry,
+  noticeAnnouncements,
   restoreErrorMessage,
   UndoNotice,
 } from "@/lib/taskUndo";
@@ -15,11 +16,17 @@ export function TaskUndoNotices() {
 
   // Screen readers: one persistent polite region and one assertive region
   // (nesting live regions, or adding them together with their text, is not
-  // announced reliably).
-  const deleted = notices.filter((n) => n.kind === "deleted" && n.status !== "failed")
-    .map((n) => `「${n.title}」を削除しました。元に戻せます`).join("。");
-  const failures = notices.filter((n) => n.kind === "delete-failed" || n.status === "failed")
-    .map(noticeText).join("。");
+  // announced reliably). Each holds only the latest event, so a change to one
+  // notice does not re-read the others.
+  const [announce, setAnnounce] = useState({ polite: "", alert: "" });
+  const previous = useRef<UndoNotice[]>([]);
+  useEffect(() => {
+    const next = noticeAnnouncements(previous.current, notices);
+    previous.current = notices;
+    if (next.polite || next.alert) {
+      setAnnounce((cur) => ({ polite: next.polite || cur.polite, alert: next.alert || cur.alert }));
+    }
+  }, [notices]);
 
   // A notice that held focus disappears after undo or expiry; keep focus on
   // the page instead of letting it fall to <body>.
@@ -29,9 +36,9 @@ export function TaskUndoNotices() {
     if (!hadFocus.current) return;
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    hadFocus.current = false;
     const next = listRef.current?.querySelector<HTMLElement>("[data-undo-action]");
     (next ?? document.getElementById("main"))?.focus({ preventScroll: true });
+    hadFocus.current = !!next && document.activeElement === next;
   }, [notices]);
 
   useEffect(() => {
@@ -50,15 +57,17 @@ export function TaskUndoNotices() {
       aria-label="タスクの削除"
       className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none"
     >
-      <p role="status" className="sr-only">{deleted}</p>
-      <p role="alert" className="sr-only">{failures}</p>
+      <p role="status" className="sr-only">{announce.polite}</p>
+      <p role="alert" className="sr-only">{announce.alert}</p>
       <ul
         ref={listRef}
         className="flex w-full max-w-md flex-col gap-2"
         onFocus={() => { hadFocus.current = true; }}
         onBlur={(event) => {
-          // relatedTarget is null when the focused button is removed; keep the flag then.
-          if (event.relatedTarget && !listRef.current?.contains(event.relatedTarget as Node)) {
+          // A focused button that is removed may blur with relatedTarget null and
+          // is then disconnected; keep the flag only in that case.
+          const to = event.relatedTarget as Node | null;
+          if (to ? !listRef.current?.contains(to) : event.target.isConnected) {
             hadFocus.current = false;
           }
         }}
@@ -129,8 +138,9 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
           ref={actionRef}
           data-undo-action
           type="button"
-          className="shrink-0 font-semibold text-notion-blue hover:underline disabled:opacity-50"
-          disabled={notice.status === "restoring"}
+          className="shrink-0 font-semibold text-notion-blue hover:underline aria-disabled:opacity-50"
+          // aria-disabled, not disabled: a disabled button loses focus.
+          aria-disabled={notice.status === "restoring"}
           onClick={undo}
           aria-label={`「${notice.title}」の削除を${notice.status === "failed" ? "もう一度" : ""}元に戻す`}
         >
@@ -144,6 +154,7 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
       {failed && (
         <button
           ref={notice.kind === "delete-failed" ? actionRef : undefined}
+          data-undo-action
           type="button"
           className="shrink-0 text-xs muted hover:underline"
           onClick={() => remove(notice.key)}
@@ -156,8 +167,3 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
   );
 }
 
-function noticeText(n: UndoNotice): string {
-  return n.kind === "delete-failed"
-    ? `「${n.title}」を削除できませんでした。${n.error}`
-    : `「${n.title}」を元に戻せませんでした。${n.kind === "deleted" ? n.error ?? "" : ""}`;
-}

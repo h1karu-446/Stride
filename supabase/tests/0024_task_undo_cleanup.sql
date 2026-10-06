@@ -77,7 +77,7 @@ begin
     raise exception 'restored onto a deleted plan';
   exception when foreign_key_violation then null; end;
 
-  -- The routine is deleted meanwhile: 23503, and the skip is kept (nothing changed).
+  -- The routine is deleted meanwhile: 23503, and nothing is inserted.
   select id into v_routine_task from public.tasks
    where routine_id = 'a2400000-0000-0000-0000-000000000021' and scheduled_date = current_date;
   v_res := public.delete_task_for_undo(v_routine_task);
@@ -86,6 +86,9 @@ begin
     perform public.restore_deleted_task(v_res->'task', array[]::uuid[]);
     raise exception 'restored onto a deleted routine';
   exception when foreign_key_violation then null; end;
+  if exists (select 1 from public.tasks where id = v_routine_task) then
+    raise exception 'the task came back although the routine was deleted';
+  end if;
 
   -- The source of a carried copy is deleted meanwhile: 23503.
   v_res := public.delete_task_for_undo('a2400000-0000-0000-0000-000000000103');

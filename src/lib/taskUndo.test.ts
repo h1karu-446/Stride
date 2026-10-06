@@ -8,6 +8,7 @@ import {
   markRestoreFailed,
   markRestoring,
   nextExpiry,
+  noticeAnnouncements,
   parseDeleteResult,
   removeNotice,
   restoreErrorMessage,
@@ -126,5 +127,26 @@ describe("error messages", () => {
   it("distinguishes an already deleted task from a network failure", () => {
     expect(deleteErrorMessage({ code: "P0002" })).toContain("見つかりません");
     expect(deleteErrorMessage(new Error("offline"))).toContain("通信");
+  });
+});
+
+describe("noticeAnnouncements (Issue #67)", () => {
+  const t0 = 1_000_000;
+  const a = deletedNotice(snap("a"), "A", t0, "k1");
+  const b = deletedNotice(snap("b"), "B", t0, "k2");
+
+  it("announces only the new delete, not the notices already shown", () => {
+    expect(noticeAnnouncements([], [a])).toEqual({ polite: "「A」を削除しました。元に戻せます", alert: "" });
+    expect(noticeAnnouncements([a], [a, b]).polite).toContain("「B」");
+    expect(noticeAnnouncements([a, b], [b])).toEqual({ polite: "", alert: "" }); // expiry
+  });
+
+  it("announces a successful undo and a failure once", () => {
+    const restoring = markRestoring([a, b], "k1");
+    expect(noticeAnnouncements([a, b], restoring)).toEqual({ polite: "", alert: "" });
+    expect(noticeAnnouncements(restoring, [b]).polite).toBe("「A」を元に戻しました");
+    const failed = markRestoreFailed(restoring, "k1", "理由");
+    expect(noticeAnnouncements(restoring, failed).alert).toBe("「A」を元に戻せませんでした。理由");
+    expect(noticeAnnouncements(failed, failed)).toEqual({ polite: "", alert: "" });
   });
 });

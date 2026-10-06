@@ -138,7 +138,7 @@ function errorCode(err: unknown): string | undefined {
 export function restoreErrorMessage(err: unknown): string {
   switch (errorCode(err)) {
     case "23505":
-      return "別の画面で同じタスク（または同じ日のルーティン）が既に戻されています";
+      return "別の画面で同じタスク（または同じ日のメニュー）が既に戻されています";
     // restore_deleted_task (0024) checks the plan, menu and carried-from source first.
     case "23503":
       return "計画・メニュー・持ち越し元の予定のいずれかが削除されています";
@@ -154,4 +154,35 @@ export function deleteErrorMessage(err: unknown): string {
   return errorCode(err) === "P0002"
     ? "タスクが見つかりません（別の画面で削除済みの可能性があります）"
     : "通信を確認してください";
+}
+
+/**
+ * What the live regions say for a change of the notice list: only the latest
+ * event, so the other notices are not read again (Issue #67).
+ */
+export function noticeAnnouncements(
+  before: UndoNotice[],
+  after: UndoNotice[]
+): { polite: string; alert: string } {
+  const old = new Map(before.map((n) => [n.key, n]));
+  let polite = "";
+  let alert = "";
+  for (const n of after) {
+    const prev = old.get(n.key);
+    if (n.kind === "delete-failed") {
+      if (!prev) alert = `「${n.title}」を削除できませんでした。${n.error}`;
+    } else if (n.status === "failed" && !(prev?.kind === "deleted" && prev.status === "failed")) {
+      alert = `「${n.title}」を元に戻せませんでした。${n.error ?? ""}`;
+    } else if (!prev) {
+      polite = `「${n.title}」を削除しました。元に戻せます`;
+    }
+  }
+  const kept = new Set(after.map((n) => n.key));
+  for (const n of before) {
+    // Removed while restoring = the undo succeeded (expiry never removes a restoring notice).
+    if (!kept.has(n.key) && n.kind === "deleted" && n.status === "restoring") {
+      polite = `「${n.title}」を元に戻しました`;
+    }
+  }
+  return { polite, alert };
 }
