@@ -63,7 +63,7 @@ export default function RoutineForm({
         <input autoFocus aria-label="メニュー（必須）" className="input font-semibold" value={v.title} disabled={saving}
           placeholder="メニュー名：例）Listeningを30分解く"
           onChange={(e) => setV({ ...v, title: e.target.value })} />
-        {v.title && errors.title && <p className="mt-1 text-xs text-red-500">{errors.title}</p>}
+        {v.title && errors.title && <p className="mt-1 text-xs text-rose-600">{errors.title}</p>}
       </div>
       <Row label="時間" error={errors.minutes}>
         {MINUTE_PRESETS.map((m) => <button key={m} type="button" disabled={saving} aria-pressed={minutes === m}
@@ -102,7 +102,7 @@ export default function RoutineForm({
         <textarea aria-label="メニューの詳細（任意）" className="input min-h-[72px] text-sm" value={v.menu ?? ""} disabled={saving}
           placeholder="詳細（任意）：例）公式問題集10のTest 2"
           onChange={(e) => setV({ ...v, menu: e.target.value })} />
-        {errors.menu && <p className="mt-1 text-xs text-red-500">{errors.menu}</p>}
+        {errors.menu && <p className="mt-1 text-xs text-rose-600">{errors.menu}</p>}
       </div>
       <FormActions onDelete={onDelete} onCancel={onCancel}
         canSave={canSave} saving={saving} error={failed} />
@@ -120,7 +120,7 @@ function Row({ label, error, children }: { label: string; error?: string; childr
       <span className="w-12 shrink-0 pt-0.5 text-xs muted">{label}</span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-1.5">{children}</div>
-        {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+        {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
       </div>
     </div>
   );

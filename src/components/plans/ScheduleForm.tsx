@@ -1,7 +1,7 @@
 import { useState } from "react";
 import clsx from "clsx";
 import DatePicker from "@/components/common/DatePicker";
-import { Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
+import { choiceClass, Field, FormActions, useEscToCancel } from "@/components/common/FormParts";
 import { hasErrors, validateSchedule, type ScheduleValues } from "@/lib/plans/logic";
 import { IMPORTANCE_LIST } from "@/types";
 
@@ -75,10 +75,7 @@ export default function ScheduleForm({
               <button key={i} type="button" aria-pressed={v.importance === i}
                 disabled={!!lock || saving}
                 onClick={() => patch({ importance: i })}
-                className={clsx("flex-1 rounded-md border px-2 py-2 text-sm disabled:opacity-60",
-                  v.importance === i
-                    ? "border-blue-500 bg-blue-500/10"
-                    : "border-slate-300 dark:border-notion-border")}>
+                className={choiceClass(v.importance === i)}>
                 {i}
               </button>
             ))}

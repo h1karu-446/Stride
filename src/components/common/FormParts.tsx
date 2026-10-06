@@ -1,4 +1,27 @@
 import { useEffect, type ReactNode } from "react";
+import clsx from "clsx";
+
+// Form conventions (Issue #57):
+// - Labels: small caps style (.label). Optional fields say 「（任意）」; required ones are unmarked.
+// - Errors: text-rose-600 right under the field they belong to.
+// - Choices (importance, status): one row of buttons showing the current value and the options at once.
+// - On touch screens (coarse pointer) buttons get a 44px touch target.
+
+/** Larger hit area on touch screens without changing the desktop layout. */
+export const TOUCH_TARGET = "[@media(pointer:coarse)]:min-h-11";
+
+/** Same visible focus ring as .btn / the color buttons. */
+export const FOCUS_RING = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue";
+
+/** One option of a segmented choice (importance, status). */
+export const choiceClass = (active: boolean) => clsx(
+  "flex-1 rounded-md border px-2 py-2 text-sm transition disabled:opacity-60",
+  TOUCH_TARGET, FOCUS_RING,
+  // The text keeps the body color for contrast; border and fill show the choice.
+  active
+    ? "border-notion-blue bg-notion-blue/10 font-semibold"
+    : "border-slate-300 hover:border-slate-400 dark:border-notion-border muted"
+);
 
 export const SAVE_ERROR_MESSAGE = "保存できませんでした。もう一度お試しください";
 
@@ -43,22 +66,26 @@ export function Field({
   label,
   error,
   group,
+  optional,
   children,
 }: {
   label: string;
   error?: string;
   group?: boolean;
+  /** Adds 「（任意）」 to the label. */
+  optional?: boolean;
   children: ReactNode;
 }) {
+  const name = optional ? `${label}（任意）` : label;
   const body = (
     <>
-      <span className="label">{label}</span>
+      <span className="label">{label}{optional && <span className="ml-1 normal-case tracking-normal font-normal">（任意）</span>}</span>
       {children}
-      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
     </>
   );
   return group ? (
-    <div role="group" aria-label={label}>{body}</div>
+    <div role="group" aria-label={name}>{body}</div>
   ) : (
     <label className="block">{body}</label>
   );
@@ -69,6 +96,7 @@ export function FormActions({
   onDelete,
   onCancel,
   saveLabel = "保存",
+  savingLabel = "保存中…",
   canSave,
   saving,
   error,
@@ -76,20 +104,21 @@ export function FormActions({
   onDelete?: () => void;
   onCancel: () => void;
   saveLabel?: string;
+  savingLabel?: string;
   canSave: boolean;
   saving?: boolean;
   error?: boolean;
 }) {
   return (
     <div className="space-y-2">
-      {error && <p className="text-xs text-red-500">{SAVE_ERROR_MESSAGE}</p>}
+      {error && <p role="alert" className="text-xs text-rose-600">{SAVE_ERROR_MESSAGE}</p>}
       <div className="flex items-center justify-between gap-2">
         {onDelete ? (
           <button
             type="button"
             onClick={onDelete}
             disabled={saving}
-            className="text-xs text-red-500 hover:underline"
+            className={clsx("rounded-md px-2 py-1.5 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10", TOUCH_TARGET, FOCUS_RING)}
           >
             削除
           </button>
@@ -97,15 +126,15 @@ export function FormActions({
           <span />
         )}
         <div className="flex gap-2">
-          <button type="button" onClick={onCancel} disabled={saving} className="btn-outline !py-1.5">
+          <button type="button" onClick={onCancel} disabled={saving} className={clsx("btn-outline !py-1.5", TOUCH_TARGET)}>
             キャンセル
           </button>
           <button
             type="submit"
             disabled={!canSave || saving}
-            className="btn-primary !py-1.5"
+            className={clsx("btn-primary !py-1.5", TOUCH_TARGET)}
           >
-            {saveLabel}
+            {saving ? savingLabel : saveLabel}
           </button>
         </div>
       </div>
