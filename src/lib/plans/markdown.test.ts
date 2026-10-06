@@ -59,6 +59,40 @@ describe("plan overview markdown: blocks", () => {
     expect(block.type).toBe("paragraph");
   });
 
+  it("reads tables with alignment, inline marks and escaped pipes", () => {
+    expect(parseMarkdown("| 教材 | 進度 | 時間 |\n| :--- | :-: | --: |\n| **単語帳** | `a\\|b` | 30 |")).toEqual([{
+      type: "table", align: ["left", "center", "right"],
+      header: [[text("教材")], [text("進度")], [text("時間")]],
+      rows: [[[{ type: "strong", children: [text("単語帳")] }], [{ type: "code", text: "a|b" }], [text("30")]]],
+    }]);
+    // Outer pipes are optional; a table may have no body rows.
+    expect(parseMarkdown("a | b\n--- | ---")).toEqual([{
+      type: "table", align: [null, null], header: [[text("a")], [text("b")]], rows: [],
+    }]);
+  });
+
+  it("pads short table rows, drops extra cells and ends the table at a blank line or another block", () => {
+    const [table, ...rest] = parseMarkdown("前\n| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 |\n- 後\n\n後");
+    expect(parseMarkdown("前\n| a | b |\n|---|---|")[0]).toEqual({ type: "paragraph", children: [text("前")] });
+    expect(table).toMatchObject({ type: "paragraph" });
+    expect(rest[0]).toMatchObject({ type: "table", rows: [[[text("1")], []], [[text("1")], [text("2")]]] });
+    expect(rest.slice(1).map((b) => b.type)).toEqual(["list", "paragraph"]);
+  });
+
+  it("does not read a table without a matching delimiter row", () => {
+    // "---" without a pipe stays a thematic break, and the column counts must match.
+    expect(parseMarkdown("a | b\n---").map((b) => b.type)).toEqual(["paragraph", "hr"]);
+    expect(parseMarkdown("| a | b |\n| --- |").map((b) => b.type)).toEqual(["paragraph"]);
+    expect(parseMarkdown("| a |\n| - |")).toMatchObject([{ type: "table", align: [null] }]);
+  });
+
+  it("reads tables inside lists and blockquotes", () => {
+    expect(parseMarkdown("> | a |\n> | - |\n> | 1 |")).toMatchObject([{ type: "blockquote", blocks: [{ type: "table" }] }]);
+    expect(parseMarkdown("- 表\n  | a |\n  | - |")).toMatchObject([{ type: "list", items: [{ blocks: [
+      { type: "paragraph" }, { type: "table" },
+    ] }] }]);
+  });
+
   it("returns nothing for blank input and handles CRLF", () => {
     expect(parseMarkdown("  \n\n")).toEqual([]);
     expect(parseMarkdown("a\r\nb")).toEqual([{ type: "paragraph", children: [text("a"), { type: "br" }, text("b")] }]);

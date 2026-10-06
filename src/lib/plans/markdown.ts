@@ -5,7 +5,7 @@
 //
 // Supported: ATX headings, paragraphs (a newline is a line break), bullet /
 // ordered / task lists (nested by indentation), blockquotes, fenced code,
-// thematic breaks; inline code, **strong**, *em*, ~~del~~, [links](url),
+// thematic breaks, GFM tables (Issue #77); inline code, **strong**, *em*, ~~del~~, [links](url),
 // <autolinks>, bare http(s) URLs and backslash escapes.
 
 export type Inline =
@@ -21,12 +21,15 @@ export interface ListItem {
   blocks: Block[];
 }
 
+export type Align = "left" | "center" | "right" | null;
+
 export type Block =
   | { type: "heading"; level: 1 | 2 | 3 | 4 | 5 | 6; children: Inline[] }
   | { type: "paragraph"; children: Inline[] }
   | { type: "list"; ordered: boolean; start: number; items: ListItem[] }
   | { type: "blockquote"; blocks: Block[] }
   | { type: "code"; lang: string; text: string }
+  | { type: "table"; align: Align[]; header: Inline[][]; rows: Inline[][][] }
   | { type: "hr" };
 
 const HEADING = /^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/;
@@ -35,6 +38,8 @@ const FENCE = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const QUOTE = /^ {0,3}> ?(.*)$/;
 const LIST = /^( *)([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/;
 const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
+/** A table's delimiter row; it needs a "|" so that "---" stays a thematic break. */
+const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 /** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
 const MAX_DEPTH = 16;
 
@@ -50,6 +55,35 @@ const isBlank = (line: string) => line.trim() === "";
 function startsBlock(line: string, nest: boolean) {
   return HEADING.test(line) || HR.test(line) || FENCE.test(line)
     || (nest && (QUOTE.test(line) || (LIST.test(line) && !!line.match(LIST)![3]?.trim())));
+}
+
+/** Splits a table row into raw cells; "\|" is a pipe inside a cell. */
+function splitRow(line: string): string[] {
+  let row = line.trim();
+  if (row.startsWith("|")) row = row.slice(1);
+  if (row.endsWith("|") && !row.endsWith("\\|")) row = row.slice(0, -1);
+  const cells: string[] = [];
+  let cell = "";
+  for (let i = 0; i < row.length; i++) {
+    if (row[i] === "\\" && row[i + 1] === "|") { cell += "|"; i++; continue; }
+    if (row[i] === "|") { cells.push(cell.trim()); cell = ""; continue; }
+    cell += row[i];
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+/** The column alignments when lines[i] and lines[i + 1] start a table, else null. */
+function tableStart(lines: string[], i: number): Align[] | null {
+  const header = lines[i];
+  const delimiter = lines[i + 1];
+  if (delimiter === undefined || !header.includes("|") || !TABLE_DELIMITER.test(delimiter)) return null;
+  const align = splitRow(delimiter).map((cell): Align => {
+    const left = cell.startsWith(":");
+    const right = cell.endsWith(":");
+    return left && right ? "center" : right ? "right" : left ? "left" : null;
+  });
+  return splitRow(header).length === align.length ? align : null;
 }
 
 function parseBlocks(lines: string[], depth = 0): Block[] {
@@ -103,9 +137,25 @@ function parseBlocks(lines: string[], depth = 0): Block[] {
       continue;
     }
 
+    const align = tableStart(lines, i);
+    if (align) {
+      const header = splitRow(line).map((cell) => parseInline(cell));
+      const rows: Inline[][][] = [];
+      i += 2;
+      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)) {
+        const cells = splitRow(lines[i++]);
+        // Pad short rows and drop extra cells so every row has the header's width.
+        rows.push(align.map((_, c) => parseInline(cells[c] ?? "")));
+      }
+      blocks.push({ type: "table", align, header, rows });
+      continue;
+    }
+
     const text: string[] = [line.trim()];
     i++;
-    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)) text.push(lines[i++].trim());
+    while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest) && !tableStart(lines, i)) {
+      text.push(lines[i++].trim());
+    }
     blocks.push({ type: "paragraph", children: parseInline(text.join("\n")) });
   }
   return blocks;
