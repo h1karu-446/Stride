@@ -42,16 +42,19 @@ const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
 // Each cell already ends with [ \t]*, so the closing pipe's spaces must not repeat them (that backtracks quadratically).
 const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/;
 /**
- * A table stops taking body rows past this many cells. Short rows are padded to the
- * header's width, so without it a few KB of "a\n" under a wide header would make
- * millions of cells and freeze the page.
+ * Table cells allowed in one document. Short rows are padded to the header's width,
+ * so without it a few KB of "a\n" under wide headers would make millions of cells and
+ * freeze the page. Past it, lines are read as paragraphs.
  */
 const MAX_TABLE_CELLS = 20000;
+/** Cells still allowed in the document being parsed (parsing is synchronous). */
+let cellBudget = MAX_TABLE_CELLS;
 /** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
 const MAX_DEPTH = 16;
 
 export function parseMarkdown(source: string): Block[] {
   const lines = source.replace(/\r\n?/g, "\n").replace(/\t/g, "    ").split("\n");
+  cellBudget = MAX_TABLE_CELLS;
   return parseBlocks(lines);
 }
 
@@ -95,7 +98,7 @@ function tableStart(lines: string[], i: number): Align[] | null {
     const right = cell.endsWith(":");
     return left && right ? "center" : right ? "right" : left ? "left" : null;
   });
-  return splitRow(header).length === align.length ? align : null;
+  return splitRow(header).length === align.length && align.length <= cellBudget ? align : null;
 }
 
 function parseBlocks(lines: string[], depth = 0): Block[] {
@@ -154,9 +157,9 @@ function parseBlocks(lines: string[], depth = 0): Block[] {
       const header = splitRow(line).map((cell) => parseInline(cell));
       const rows: Inline[][][] = [];
       i += 2;
-      let cellCount = align.length;
-      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest)
-        && (cellCount += align.length) <= MAX_TABLE_CELLS) {
+      cellBudget -= align.length;
+      while (i < lines.length && !isBlank(lines[i]) && !startsBlock(lines[i], nest) && align.length <= cellBudget) {
+        cellBudget -= align.length;
         const cells = splitRow(lines[i++]);
         // Pad short rows and drop extra cells so every row has the header's width.
         rows.push(align.map((_, c) => parseInline(cells[c] ?? "")));

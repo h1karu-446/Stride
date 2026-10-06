@@ -102,12 +102,26 @@ describe("plan overview markdown: blocks", () => {
     expect(parseMarkdown("a | b\n-|-")).toMatchObject([{ type: "table" }]);
   });
 
-  it("caps the padded cells of a wide table and reads the rest as a paragraph", () => {
+  it("caps the table cells of the whole document and reads the rest as paragraphs", () => {
     const blocks = parseMarkdown("|".repeat(1668) + "\n" + Array(1667).fill("-").join("|") + "\n" + "a\n".repeat(2500));
     const table = blocks[0] as { type: "table"; align: unknown[]; rows: unknown[][] };
     expect(table.type).toBe("table");
     expect((table.rows.length + 1) * table.align.length).toBeLessThanOrEqual(20000);
     expect(blocks[1]).toMatchObject({ type: "paragraph" });
+    // Exactly at the cap every row fits; one more row is left out.
+    const rows = (n: number) => "a|b\n-|-\n" + "1|2\n".repeat(n);
+    expect((parseMarkdown(rows(9999))[0] as { rows: unknown[] }).rows).toHaveLength(9999);
+    expect(parseMarkdown(rows(10000)).map((b) => b.type)).toEqual(["table", "paragraph"]);
+    // Tables placed one after another share the cap.
+    const wide = "|".repeat(116) + "\n" + Array(115).fill("-").join("|") + "\n" + "a\n".repeat(171);
+    const cells = parseMarkdown(wide.repeat(14)).reduce((sum, b) =>
+      b.type === "table" ? sum + (b.rows.length + 1) * b.align.length : sum, 0);
+    expect(cells).toBeLessThanOrEqual(20000);
+  });
+
+  it("starts with a full cell budget on every parse", () => {
+    parseMarkdown("a|b\n-|-\n" + "1|2\n".repeat(9999));
+    expect(parseMarkdown("a|b\n-|-")).toMatchObject([{ type: "table" }]);
   });
 
   it("reads tables inside lists and blockquotes", () => {
