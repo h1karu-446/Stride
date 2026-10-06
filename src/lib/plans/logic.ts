@@ -44,6 +44,19 @@ export function phaseForDate(phases: Phase[], date: string): Phase | undefined {
   return phasesForDate(phases, date)[0];
 }
 
+/** Minimum readable width of a phase bar on the timeline (px). */
+export const PHASE_BAR_MIN_WIDTH = 48;
+
+/**
+ * Width of a phase bar: its real length, widened up to the minimum only while
+ * that does not run into the next bar in the same row (it would look like the
+ * phases overlap although their dates do not).
+ */
+export function phaseBarWidth(days: number, dayWidth: number, roomToNext = Infinity): number {
+  const actual = days * dayWidth;
+  return Math.max(actual, Math.min(PHASE_BAR_MIN_WIDTH, roomToNext));
+}
+
 export function sortedPhases(phases: Phase[]): Phase[] {
   return [...phases].sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")

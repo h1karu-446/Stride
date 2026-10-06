@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
-import { phaseDatesAfterDrag, sortedPhases } from "@/lib/plans/logic";
+import { phaseBarWidth, phaseDatesAfterDrag, sortedPhases } from "@/lib/plans/logic";
 import type { PhaseDragEdge } from "@/lib/plans/logic";
 import type { Phase, PlanColor } from "@/types";
 
@@ -200,19 +200,24 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
           className="relative h-12 cursor-crosshair touch-none border-b border-slate-100 dark:border-notion-border/60"
           {...createEvents(laneIndex)}>
           {createOverlay(laneIndex)}
-          {lane.map((phase) => {
-          const dates = preview?.id === phase.id ? preview.dates : {
-              start_date: phase.start_date!, end_date: phase.end_date!,
-            };
+          {lane.map((phase, index) => {
+            const datesOf = (p: Phase) => preview?.id === p.id ? preview.dates
+              : { start_date: p.start_date!, end_date: p.end_date! };
+            const dates = datesOf(phase);
             const days = differenceInCalendarDays(parseISO(dates.end_date), parseISO(dates.start_date)) + 1;
+            // A short phase is widened for its name only up to the next bar in this row.
+            const next = lane[index + 1];
+            const barWidth = phaseBarWidth(days, dayWidth,
+              next ? xFor(datesOf(next).start_date) - xFor(dates.start_date) : undefined);
+            const narrow = barWidth < 32;
             const selected = phase.id === selectedId;
             const wide = days * dayWidth >= 130;
             // Days left after an early completion are hatched; the planned end stays visible.
             const done = phase.completed_at;
             const restDays = done && done < dates.end_date
               ? differenceInCalendarDays(parseISO(dates.end_date), parseISO(done)) : 0;
-            return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 min-w-12 overflow-hidden rounded-md border transition-shadow"
-                style={{ left: xFor(dates.start_date), width: Math.max(48, days * dayWidth),
+            return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 overflow-hidden rounded-md border transition-shadow"
+                style={{ left: xFor(dates.start_date), width: barWidth,
                   borderColor: selected ? hex : `${hex}55`,
                   background: selected ? `${hex}38` : `${hex}1d`,
                   boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
@@ -221,19 +226,19 @@ export default function PhaseBar({ phases, color, selectedId, today, onSelect, o
                     background: `repeating-linear-gradient(135deg, transparent 0 4px, ${hex}26 4px 6px)` }} />}
                 <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
                   title="開始日をドラッグ（左右キーでも1日ずつ調整）"
-                  className="w-3 shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15"
+                  className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
                   onPointerDown={(event) => pointerDown(event, phase, "start")}
                   onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
                 <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}${done ? `、${md(done)}に完了` : ""}、ドラッグで移動`}
                   title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}${done ? `（${md(done)} 完了）` : ""}`}
-                  className="relative min-w-0 flex-1 cursor-grab truncate px-1 text-left text-xs font-medium touch-none active:cursor-grabbing"
+                  className={`relative min-w-0 flex-1 cursor-grab truncate ${narrow ? "px-0" : "px-1"} text-left text-xs font-medium touch-none active:cursor-grabbing`}
                   onPointerDown={(event) => pointerDown(event, phase, "move")}
                   onKeyDown={(event) => keyAdjust(event, phase, "move")}
                   onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}
                   {...dragEvents}>{done && <span aria-hidden="true" className="mr-1">✓</span>}<span className="truncate">{phase.name}</span>{wide && <span className="ml-1.5 font-normal tabular-nums opacity-60">{md(dates.start_date)}–{md(dates.end_date)}</span>}</button>
                 <button type="button" aria-label={`${phase.name}の終了日 ${md(dates.end_date)} を調整`}
                   title="終了日をドラッグ（左右キーでも1日ずつ調整）"
-                  className="w-3 shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15"
+                  className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
                   onPointerDown={(event) => pointerDown(event, phase, "end")}
                   onKeyDown={(event) => keyAdjust(event, phase, "end")} {...dragEvents} />
               </div>

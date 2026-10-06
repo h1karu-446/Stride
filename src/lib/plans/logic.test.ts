@@ -10,6 +10,7 @@ import {
   initialPhase,
   memoOneLine,
   phaseForDate,
+  phaseBarWidth,
   phaseDatesAfterDrag,
   phasesForDate,
   phaseProgress,
@@ -362,5 +363,15 @@ describe("phase early completion (Issue #50)", () => {
     const p = plan({ phases: [done] });
     expect(routinesForDate(p, TODAY)).toHaveLength(1);
     expect(routinesForDate(p, "2026-10-01")).toHaveLength(0);
+  });
+});
+
+describe("phaseBarWidth", () => {
+  it("widens a short phase to the minimum only up to the next bar", () => {
+    expect(phaseBarWidth(30, 14)).toBe(420);          // long: its real length
+    expect(phaseBarWidth(3, 14)).toBe(48);            // short, nothing next: minimum
+    expect(phaseBarWidth(3, 14, 42)).toBe(42);        // next starts the day after: real length
+    expect(phaseBarWidth(1, 14, 14)).toBe(14);
+    expect(phaseBarWidth(3, 14, -10)).toBe(42);       // next moved behind while dragging
   });
 });
