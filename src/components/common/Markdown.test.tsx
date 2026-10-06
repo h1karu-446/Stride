@@ -14,6 +14,14 @@ describe("Markdown view", () => {
     expect(out).toContain('href="https://example.com" target="_blank" rel="noopener noreferrer"');
   });
 
+  it("renders tables in a scroll box with header cells and column alignment", () => {
+    const out = html("| 教材 | 時間 |\n| :-: | --: |\n| 単語 | 30 |");
+    expect(out).toContain('<div class="overflow-x-auto"><table');
+    expect(out).toMatch(/<th scope="col" style="text-align:center"[^>]*>教材<\/th>/);
+    expect(out).toMatch(/<td style="text-align:right"[^>]*>30<\/td>/);
+    expect(html("| a |\n| - |")).not.toContain("<tbody");
+  });
+
   it("escapes raw HTML and drops unsafe link schemes", () => {
     const out = html('<script>alert(1)</script>\n[x](javascript:alert(1)) <img src=x onerror="a()">');
     expect(out).not.toContain("<script");

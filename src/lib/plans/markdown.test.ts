@@ -86,6 +86,17 @@ describe("plan overview markdown: blocks", () => {
     expect(parseMarkdown("| a |\n| - |")).toMatchObject([{ type: "table", align: [null] }]);
   });
 
+  it("splits an escaped backslash before a pipe as a cell separator", () => {
+    expect(parseMarkdown("a \\\\| b\n|-|-|")).toMatchObject([{ type: "table", header: [[text("a \\")], [text("b")]] }]);
+    expect(parseMarkdown("| a \\| |\n|-|")).toMatchObject([{ type: "table", header: [[text("a |")]] }]);
+  });
+
+  it("checks long runs of spaces in a delimiter-like row quickly", () => {
+    const started = performance.now();
+    parseMarkdown("|a\n|-" + "\t".repeat(10000) + "x");
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it("reads tables inside lists and blockquotes", () => {
     expect(parseMarkdown("> | a |\n> | - |\n> | 1 |")).toMatchObject([{ type: "blockquote", blocks: [{ type: "table" }] }]);
     expect(parseMarkdown("- 表\n  | a |\n  | - |")).toMatchObject([{ type: "list", items: [{ blocks: [

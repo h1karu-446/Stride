@@ -39,7 +39,8 @@ const QUOTE = /^ {0,3}> ?(.*)$/;
 const LIST = /^( *)([-*+]|\d{1,9}[.)])(?:[ \t]+(.*))?$/;
 const TASK = /^\[([ xX])\](?:[ \t]+|$)/;
 /** A table's delimiter row; it needs a "|" so that "---" stays a thematic break. */
-const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
+// Each cell already ends with [ \t]*, so the closing pipe's spaces must not repeat them (that backtracks quadratically).
+const TABLE_DELIMITER = /^ {0,3}(?=[^|]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*(?:\|[ \t]*)?$/;
 /** Deeper quotes / lists are read as plain text, so recursion stays bounded. */
 const MAX_DEPTH = 16;
 
@@ -57,19 +58,22 @@ function startsBlock(line: string, nest: boolean) {
     || (nest && (QUOTE.test(line) || (LIST.test(line) && !!line.match(LIST)![3]?.trim())));
 }
 
-/** Splits a table row into raw cells; "\|" is a pipe inside a cell. */
+/** Splits a table row into raw cells; "\|" is a pipe inside a cell, "\\|" a backslash then a separator. */
 function splitRow(line: string): string[] {
-  let row = line.trim();
-  if (row.startsWith("|")) row = row.slice(1);
-  if (row.endsWith("|") && !row.endsWith("\\|")) row = row.slice(0, -1);
   const cells: string[] = [];
   let cell = "";
-  for (let i = 0; i < row.length; i++) {
-    if (row[i] === "\\" && row[i + 1] === "|") { cell += "|"; i++; continue; }
-    if (row[i] === "|") { cells.push(cell.trim()); cell = ""; continue; }
-    cell += row[i];
+  for (let i = 0; i < line.length; i++) {
+    // Keep other escapes ("\\", "\*") for the inline parser.
+    if (line[i] === "\\" && line[i + 1] === "|") { cell += "|"; i++; continue; }
+    if (line[i] === "\\" && i + 1 < line.length) { cell += line[i] + line[i + 1]; i++; continue; }
+    if (line[i] === "|") { cells.push(cell.trim()); cell = ""; continue; }
+    cell += line[i];
   }
   cells.push(cell.trim());
+  // Outer pipes are optional: drop the empty cells they leave at either end
+  // (an escaped outer pipe leaves "|" in the cell, so that cell is not empty).
+  if (cells.length > 1 && cells[0] === "" && line.trimStart().startsWith("|")) cells.shift();
+  if (cells.length > 1 && cells[cells.length - 1] === "" && line.trimEnd().endsWith("|")) cells.pop();
   return cells;
 }
 
