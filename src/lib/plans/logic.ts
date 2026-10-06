@@ -57,6 +57,31 @@ export function phaseBarWidth(days: number, dayWidth: number, roomToNext = Infin
   return Math.max(actual, Math.min(PHASE_BAR_MIN_WIDTH, roomToNext));
 }
 
+/**
+ * The date axis of the phase timeline. The scale (px per day) comes from the
+ * phases alone, so a far-off milestone does not shrink the bars; the axis still
+ * reaches every schedule (Issue #79). `viewStart` is where the view opens.
+ */
+export function timelineAxis(phases: Phase[], scheduleDates: string[], today: string) {
+  const ordered = sortedPhases(phases);
+  const viewStart = addDaysISO(ordered[0]?.start_date ?? today, -7);
+  let phaseEnd = today;
+  for (const phase of ordered) if (phase.end_date! > phaseEnd) phaseEnd = phase.end_date!;
+  const firstSchedule = scheduleDates.reduce((min, date) => date < min ? date : min, viewStart);
+  const lastSchedule = scheduleDates.reduce((max, date) => date > max ? date : max, phaseEnd);
+  const axisStart = addDaysISO(firstSchedule, firstSchedule < viewStart ? -7 : 0);
+  const span = (from: string, to: string) =>
+    differenceInCalendarDays(parseISO(addDaysISO(to, 37)), parseISO(from)) + 1;
+  const scaleDays = span(viewStart, phaseEnd);
+  return {
+    axisStart,
+    viewStart,
+    dayWidth: scaleDays > 180 ? 8 : scaleDays > 60 ? 10 : 14,
+    /** The fewest days the axis shows before it grows with the viewport and scrolling. */
+    baseDays: span(axisStart, lastSchedule),
+  };
+}
+
 export function sortedPhases(phases: Phase[]): Phase[] {
   return [...phases].sort((a, b) =>
     (a.start_date ?? "").localeCompare(b.start_date ?? "")

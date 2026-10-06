@@ -10,6 +10,7 @@ import {
   mergeNearbyDays,
   scheduleDays,
   scheduleGroups,
+  timelineAxis,
   validateMaterial,
   validateSchedule,
 } from "./logic";
@@ -291,5 +292,28 @@ describe("mergeNearbyDays (Issue #79)", () => {
     const days = scheduleDays([sched("2026-09-28"), sched("2026-09-29", { completed: true })], "p1", TODAY);
     expect(mergeNearbyDays(days, 2)).toMatchObject([{ state: "overdue", items: [{}, {}] }]);
     expect(mergeNearbyDays(days, 1)).toHaveLength(2);
+  });
+});
+
+describe("timelineAxis (Issue #79)", () => {
+  const phases = [phase("a", { start_date: "2026-09-01", end_date: "2026-10-15" })];
+
+  it("is unchanged by schedules inside the phases' range", () => {
+    expect(timelineAxis(phases, ["2026-09-10"], TODAY)).toEqual(timelineAxis(phases, [], TODAY));
+    expect(timelineAxis(phases, [], TODAY)).toEqual({
+      axisStart: "2026-08-25", viewStart: "2026-08-25", dayWidth: 10, baseDays: 89,
+    });
+  });
+
+  it("reaches schedules outside the phases but keeps the phases' scale and view start", () => {
+    const axis = timelineAxis(phases, ["2026-06-01", "2027-06-01"], TODAY);
+    expect(axis.axisStart).toBe("2026-05-25");
+    expect(axis.viewStart).toBe("2026-08-25");
+    expect(axis.dayWidth).toBe(10);
+    expect(axis.baseDays).toBe(410);
+  });
+
+  it("starts a week before today without phases", () => {
+    expect(timelineAxis([], [], TODAY)).toMatchObject({ axisStart: "2026-09-23", dayWidth: 14 });
   });
 });
