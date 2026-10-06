@@ -121,6 +121,8 @@ export interface Phase {
   name?: string;
   start_date?: string; // YYYY-MM-DD
   end_date?: string;
+  /** Day the phase was actually finished (migration 0023). The planned dates are kept. */
+  completed_at?: string;
   routines: Routine[];
 }
 

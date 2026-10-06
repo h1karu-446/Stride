@@ -34,6 +34,7 @@ interface PhaseRow {
   name: string | null;
   start_date: string | null;
   end_date: string | null;
+  completed_at?: string | null; // undefined until migration 0023 is applied
   routines: RoutineRow[] | null;
 }
 interface PlanRow {
@@ -98,6 +99,7 @@ function rowToPhase(r: PhaseRow): Phase {
     name: r.name ?? undefined,
     start_date: r.start_date ?? undefined,
     end_date: r.end_date ?? undefined,
+    completed_at: r.completed_at ?? undefined,
     routines: [...(r.routines ?? [])]
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map(rowToRoutine),
@@ -269,6 +271,21 @@ export function useDeletePhase() {
     mutationFn: async (phaseId: string) => {
       const { error } = await supabase.rpc("delete_phase", {
         p_phase_id: phaseId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: PLANS_KEY }),
+  });
+}
+
+/** Completes a phase on `date` (the device's date), or undoes it with null (Issue #50). */
+export function useSetPhaseCompletion() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ phaseId, date }: { phaseId: string; date: string | null }) => {
+      const { error } = await supabase.rpc("set_phase_completion", {
+        p_phase_id: phaseId,
+        p_date: date,
       });
       if (error) throw error;
     },

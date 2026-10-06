@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRestoreDeletedTask } from "@/lib/queries";
 import {
   canUndo,
   nextExpiry,
+  noticeAnnouncements,
   restoreErrorMessage,
   UndoNotice,
 } from "@/lib/taskUndo";
@@ -12,6 +13,36 @@ import { useTaskUndoStore } from "@/lib/taskUndoStore";
 export function TaskUndoNotices() {
   const notices = useTaskUndoStore((s) => s.notices);
   const expire = useTaskUndoStore((s) => s.expire);
+
+  // Screen readers: one persistent polite region and one assertive region
+  // (nesting live regions, or adding them together with their text, is not
+  // announced reliably). Each holds only the latest event, so a change to one
+  // notice does not re-read the others.
+  const [announce, setAnnounce] = useState({ polite: "", alert: "" });
+  const previous = useRef<UndoNotice[]>([]);
+  useEffect(() => {
+    const next = noticeAnnouncements(previous.current, notices);
+    previous.current = notices;
+    if (next.polite || next.alert) {
+      // The same text twice is no DOM change and is not read again; vary it invisibly.
+      const fresh = (text: string, cur: string) => !text ? cur : text === cur.replace(/\u200b$/, "")
+        ? (cur.endsWith("\u200b") ? text : `${text}\u200b`) : text;
+      setAnnounce((cur) => ({ polite: fresh(next.polite, cur.polite), alert: fresh(next.alert, cur.alert) }));
+    }
+  }, [notices]);
+
+  // A notice that held focus disappears after undo or expiry; keep focus on
+  // the page instead of letting it fall to <body>.
+  const listRef = useRef<HTMLUListElement>(null);
+  const hadFocus = useRef(false);
+  useEffect(() => {
+    if (!hadFocus.current) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    const next = listRef.current?.querySelector<HTMLElement>("[data-undo-action]");
+    (next ?? document.getElementById("main"))?.focus({ preventScroll: true });
+    hadFocus.current = !!next && document.activeElement === next;
+  }, [notices]);
 
   useEffect(() => {
     const at = nextExpiry(notices);
@@ -29,10 +60,20 @@ export function TaskUndoNotices() {
       aria-label="タスクの削除"
       className="fixed inset-x-0 bottom-4 z-50 flex justify-center px-4 pointer-events-none"
     >
+      <p role="status" className="sr-only">{announce.polite}</p>
+      <p role="alert" className="sr-only">{announce.alert}</p>
       <ul
-        role="status"
-        aria-live="polite"
+        ref={listRef}
         className="flex w-full max-w-md flex-col gap-2"
+        onFocus={() => { hadFocus.current = true; }}
+        onBlur={(event) => {
+          // A focused button that is removed may blur with relatedTarget null and
+          // is then disconnected; keep the flag only in that case.
+          const to = event.relatedTarget as Node | null;
+          if (to ? !listRef.current?.contains(to) : event.target.isConnected) {
+            hadFocus.current = false;
+          }
+        }}
       >
         {notices.map((n) => (
           <NoticeItem key={n.key} notice={n} />
@@ -82,11 +123,11 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
     >
       <span className="flex-1 min-w-0">
         {notice.kind === "delete-failed" ? (
-          <span role="alert">
+          <span>
             「<span className="break-all">{notice.title}</span>」を削除できませんでした。{notice.error}
           </span>
         ) : notice.status === "failed" ? (
-          <span role="alert">
+          <span>
             「<span className="break-all">{notice.title}</span>」を元に戻せませんでした。{notice.error}
           </span>
         ) : (
@@ -98,9 +139,11 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
       {notice.kind === "deleted" && (
         <button
           ref={actionRef}
+          data-undo-action
           type="button"
-          className="shrink-0 font-semibold text-notion-blue hover:underline disabled:opacity-50"
-          disabled={notice.status === "restoring"}
+          className="shrink-0 font-semibold text-notion-blue hover:underline aria-disabled:opacity-50"
+          // aria-disabled, not disabled: a disabled button loses focus.
+          aria-disabled={notice.status === "restoring"}
           onClick={undo}
           aria-label={`「${notice.title}」の削除を${notice.status === "failed" ? "もう一度" : ""}元に戻す`}
         >
@@ -114,6 +157,7 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
       {failed && (
         <button
           ref={notice.kind === "delete-failed" ? actionRef : undefined}
+          data-undo-action
           type="button"
           className="shrink-0 text-xs muted hover:underline"
           onClick={() => remove(notice.key)}
@@ -125,3 +169,4 @@ function NoticeItem({ notice }: { notice: UndoNotice }) {
     </li>
   );
 }
+
