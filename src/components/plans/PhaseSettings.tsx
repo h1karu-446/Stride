@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import DatePicker from "@/components/common/DatePicker";
 import { Field, FormActions } from "@/components/common/FormParts";
-import { todayISO } from "@/lib/date";
 import { ISO_WEEKDAY_CHAR, ISO_WEEKDAYS_IN_ORDER } from "@/lib/calendar";
 import { chip, MINUTE_PRESETS, WEEKDAY_PRESETS } from "./routinePresets";
 import { formatMinutes, hasErrors, validatePhase, validateRoutine, weekdaysLabel } from "@/lib/plans/logic";
@@ -16,7 +15,7 @@ const blankRoutine = (): Draft => ({
 });
 
 export default function PhaseSettings({ initial, selfId, existingRoutines, startWithNewRoutine,
-  initialDirty, showMenus = true,
+  initialDirty, showMenus = true, completedAt,
   openRoutineId, saving,
   failed, onSave, onCancel, onDelete, onDirtyChange }: {
   initial: PhaseInput;
@@ -33,6 +32,8 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   onDirtyChange: (dirty: boolean) => void;
   /** False: only the phase name and dates are editable; menus are saved unchanged. */
   showMenus?: boolean;
+  /** The phase's completion day (Issue #50); the start date cannot move past it. */
+  completedAt?: string;
 }) {
   const [phase, setPhase] = useState(initial);
   const [routines, setRoutines] = useState<Draft[]>(() => {
@@ -49,8 +50,7 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
   const [dirty, setDirty] = useState(!!initialDirty);
   // Errors stay hidden until the first save attempt, so an empty new form is not all red.
   const [attempted, setAttempted] = useState(false);
-  const today = todayISO();
-  const phaseErrors = validatePhase(phase);
+  const phaseErrors = validatePhase(phase, completedAt);
   const routineErrors = routines.map(({ input }) => validateRoutine(input));
   const canSave = !hasErrors(phaseErrors) && (!showMenus || routineErrors.every((errors) => !hasErrors(errors)));
 
@@ -134,15 +134,6 @@ export default function PhaseSettings({ initial, selfId, existingRoutines, start
         </div>
         {(attempted || phase.start_date) && phaseErrors.start_date && <p className="text-xs text-rose-600">{phaseErrors.start_date}</p>}
         {(attempted || phase.end_date) && phaseErrors.end_date && <p className="text-xs text-rose-600">{phaseErrors.end_date}</p>}
-        {selfId && phase.start_date <= today && phase.end_date > today && (
-          <button type="button" disabled={saving} onClick={() => updatePhase({ end_date: today })}
-            className="text-sm text-notion-blue hover:underline disabled:opacity-50">
-            今日でこのフェーズを終える
-          </button>
-        )}
-        {selfId && initial.end_date > today && phase.end_date === today && (
-          <p className="text-xs muted">保存すると明日からこのメニューは生成されません。次のフェーズの開始日は変わりません。</p>
-        )}
       </div>
       {showMenus && <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-notion-border">
         <div className="flex flex-wrap items-center justify-between gap-2">
