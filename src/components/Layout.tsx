@@ -88,7 +88,8 @@ export default function Layout() {
           </div>
         </nav>
       </header>
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
+      {/* tabIndex -1: focus lands here when the control that had it disappears (e.g. an undo notice). */}
+      <main id="main" tabIndex={-1} className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10 focus:outline-none">
         <Outlet />
         <UndoToasts />
       </main>
