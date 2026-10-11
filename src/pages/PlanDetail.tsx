@@ -19,6 +19,7 @@ import {
   formatDateLabel,
   formatMinutes,
   initialPhase,
+  phaseColors,
   scheduleDays,
   shouldShowOverdueNotice,
   sortedPhases,
@@ -146,6 +147,8 @@ export default function PlanDetail() {
   }
 
   const color = planHex(plan.color);
+  // The selected phase's own shade, the same as its bar.
+  const phaseColor = phaseColors(phases, color).get(selected.id) ?? color;
   const explicit = sortedPhases(phases.filter((p) => !p.is_implicit));
   const hasPhases = explicit.length > 0;
   const settingsRoutines = selected.routines.map(({ id, title, minutes, weekdays, importance, menu }) =>
@@ -283,7 +286,7 @@ export default function PlanDetail() {
               </div>
               <div className="flex shrink-0 items-center gap-1">
                 <span className="rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums"
-                  style={{ background: `${color}1f`, color }}>{phaseHeading()}</span>
+                  style={{ background: `${phaseColor}1f`, color }}>{phaseHeading()}</span>
                 <button type="button" aria-label="フェーズを編集" className="btn-ghost !p-1.5 muted"
                   onClick={() => setEditing({ kind: "phase-edit" })}>✎</button>
               </div>
@@ -330,7 +333,7 @@ export default function PlanDetail() {
               </div>
             )}
             <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-slate-100 dark:bg-notion-panel-hover">
-              <div className="h-full rounded-full" style={{ width: `${phaseProgress * 100}%`, background: color }} />
+              <div className="h-full rounded-full" style={{ width: `${phaseProgress * 100}%`, background: phaseColor }} />
             </div>
           </div>
         )}

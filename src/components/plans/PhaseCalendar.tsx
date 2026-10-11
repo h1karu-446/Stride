@@ -5,7 +5,7 @@ import { addDaysISO } from "@/lib/date";
 import { WEEKDAY_HEADERS } from "@/lib/calendar";
 import { planHex } from "@/lib/plans/colors";
 import { monthWeeks, weekSegments } from "@/lib/plans/calendar";
-import { phaseDatesAfterDrag } from "@/lib/plans/logic";
+import { phaseColors, phaseDatesAfterDrag } from "@/lib/plans/logic";
 import type { PhaseDragEdge, ScheduleDay } from "@/lib/plans/logic";
 import ScheduleMarker from "./ScheduleMarker";
 import type { Phase, PlanColor } from "@/types";
@@ -51,6 +51,7 @@ export default function PhaseCalendar({ phases, schedules = [], color, selectedI
     return () => observer.disconnect();
   }, []);
   const hex = planHex(color);
+  const shades = phaseColors(phases, hex);
   const drag = useRef<Drag | null>(null);
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
   const [createPreview, setCreatePreview] = useState<Dates | null>(null);
@@ -208,6 +209,7 @@ export default function PhaseCalendar({ phases, schedules = [], color, selectedI
           </span>}
           {segments.map(({ item: { phase, start_date, end_date }, startCol, endCol, continuesBefore, continuesAfter, lane }) => {
             const selected = phase.id === selectedId;
+            const shade = shades.get(phase.id) ?? hex;
             const done = phase.completed_at;
             const left = startCol * cellWidth + (continuesBefore ? 0 : 3);
             const width = (endCol - startCol + 1) * cellWidth - (continuesBefore ? 0 : 3) - (continuesAfter ? 0 : 3);
@@ -215,9 +217,9 @@ export default function PhaseCalendar({ phases, schedules = [], color, selectedI
             return <div key={phase.id}
               className={`absolute z-10 flex touch-none overflow-hidden border text-xs font-medium ${continuesBefore ? "rounded-l-none border-l-0" : "rounded-l-md"} ${continuesAfter ? "rounded-r-none border-r-0" : "rounded-r-md"}`}
               style={{ top: DAY_LABEL + lane * LANE, height: BAR, left, width,
-                borderColor: selected ? hex : `${hex}55`,
-                background: selected ? `${hex}38` : `${hex}1d`,
-                boxShadow: selected ? `0 0 0 1px ${hex}` : undefined }}>
+                borderColor: selected ? shade : `${shade}66`,
+                background: selected ? `${shade}40` : `${shade}24`,
+                boxShadow: selected ? `0 0 0 1px ${shade}` : undefined }}>
               {!continuesBefore && <button type="button" data-phase-id={phase.id} data-edge="start"
                 aria-label={`${phase.name}の開始日 ${md(start_date)} を調整`} title="開始日をドラッグ（左右キーでも1日ずつ調整）"
                 className={handle} onKeyDown={(event) => keyAdjust(event, phase, "start")} />}
