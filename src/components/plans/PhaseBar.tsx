@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
-import { mergeNearbyDays, phaseBarWidth, phaseDatesAfterDrag, sortedPhases, timelineAxis } from "@/lib/plans/logic";
+import { mergeNearbyDays, phaseBarWidth, phaseDatesAfterDrag, phaseGaps, sortedPhases, timelineAxis } from "@/lib/plans/logic";
 import type { PhaseDragEdge, ScheduleDay } from "@/lib/plans/logic";
 import ScheduleMarker from "./ScheduleMarker";
 import type { Phase, PlanColor } from "@/types";
@@ -15,7 +15,7 @@ type Drag = { id: string; pointerId: number; x: number; edge: PhaseDragEdge;
 /** row: the lane index where the drag started, or -1 for the bottom "add" row. */
 type CreateDrag = { pointerId: number; startDay: number; row: number };
 
-/** A shared date axis keeps adjacent, empty, and overlapping periods honest. */
+/** The timeline view of the phases: a shared date axis keeps adjacent, empty, and overlapping periods honest. */
 export default function PhaseBar({ phases, schedules = [], color, selectedId, today, onSelect, onAdd, onAdjustDates }: {
   phases: Phase[];
   /** The plan's schedules by day (scheduleDays), shown in their own row under the months. */
@@ -28,7 +28,6 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
   onAdjustDates: (id: string, dates: Dates) => void;
 }) {
   const ordered = sortedPhases(phases);
-  const first = ordered[0];
   // The axis also reaches schedules before or after every phase; the scale comes from the phases alone.
   const { axisStart, viewStart, dayWidth, baseDays } = timelineAxis(phases,
     schedules.flatMap((day) => [day.date, day.end]), today);
@@ -91,16 +90,7 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
     if (lane) lane.push(phase); else lanes.push([phase]);
   }
 
-  const gaps: { start: string; end: string; days: number }[] = [];
-  let coveredUntil = first?.end_date ?? today;
-  for (const phase of ordered.slice(1)) {
-    if (phase.start_date! > addDaysISO(coveredUntil, 1)) {
-      const start = addDaysISO(coveredUntil, 1);
-      const end = addDaysISO(phase.start_date!, -1);
-      gaps.push({ start, end, days: differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 });
-    }
-    if (phase.end_date! > coveredUntil) coveredUntil = phase.end_date!;
-  }
+  const gaps = phaseGaps(phases, today);
 
   function pointerDown(event: PointerEvent<HTMLButtonElement>, phase: Phase, edge: PhaseDragEdge) {
     if (event.button !== 0) return;
@@ -198,95 +188,87 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
     onPointerCancel: () => { drag.current = null; setPreview(null); },
   };
 
-  return <section aria-label="フェーズの期間" className="space-y-2">
-    <div className="flex items-end justify-between gap-3">
-      <h2 className="section-title">フェーズ</h2>
-      <p className="hidden text-[11px] muted sm:block">帯をドラッグで移動・端で期間を調整・空いている所をドラッグで追加</p>
-    </div>
-    <div ref={scroller} onScroll={extendNearEnd} className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
-      <div className="relative" style={{ width }}>
-        <div className="relative h-7 border-b border-slate-200 bg-slate-50 text-[11px] muted dark:border-notion-border dark:bg-notion-panel-hover">
-          {months.map((m) => <span key={m.date} className="absolute top-1.5 pl-1.5 font-medium" style={{ left: xFor(m.date) }}>{m.label}</span>)}
-        </div>
-        {schedules.length > 0 && <div role="group" aria-label="予定"
-          className="relative h-6 border-b border-slate-200 dark:border-notion-border">
-          {marks.map((day) => <ScheduleMarker key={day.date} day={day} left={xFor(day.date)}
-            width={(differenceInCalendarDays(parseISO(day.end), parseISO(day.date)) + 1) * dayWidth}
-            color={hex} today={today} open={openDay === day.date}
-            onToggle={() => setOpenDay((current) => current === day.date ? null : day.date)}
-            onClose={closeDay} />)}
-        </div>}
-        {months.map((m) => <div key={m.date} aria-hidden="true" className="pointer-events-none absolute bottom-0 top-0 border-l border-slate-200 dark:border-notion-border" style={{ left: xFor(m.date) }} />)}
-        {gaps.map((gap) => <div key={gap.start} aria-hidden="true"
-          className="pointer-events-none absolute bottom-0 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
-          style={{ top: headerHeight, left: xFor(gap.start), width: gap.days * dayWidth }} />)}
-        {lanes.map((lane, laneIndex) => <div key={laneIndex} title="空いている所をドラッグして新しいフェーズの期間を選択"
-          className="relative h-12 cursor-crosshair touch-none border-b border-slate-100 dark:border-notion-border/60"
-          {...createEvents(laneIndex)}>
-          {createOverlay(laneIndex)}
-          {lane.map((phase, index) => {
-            const datesOf = (p: Phase) => preview?.id === p.id ? preview.dates
-              : { start_date: p.start_date!, end_date: p.end_date! };
-            const dates = datesOf(phase);
-            const days = differenceInCalendarDays(parseISO(dates.end_date), parseISO(dates.start_date)) + 1;
-            // A short phase is widened for its name only up to the next bar in this row.
-            const next = lane[index + 1];
-            const barWidth = phaseBarWidth(days, dayWidth,
-              next ? xFor(datesOf(next).start_date) - xFor(dates.start_date) : undefined);
-            const narrow = barWidth < 32;
-            const selected = phase.id === selectedId;
-            const wide = days * dayWidth >= 130;
-            // Days left after an early completion are hatched; the planned end stays visible.
-            const done = phase.completed_at;
-            const restDays = done && done < dates.end_date
-              ? differenceInCalendarDays(parseISO(dates.end_date), parseISO(done)) : 0;
-            return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 overflow-hidden rounded-md border transition-shadow"
-                style={{ left: xFor(dates.start_date), width: barWidth,
-                  borderColor: selected ? hex : `${hex}55`,
-                  background: selected ? `${hex}38` : `${hex}1d`,
-                  boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
-                {restDays > 0 && <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 top-0 z-0"
-                  style={{ width: restDays * dayWidth,
-                    background: `repeating-linear-gradient(135deg, transparent 0 4px, ${hex}26 4px 6px)` }} />}
-                <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
-                  title="開始日をドラッグ（左右キーでも1日ずつ調整）"
-                  className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
-                  onPointerDown={(event) => pointerDown(event, phase, "start")}
-                  onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
-                <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}${done ? `、${md(done)}に完了` : ""}、ドラッグで移動`}
-                  title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}${done ? `（${md(done)} 完了）` : ""}`}
-                  className={`relative min-w-0 flex-1 cursor-grab truncate ${narrow ? "px-0" : "px-1"} text-left text-xs font-medium touch-none active:cursor-grabbing`}
-                  onPointerDown={(event) => pointerDown(event, phase, "move")}
-                  onKeyDown={(event) => keyAdjust(event, phase, "move")}
-                  onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}
-                  {...dragEvents}>{done && <span aria-hidden="true" className="mr-1">✓</span>}<span className="truncate">{phase.name}</span>{wide && <span className="ml-1.5 font-normal tabular-nums opacity-60">{md(dates.start_date)}–{md(dates.end_date)}</span>}</button>
-                <button type="button" aria-label={`${phase.name}の終了日 ${md(dates.end_date)} を調整`}
-                  title="終了日をドラッグ（左右キーでも1日ずつ調整）"
-                  className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
-                  onPointerDown={(event) => pointerDown(event, phase, "end")}
-                  onKeyDown={(event) => keyAdjust(event, phase, "end")} {...dragEvents} />
-              </div>
-          })}
-        </div>)}
-        <div title="ドラッグして新しいフェーズの期間を選択"
-          className="relative h-12 cursor-crosshair touch-none border-t border-slate-200/70 bg-slate-50/60 dark:border-notion-border dark:bg-notion-panel-hover/40"
-          {...createEvents(-1)}>
-          {createOverlay(-1)}
-          <button type="button" onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => onAdd()} aria-label="フェーズを追加" title="フェーズを追加"
-            className="sticky left-2 z-10 ml-2 mt-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white/95 text-sm font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
-            ＋
-          </button>
-          {createPreview?.row !== -1 && <span className="pointer-events-none sticky left-11 ml-2 text-[11px] muted">ドラッグで期間を選んで追加</span>}
-        </div>
-        {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
-          <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
-          {/* Below the schedule row, so a mark for today is not crossed out. */}
-          <span className="absolute bottom-0 w-px bg-rose-500/70" style={{ top: schedules.length > 0 ? headerHeight : 24 }} />
-        </div>}
+  return <div ref={scroller} onScroll={extendNearEnd} className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-notion-border dark:bg-notion-panel">
+    <div className="relative" style={{ width }}>
+      <div className="relative h-7 border-b border-slate-200 bg-slate-50 text-[11px] muted dark:border-notion-border dark:bg-notion-panel-hover">
+        {months.map((m) => <span key={m.date} className="absolute top-1.5 pl-1.5 font-medium" style={{ left: xFor(m.date) }}>{m.label}</span>)}
       </div>
+      {schedules.length > 0 && <div role="group" aria-label="予定"
+        className="relative h-6 border-b border-slate-200 dark:border-notion-border">
+        {marks.map((day) => <ScheduleMarker key={day.date} day={day} left={xFor(day.date)}
+          width={(differenceInCalendarDays(parseISO(day.end), parseISO(day.date)) + 1) * dayWidth}
+          color={hex} today={today} open={openDay === day.date}
+          onToggle={() => setOpenDay((current) => current === day.date ? null : day.date)}
+          onClose={closeDay} />)}
+      </div>}
+      {months.map((m) => <div key={m.date} aria-hidden="true" className="pointer-events-none absolute bottom-0 top-0 border-l border-slate-200 dark:border-notion-border" style={{ left: xFor(m.date) }} />)}
+      {gaps.map((gap) => <div key={gap.start} aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 border-x border-dashed border-slate-300 bg-slate-100/70 dark:border-notion-border-strong dark:bg-notion-panel-hover/70"
+        style={{ top: headerHeight, left: xFor(gap.start), width: gap.days * dayWidth }} />)}
+      {lanes.map((lane, laneIndex) => <div key={laneIndex} title="空いている所をドラッグして新しいフェーズの期間を選択"
+        className="relative h-12 cursor-crosshair touch-none border-b border-slate-100 dark:border-notion-border/60"
+        {...createEvents(laneIndex)}>
+        {createOverlay(laneIndex)}
+        {lane.map((phase, index) => {
+          const datesOf = (p: Phase) => preview?.id === p.id ? preview.dates
+            : { start_date: p.start_date!, end_date: p.end_date! };
+          const dates = datesOf(phase);
+          const days = differenceInCalendarDays(parseISO(dates.end_date), parseISO(dates.start_date)) + 1;
+          // A short phase is widened for its name only up to the next bar in this row.
+          const next = lane[index + 1];
+          const barWidth = phaseBarWidth(days, dayWidth,
+            next ? xFor(datesOf(next).start_date) - xFor(dates.start_date) : undefined);
+          const narrow = barWidth < 32;
+          const selected = phase.id === selectedId;
+          const wide = days * dayWidth >= 130;
+          // Days left after an early completion are hatched; the planned end stays visible.
+          const done = phase.completed_at;
+          const restDays = done && done < dates.end_date
+            ? differenceInCalendarDays(parseISO(dates.end_date), parseISO(done)) : 0;
+          return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 overflow-hidden rounded-md border transition-shadow"
+              style={{ left: xFor(dates.start_date), width: barWidth,
+                borderColor: selected ? hex : `${hex}55`,
+                background: selected ? `${hex}38` : `${hex}1d`,
+                boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
+              {restDays > 0 && <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 top-0 z-0"
+                style={{ width: restDays * dayWidth,
+                  background: `repeating-linear-gradient(135deg, transparent 0 4px, ${hex}26 4px 6px)` }} />}
+              <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
+                title="開始日をドラッグ（左右キーでも1日ずつ調整）"
+                className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
+                onPointerDown={(event) => pointerDown(event, phase, "start")}
+                onKeyDown={(event) => keyAdjust(event, phase, "start")} {...dragEvents} />
+              <button type="button" aria-label={`${phase.name} ${md(dates.start_date)}から${md(dates.end_date)}${done ? `、${md(done)}に完了` : ""}、ドラッグで移動`}
+                title={`${phase.name}: ${md(dates.start_date)}–${md(dates.end_date)}${done ? `（${md(done)} 完了）` : ""}`}
+                className={`relative min-w-0 flex-1 cursor-grab truncate ${narrow ? "px-0" : "px-1"} text-left text-xs font-medium touch-none active:cursor-grabbing`}
+                onPointerDown={(event) => pointerDown(event, phase, "move")}
+                onKeyDown={(event) => keyAdjust(event, phase, "move")}
+                onClick={() => { if (Date.now() >= ignoreClickUntil.current) onSelect(phase.id); }}
+                {...dragEvents}>{done && <span aria-hidden="true" className="mr-1">✓</span>}<span className="truncate">{phase.name}</span>{wide && <span className="ml-1.5 font-normal tabular-nums opacity-60">{md(dates.start_date)}–{md(dates.end_date)}</span>}</button>
+              <button type="button" aria-label={`${phase.name}の終了日 ${md(dates.end_date)} を調整`}
+                title="終了日をドラッグ（左右キーでも1日ずつ調整）"
+                className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}
+                onPointerDown={(event) => pointerDown(event, phase, "end")}
+                onKeyDown={(event) => keyAdjust(event, phase, "end")} {...dragEvents} />
+            </div>
+        })}
+      </div>)}
+      <div title="ドラッグして新しいフェーズの期間を選択"
+        className="relative h-12 cursor-crosshair touch-none border-t border-slate-200/70 bg-slate-50/60 dark:border-notion-border dark:bg-notion-panel-hover/40"
+        {...createEvents(-1)}>
+        {createOverlay(-1)}
+        <button type="button" onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => onAdd()} aria-label="フェーズを追加" title="フェーズを追加"
+          className="sticky left-2 z-10 ml-2 mt-2.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-slate-300 bg-white/95 text-sm font-medium text-notion-blue hover:border-notion-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-notion-blue dark:border-notion-border dark:bg-notion-panel">
+          ＋
+        </button>
+        {createPreview?.row !== -1 && <span className="pointer-events-none sticky left-11 ml-2 text-[11px] muted">ドラッグで期間を選んで追加</span>}
+      </div>
+      {axisStart <= today && today <= axisEnd && <div aria-label="今日" className="pointer-events-none absolute bottom-0 top-0 z-20" style={{ left: xFor(today) + dayWidth / 2 }}>
+        <span className="absolute -translate-x-1/2 top-1 whitespace-nowrap rounded-full bg-rose-500 px-1.5 text-[10px] font-semibold leading-4 text-white">今日</span>
+        {/* Below the schedule row, so a mark for today is not crossed out. */}
+        <span className="absolute bottom-0 w-px bg-rose-500/70" style={{ top: schedules.length > 0 ? headerHeight : 24 }} />
+      </div>}
     </div>
-    {gaps.length > 0 && <p className="text-xs muted">{gaps.map((gap) =>
-      `空白 ${gap.days}日（${md(gap.start)}–${md(gap.end)}）`).join(" · ")}</p>}
-  </section>;
+  </div>;
 }

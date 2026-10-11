@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import EmptyAddButton from "@/components/common/EmptyAddButton";
 import { useDeferredDelete, useHiddenKeys } from "@/lib/deferredDelete";
 import GoalPanel from "@/components/plans/GoalPanel";
 import MaterialList from "@/components/plans/MaterialList";
-import PhaseBar from "@/components/plans/PhaseBar";
+import PhasePanel from "@/components/plans/PhasePanel";
 import PhaseSettings from "@/components/plans/PhaseSettings";
 import PlanHeader from "@/components/plans/PlanHeader";
 import PlanOverview from "@/components/plans/PlanOverview";
@@ -14,6 +14,7 @@ import RoutineForm from "@/components/plans/RoutineForm";
 import ScheduleList from "@/components/plans/ScheduleList";
 import { addDaysISO, todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
+import { phaseDatesError } from "@/lib/plans/calendar";
 import {
   formatDateLabel,
   formatMinutes,
@@ -30,9 +31,14 @@ import {
   useSavePhaseSettings,
   useSaveRoutine,
   useSetPhaseCompletion,
+  useUpdatePhaseDates,
   useUpdatePlan,
 } from "@/lib/plans/queries";
 import { useTasks } from "@/lib/queries";
+
+type Dates = { start_date: string; end_date: string };
+/** The last date change saved from a drag; `before` is where an undo goes back to. */
+type Adjusted = { phaseId: string; name: string; before: Dates; after: Dates } | { error: string };
 
 type Editing =
   | { kind: "phase-add"; draftId: number;
@@ -57,6 +63,8 @@ export default function PlanDetail() {
   const saveRoutine = useSaveRoutine();
   const deleteRoutine = useDeleteRoutine();
   const setCompletion = useSetPhaseCompletion();
+  const updateDates = useUpdatePhaseDates();
+  const [adjusted, setAdjusted] = useState<Adjusted | null>(null);
   const deferDelete = useDeferredDelete((state) => state.schedule);
   const hidden = useHiddenKeys();
 
@@ -95,6 +103,12 @@ export default function PlanDetail() {
     return true;
   }, [editing, phaseDirty, savePhase, saveRoutine, deletePhase, deleteRoutine, setCompletion]);
   const closeEditing = useCallback(() => setEditing(null), [setEditing]);
+  // The notice of a saved change stays a few seconds; an error stays until the next change.
+  useEffect(() => {
+    if (!adjusted || "error" in adjusted) return;
+    const timer = window.setTimeout(() => setAdjusted(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [adjusted]);
 
   if (isLoading) return <p className="text-sm muted">読み込み中…</p>;
   if (!plan || !selected) {
@@ -106,6 +120,29 @@ export default function PlanDetail() {
         </Link>
       </div>
     );
+  }
+
+  // Dragging a phase on the timeline or calendar saves its new dates at once (no settings form).
+  function adjustDates(phaseId: string, dates: Dates, undo = false) {
+    const phase = phases.find((p) => p.id === phaseId);
+    if (!phase?.start_date || !phase.end_date) return;
+    const error = phaseDatesError(dates, phase.completed_at);
+    if (error) { setAdjusted({ error }); return; }
+    // An open settings form for this phase would save its older dates over the new ones.
+    if (editing?.kind === "phase-edit" && selected?.id === phaseId) {
+      if (savePhase.isPending) {
+        setAdjusted({ error: "フェーズの設定を保存しています。保存が終わってからもう一度操作してください" });
+        return;
+      }
+      if (!setEditing(null)) return;
+    }
+    const before = { start_date: phase.start_date, end_date: phase.end_date };
+    updateDates.mutate({ phaseId, dates }, {
+      onError: () => setAdjusted({ error: "期間を保存できませんでした。もう一度操作してください" }),
+    });
+    // Quick changes to one phase (arrow keys) are undone together.
+    setAdjusted((last) => undo ? null : { phaseId, name: phase.name ?? "フェーズ", after: dates,
+      before: last && !("error" in last) && last.phaseId === phaseId ? last.before : before });
   }
 
   const color = planHex(plan.color);
@@ -191,7 +228,7 @@ export default function PlanDetail() {
 
       <GoalPanel key={`goal-${plan.id}`} plan={plan} />
 
-      <PhaseBar
+      <PhasePanel
           phases={explicit}
           schedules={scheduleDays(tasks.filter((task) => !hidden.has(`task:${task.id}`)), plan.id, today)}
           color={plan.color}
@@ -200,9 +237,14 @@ export default function PlanDetail() {
           onSelect={(pid) => { if (setEditing(null)) setSelectedId(pid); }}
           onAdd={(dates) => setEditing({ kind: "phase-add", draftId: ++nextPhaseDraftId.current,
             initialDates: dates })}
-          onAdjustDates={(pid, dates) => {
-            if (setEditing({ kind: "phase-edit", initialDates: dates })) setSelectedId(pid);
-          }}
+          onAdjustDates={(pid, dates) => adjustDates(pid, dates)}
+          notice={adjusted && ("error" in adjusted
+            ? <p role="alert" className="text-xs text-rose-600">{adjusted.error}</p>
+            : <p role="status" className="flex flex-wrap items-center gap-x-2 text-xs muted">
+              <span>「{adjusted.name}」を {format(parseISO(adjusted.after.start_date), "M/d")}–{format(parseISO(adjusted.after.end_date), "M/d")} に変更しました</span>
+              <button type="button" className="text-notion-blue hover:underline"
+                onClick={() => adjustDates(adjusted.phaseId, adjusted.before, true)}>元に戻す</button>
+            </p>)}
         />
 
       {editing?.kind === "phase-add" && (
