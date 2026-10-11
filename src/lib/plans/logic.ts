@@ -99,6 +99,22 @@ export function phaseDatesAfterDrag(
   return { start_date: start, end_date: [start, addDaysISO(end, days)].sort()[1] };
 }
 
+/** Days between phases that no phase covers, in order. */
+export function phaseGaps(phases: Phase[], today: string): { start: string; end: string; days: number }[] {
+  const ordered = sortedPhases(phases);
+  const gaps: { start: string; end: string; days: number }[] = [];
+  let coveredUntil = ordered[0]?.end_date ?? today;
+  for (const phase of ordered.slice(1)) {
+    if (phase.start_date! > addDaysISO(coveredUntil, 1)) {
+      const start = addDaysISO(coveredUntil, 1);
+      const end = addDaysISO(phase.start_date!, -1);
+      gaps.push({ start, end, days: differenceInCalendarDays(parseISO(end), parseISO(start)) + 1 });
+    }
+    if (phase.end_date! > coveredUntil) coveredUntil = phase.end_date!;
+  }
+  return gaps;
+}
+
 /** Initial selection on the detail screen (spec 4.2). */
 export function initialPhase(phases: Phase[], today: string): Phase | undefined {
   const sorted = sortedPhases(phases);

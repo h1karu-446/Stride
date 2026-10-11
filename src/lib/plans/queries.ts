@@ -278,6 +278,45 @@ export function useDeletePhase() {
   });
 }
 
+const PHASE_DATES_KEY = ["phase-dates"] as const;
+
+/**
+ * Saves only a phase's dates, straight from a drag on the timeline or calendar,
+ * updating the cache first. Changes run one at a time in order, so quick arrow
+ * keys cannot land out of order.
+ */
+export function useUpdatePhaseDates() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: PHASE_DATES_KEY,
+    scope: { id: "phase-dates" },
+    mutationFn: async ({ phaseId, dates }: { phaseId: string; dates: { start_date: string; end_date: string } }) => {
+      const { data, error } = await supabase.from("phases").update(dates).eq("id", phaseId).select("id");
+      if (error) throw error;
+      // No row means the phase is gone (deleted elsewhere); do not report it as saved.
+      if (!data?.length) throw new Error("phase not found");
+    },
+    onMutate: async ({ phaseId, dates }) => {
+      await qc.cancelQueries({ queryKey: PLANS_KEY });
+      const previous = qc.getQueryData<Plan[]>(PLANS_KEY);
+      qc.setQueryData<Plan[]>(PLANS_KEY, (plans) => plans?.map((p) => ({
+        ...p,
+        phases: p.phases.map((phase) => phase.id === phaseId ? { ...phase, ...dates } : phase),
+      })));
+      return { previous };
+    },
+    // A later change already shows on top of this one; going back would hide it, so
+    // only the last change rolls back, and the refetch below corrects the rest.
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous && qc.isMutating({ mutationKey: PHASE_DATES_KEY }) <= 1) qc.setQueryData(PLANS_KEY, ctx.previous);
+    },
+    // Refetching while a later change is still waiting would briefly show older dates.
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: PHASE_DATES_KEY }) <= 1) qc.invalidateQueries({ queryKey: PLANS_KEY });
+    },
+  });
+}
+
 /** Completes a phase on `date` (the device's date), or undoes it with null (Issue #50). */
 export function useSetPhaseCompletion() {
   const qc = useQueryClient();
