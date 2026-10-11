@@ -3,7 +3,7 @@ import type { KeyboardEvent, PointerEvent } from "react";
 import { addMonths, differenceInCalendarDays, format, parseISO, startOfMonth } from "date-fns";
 import { addDaysISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
-import { mergeNearbyDays, phaseBarWidth, phaseDatesAfterDrag, phaseGaps, sortedPhases, timelineAxis } from "@/lib/plans/logic";
+import { mergeNearbyDays, phaseBarWidth, phaseColors, phaseDatesAfterDrag, phaseGaps, sortedPhases, timelineAxis } from "@/lib/plans/logic";
 import type { PhaseDragEdge, ScheduleDay } from "@/lib/plans/logic";
 import ScheduleMarker from "./ScheduleMarker";
 import type { Phase, PlanColor } from "@/types";
@@ -70,6 +70,7 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
   const [preview, setPreview] = useState<{ id: string; dates: Dates } | null>(null);
   const [createPreview, setCreatePreview] = useState<(Dates & { row: number }) | null>(null);
   const hex = planHex(color);
+  const shades = phaseColors(phases, hex);
   // Marks closer than about 24px are merged so they and their counts stay readable.
   const marks = mergeNearbyDays(schedules, Math.ceil(24 / dayWidth));
   const [openDay, setOpenDay] = useState<string | null>(null);
@@ -220,6 +221,7 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
             next ? xFor(datesOf(next).start_date) - xFor(dates.start_date) : undefined);
           const narrow = barWidth < 32;
           const selected = phase.id === selectedId;
+          const shade = shades.get(phase.id) ?? hex;
           const wide = days * dayWidth >= 130;
           // Days left after an early completion are hatched; the planned end stays visible.
           const done = phase.completed_at;
@@ -227,12 +229,12 @@ export default function PhaseBar({ phases, schedules = [], color, selectedId, to
             ? differenceInCalendarDays(parseISO(dates.end_date), parseISO(done)) : 0;
           return <div key={phase.id} className="absolute top-1.5 z-10 flex h-9 overflow-hidden rounded-md border transition-shadow"
               style={{ left: xFor(dates.start_date), width: barWidth,
-                borderColor: selected ? hex : `${hex}55`,
-                background: selected ? `${hex}38` : `${hex}1d`,
-                boxShadow: selected ? `0 0 0 1px ${hex}, 0 4px 12px -4px ${hex}66` : undefined }}>
+                borderColor: selected ? shade : `${shade}66`,
+                background: selected ? `${shade}40` : `${shade}24`,
+                boxShadow: selected ? `0 0 0 1px ${shade}, 0 4px 12px -4px ${shade}66` : undefined }}>
               {restDays > 0 && <div aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 top-0 z-0"
                 style={{ width: restDays * dayWidth,
-                  background: `repeating-linear-gradient(135deg, transparent 0 4px, ${hex}26 4px 6px)` }} />}
+                  background: `repeating-linear-gradient(135deg, transparent 0 4px, ${shade}26 4px 6px)` }} />}
               <button type="button" aria-label={`${phase.name}の開始日 ${md(dates.start_date)} を調整`}
                 title="開始日をドラッグ（左右キーでも1日ずつ調整）"
                 className={`${narrow ? "w-1.5" : "w-3"} shrink-0 cursor-ew-resize touch-none transition hover:bg-black/10 dark:hover:bg-white/15`}

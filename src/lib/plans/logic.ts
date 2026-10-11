@@ -12,7 +12,7 @@ import type {
   Task,
 } from "@/types";
 import type { AddTaskInput } from "@/lib/queries";
-import { PLAN_COLORS } from "./colors";
+import { PLAN_COLORS, phaseShade } from "./colors";
 
 // Pure helpers for the plan screens. No Supabase access here so they can be
 // unit tested (see logic.test.ts).
@@ -97,6 +97,12 @@ export function phaseDatesAfterDrag(
   if (edge === "move") return { start_date: addDaysISO(start, days), end_date: addDaysISO(end, days) };
   if (edge === "start") return { start_date: [addDaysISO(start, days), end].sort()[0], end_date: end };
   return { start_date: start, end_date: [start, addDaysISO(end, days)].sort()[1] };
+}
+
+/** Each phase's own color near the plan's color, in date order (the first keeps the plan's color). */
+export function phaseColors(phases: Phase[], planColor: string): Map<string, string> {
+  return new Map(sortedPhases(phases.filter((p) => !p.is_implicit))
+    .map((phase, index) => [phase.id, phaseShade(planColor, index)]));
 }
 
 /** Days between phases that no phase covers, in order. */
