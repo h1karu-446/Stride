@@ -57,7 +57,7 @@ export function deadlineLabel(deadline: string, today: string): string {
   return `${md}まで`;
 }
 
-/** Label of the add button for the displayed day. */
-export function scheduleButtonLabel(date: string, today: string): string {
-  return date === today ? "今日に追加" : `${format(parseISO(date), "M/d")}に追加`;
+/** "今日" or "10/24". */
+export function dayName(date: string, today: string): string {
+  return date === today ? "今日" : format(parseISO(date), "M/d");
 }

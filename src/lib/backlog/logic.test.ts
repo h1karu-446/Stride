@@ -5,7 +5,7 @@ import {
   canUnschedule,
   deadlineLabel,
   deadlineState,
-  scheduleButtonLabel,
+  dayName,
   sortBacklog,
 } from "./logic";
 
@@ -79,9 +79,9 @@ describe("deadline", () => {
   });
 });
 
-describe("scheduleButtonLabel", () => {
+describe("dayName", () => {
   it("names the displayed day", () => {
-    expect(scheduleButtonLabel(TODAY, TODAY)).toBe("今日に追加");
-    expect(scheduleButtonLabel("2026-10-24", TODAY)).toBe("10/24に追加");
+    expect(dayName(TODAY, TODAY)).toBe("今日");
+    expect(dayName("2026-10-24", TODAY)).toBe("10/24");
   });
 });

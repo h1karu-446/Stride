@@ -4,7 +4,7 @@ import {
   canUnschedule,
   deadlineLabel,
   deadlineState,
-  scheduleButtonLabel,
+  dayName,
   sortBacklog,
 } from "@/lib/backlog/logic";
 import {
@@ -79,26 +79,18 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
         unschedule.mutate(task);
       }}
     >
-      <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
-        <div>
-          <h2 id="backlog-heading" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-none">
-            やることリスト
-          </h2>
-          <p className="text-[11px] muted mt-0.5">
-            日付を決めていないこと。タスクへドラッグするとこの日に入ります
-          </p>
-        </div>
+      <header className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-notion-border">
+        <h2 id="backlog-heading" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+          やることリスト
+        </h2>
         <span className="text-sm tabular-nums muted">{items.length}</span>
       </header>
 
       <BacklogAdd />
       <BacklogNotices />
 
-      {isLoading ? null : items.length === 0 ? (
-        <p className="px-5 py-6 text-center text-sm muted">
-          まだありません。日付を決めていないことを上から追加してください。
-        </p>
-      ) : (
+      {/* Empty: the add row above is the whole panel; no placeholder text. */}
+      {!isLoading && items.length > 0 && (
         <ul className="divide-y divide-slate-100 dark:divide-notion-border overflow-y-auto" style={{ maxHeight: 360 }}>
           {items.map((item) => (
             <BacklogRow
@@ -137,8 +129,8 @@ function BacklogNotices() {
   const alert = notice?.kind === "alert" ? notice.text : "";
   return (
     <>
-      <p role="status" className={status ? "px-5 pt-2 text-xs muted" : "sr-only"}>{status}</p>
-      <p role="alert" className={alert ? "px-5 pt-2 text-xs text-rose-600 dark:text-rose-300" : "sr-only"}>{alert}</p>
+      <p role="status" className={status ? "px-5 py-1.5 text-xs muted" : "sr-only"}>{status}</p>
+      <p role="alert" className={alert ? "px-5 py-1.5 text-xs text-rose-600 dark:text-rose-300" : "sr-only"}>{alert}</p>
     </>
   );
 }
@@ -158,34 +150,37 @@ function BacklogAdd() {
   return (
     <form
       onSubmit={submit}
-      className="px-5 py-3 border-b border-slate-100 dark:border-notion-border bg-slate-50/40 dark:bg-notion-panel-hover/40 space-y-2"
+      className="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-slate-100 dark:border-notion-border"
     >
-      <div className="flex items-center gap-2 rounded-md border border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel px-3 py-1.5 focus-within:ring-2 focus-within:ring-notion-blue focus-within:border-transparent transition">
-        <span className="text-notion-blue text-base leading-none select-none" aria-hidden>+</span>
-        <input
-          aria-label="やることを追加"
-          className="flex-1 bg-transparent outline-none text-sm placeholder:text-slate-400 dark:placeholder:text-notion-muted"
-          placeholder="やることを追加..."
-          value={v.title}
-          onChange={(e) => setV({ ...v, title: e.target.value })}
-          onKeyDown={(e) => {
-            // Enter that confirms an IME conversion must not submit.
-            if (e.key === "Enter" && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault();
-          }}
-        />
-        <button type="submit" className="btn-primary !py-1 !px-3 text-xs" disabled={!v.title.trim() || add.isPending}>
-          追加
-        </button>
-      </div>
+      <input
+        aria-label="やることを追加"
+        className={INPUT + " min-w-[10rem] flex-1"}
+        placeholder="やることを追加"
+        value={v.title}
+        onChange={(e) => setV({ ...v, title: e.target.value })}
+        onKeyDown={(e) => {
+          // Enter that confirms an IME conversion must not submit.
+          if (e.key === "Enter" && (e.nativeEvent.isComposing || e.keyCode === 229)) e.preventDefault();
+        }}
+      />
       <BacklogFields value={v} onChange={setV} />
+      <button type="submit" className="btn-primary !py-2 !px-3 text-xs" disabled={!v.title.trim() || add.isPending}>
+        追加
+      </button>
       {add.isError && (
-        <p className="text-xs text-rose-600 dark:text-rose-300" role="alert">追加できませんでした。</p>
+        <p className="basis-full text-xs text-rose-600 dark:text-rose-300" role="alert">追加できませんでした。</p>
       )}
     </form>
   );
 }
 
-/** Priority pills and the optional deadline, shared by add and edit. */
+const INPUT =
+  "rounded-md border border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel px-2.5 py-2 text-sm outline-none placeholder:text-slate-400 dark:placeholder:text-notion-muted focus:ring-2 focus:ring-notion-blue focus:border-transparent";
+
+/**
+ * Priority (one segmented control: the colored dots say what it is) and the
+ * optional deadline, shared by add and edit. Laid out inline by the parent.
+ */
 function BacklogFields({
   value,
   onChange,
@@ -194,20 +189,24 @@ function BacklogFields({
   onChange: (v: BacklogInput) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-[11px] uppercase tracking-wide muted">優先度</span>
-      <div className="inline-flex gap-1">
+    <>
+      <div
+        role="group"
+        aria-label="優先度"
+        className="inline-flex rounded-md border border-slate-200 dark:border-notion-border p-0.5"
+      >
         {IMPORTANCE_LIST.map((i) => (
           <button
             key={i}
             type="button"
             aria-pressed={value.importance === i}
+            aria-label={`優先度 ${i}`}
             onClick={() => onChange({ ...value, importance: i })}
             className={
-              "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs transition " +
+              "inline-flex items-center gap-1 rounded px-2 py-1 text-xs transition " +
               (value.importance === i
-                ? "border-slate-400 dark:border-notion-border-strong bg-white dark:bg-notion-panel font-semibold"
-                : "border-slate-200 dark:border-notion-border muted hover:bg-slate-100 dark:hover:bg-notion-panel-hover")
+                ? "bg-slate-100 dark:bg-notion-panel-hover font-semibold"
+                : "muted hover:text-slate-700 dark:hover:text-notion-fg")
             }
           >
             <span className={"size-2 rounded-full " + DOT[i]} aria-hidden />
@@ -215,16 +214,14 @@ function BacklogFields({
           </button>
         ))}
       </div>
-      <div className="w-56 max-w-full">
-        <DatePicker
-          label="締め切り"
-          value={value.deadline ?? ""}
-          emptyLabel="＋ 締め切り"
-          allowClear
-          onChange={(d) => onChange({ ...value, deadline: d || undefined })}
-        />
-      </div>
-    </div>
+      <DatePicker
+        label="締め切り"
+        value={value.deadline ?? ""}
+        emptyLabel="締め切り"
+        allowClear
+        onChange={(d) => onChange({ ...value, deadline: d || undefined })}
+      />
+    </>
   );
 }
 
@@ -251,11 +248,11 @@ function BacklogRow({
       update.mutate({ id: item.id, input: { ...editing, title } }, { onSuccess: () => setEditing(null) });
     };
     return (
-      <li className="px-5 py-3 space-y-2 bg-slate-50/60 dark:bg-notion-panel-hover/30">
+      <li className="flex flex-wrap items-center gap-2 px-5 py-2.5 bg-slate-50/60 dark:bg-notion-panel-hover/30">
         <input
           autoFocus
           aria-label="やることのタイトル"
-          className="w-full rounded-md border border-slate-200 dark:border-notion-border bg-white dark:bg-notion-panel px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-notion-blue"
+          className={INPUT + " basis-full"}
           value={editing.title}
           onChange={(e) => setEditing({ ...editing, title: e.target.value })}
           onKeyDown={(e) => {
@@ -265,24 +262,24 @@ function BacklogRow({
           }}
         />
         <BacklogFields value={editing} onChange={setEditing} />
-        <div className="flex items-center gap-2">
-          <button type="button" className="btn-primary !py-1 !px-3 text-xs" disabled={!editing.title.trim() || update.isPending} onClick={save}>
-            保存
-          </button>
-          <button type="button" className="btn-ghost !py-1 !px-3 text-xs" onClick={() => setEditing(null)}>
-            キャンセル
-          </button>
+        <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            className="ml-auto text-xs text-rose-600 dark:text-rose-300 hover:underline disabled:opacity-50"
+            className="btn-ghost !py-1.5 !px-2.5 text-xs text-rose-600 dark:text-rose-300 disabled:opacity-50"
             disabled={remove.isPending}
             onClick={() => remove.mutate(item.id)}
           >
             削除
           </button>
+          <button type="button" className="btn-ghost !py-1.5 !px-2.5 text-xs" onClick={() => setEditing(null)}>
+            キャンセル
+          </button>
+          <button type="button" className="btn-primary !py-1.5 !px-3 text-xs" disabled={!editing.title.trim() || update.isPending} onClick={save}>
+            保存
+          </button>
         </div>
         {(update.isError || remove.isError) && (
-          <p className="text-xs text-rose-600 dark:text-rose-300" role="alert">保存できませんでした。</p>
+          <p className="basis-full text-xs text-rose-600 dark:text-rose-300" role="alert">保存できませんでした。</p>
         )}
       </li>
     );
@@ -323,13 +320,14 @@ function BacklogRow({
           {deadlineLabel(item.deadline, today)}
         </span>
       )}
+      {/* Shown on hover / focus with a mouse; always on touch, where it is the only way. */}
       <button
         type="button"
-        className="flex-shrink-0 rounded border border-slate-200 dark:border-notion-border px-2 py-0.5 text-[11px] muted hover:text-slate-900 dark:hover:text-notion-fg hover:bg-white dark:hover:bg-notion-panel transition"
+        className="flex-shrink-0 rounded-md border border-slate-200 dark:border-notion-border px-2 py-1 text-xs muted hover:text-slate-900 dark:hover:text-notion-fg hover:bg-white dark:hover:bg-notion-panel opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition"
         onClick={(e) => onSchedule(document.activeElement === e.currentTarget)}
-        aria-label={`「${item.title}」を${scheduleButtonLabel(date, today)}`}
+        aria-label={`「${item.title}」を${dayName(date, today)}のタスクにする`}
       >
-        {scheduleButtonLabel(date, today)}
+        {dayName(date, today)}へ
       </button>
     </li>
   );

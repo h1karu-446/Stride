@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { fetchAllPages } from "@/lib/pagination";
-import { format, parseISO } from "date-fns";
 import { todayISO } from "@/lib/date";
+import { dayName } from "./logic";
 import { useBacklogNotice } from "./notice";
 import type { BacklogItem, Importance, Task } from "@/types";
 
@@ -136,9 +136,6 @@ function show(kind: "status" | "alert", text: string) {
   useBacklogNotice.getState().show(kind, text);
 }
 
-function dayLabel(date: string): string {
-  return date === todayISO() ? "今日" : format(parseISO(date), "M/d");
-}
 
 /**
  * Moves an item to `date` (a time-less task, or with both times). The item
@@ -174,7 +171,7 @@ export function useScheduleBacklogItem() {
       return { title };
     },
     onSuccess: (_d, v, ctx) =>
-      show("status", `「${ctx?.title ?? ""}」を${dayLabel(v.date)}のタスクにしました`),
+      show("status", `「${ctx?.title ?? ""}」を${dayName(v.date, todayISO())}のタスクにしました`),
     onError: (e, _v, ctx) => {
       if (!isAlreadyMoved(e)) {
         show("alert", `「${ctx?.title ?? ""}」をタスクにできませんでした。もう一度お試しください。`);
