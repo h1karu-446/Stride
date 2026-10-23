@@ -353,6 +353,20 @@ export function dropTimes(
   return { start, end: start + boundedDur };
 }
 
+/**
+ * Start / end minutes of a timeline task moved by `delta` minutes. The
+ * duration is kept: a move past 00:00 or 24:00 stops at that edge instead of
+ * shortening the task.
+ */
+export function movedRange(
+  start: number,
+  end: number,
+  delta: number
+): { start: number; end: number } {
+  const d = Math.max(-start, Math.min(DAY_MIN - end, delta));
+  return { start: start + d, end: end + d };
+}
+
 // --- dates -------------------------------------------------------------
 
 export function formatDateLabel(date: string, today: string): string {

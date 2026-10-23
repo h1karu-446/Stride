@@ -10,6 +10,7 @@ import {
   futureMenuView,
   pendingRoutines,
   dropTimes,
+  movedRange,
   initialPhase,
   memoOneLine,
   phaseForDate,
@@ -425,5 +426,17 @@ describe("phaseBarWidth", () => {
     expect(phaseBarWidth(3, 14, 42)).toBe(42);        // next starts the day after: real length
     expect(phaseBarWidth(1, 14, 14)).toBe(14);
     expect(phaseBarWidth(3, 14, -10)).toBe(42);       // next moved behind while dragging
+  });
+});
+
+describe("movedRange", () => {
+  it("moves start and end together", () => {
+    expect(movedRange(540, 585, 60)).toEqual({ start: 600, end: 645 });
+    expect(movedRange(540, 585, -60)).toEqual({ start: 480, end: 525 });
+  });
+  it("keeps the duration at the day's edges instead of shortening", () => {
+    // 09:00-09:45 dragged far past midnight stops at 23:15-24:00.
+    expect(movedRange(540, 585, 2000)).toEqual({ start: 1395, end: 1440 });
+    expect(movedRange(540, 585, -2000)).toEqual({ start: 0, end: 45 });
   });
 });

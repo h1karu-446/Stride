@@ -18,10 +18,12 @@ import { useScheduleBacklogItem } from "@/lib/backlog/queries";
 import {
   dropTimes,
   formatMinutes,
+  movedRange,
   isLockedSchedule,
   taskDurationMinutes,
 } from "@/lib/plans/logic";
 import { todayISO } from "@/lib/date";
+import { edgeScrollSpeed } from "@/lib/edgeScroll";
 import { planHex } from "@/lib/plans/colors";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 
@@ -35,6 +37,7 @@ const HOUR_PX = 56;
 const SNAP_MIN = 15;
 const VIEWPORT_PX = 560;
 const DRAG_THRESHOLD_PX = 4;
+const EDGE_SCROLL_FRAME_MS = 16;
 
 type DragState =
   | {
@@ -232,52 +235,123 @@ export function TimelineView({
   const bedTargetMin = toMin(bedTarget);
 
   function pointerMin(e: React.PointerEvent | PointerEvent): number {
+    return minAtClientY(e.clientY);
+  }
+
+  function minAtClientY(clientY: number): number {
     const grid = gridRef.current;
     if (!grid) return START_HOUR * 60;
     const rect = grid.getBoundingClientRect();
-    const y = e.clientY - rect.top;
+    const y = clientY - rect.top;
     return Math.max(
       START_HOUR * 60,
       Math.min(END_HOUR * 60, snap(yToMin(y)))
     );
   }
 
+  // --- scrolling at the edges while dragging --------------------------------
+  // The timeline shows about 10 hours; dragging to its top / bottom edge (or
+  // past it) scrolls it, so a task can be moved / resized / drawn to any hour.
+  const dragStartClientY = useRef<number | null>(null);
+  const lastClientY = useRef<number | null>(null);
+  const scrollSpeed = useRef(0);
+  const scrollTimer = useRef<number | null>(null);
+
+  function beginEdgeScroll(e: React.PointerEvent) {
+    dragStartClientY.current = e.clientY;
+    lastClientY.current = e.clientY;
+    // Keep receiving the pointer when it leaves the timeline's box.
+    try {
+      gridRef.current?.setPointerCapture?.(e.pointerId);
+    } catch {
+      // The pointer is already gone (released before this ran); nothing to keep.
+    }
+  }
+
+  function updateEdgeScroll(clientY: number) {
+    const el = scrollRef.current;
+    const start = dragStartClientY.current;
+    lastClientY.current = clientY;
+    // Not before the pointer really moves: a click near an edge must not scroll.
+    if (!el || start == null || Math.abs(clientY - start) <= DRAG_THRESHOLD_PX) return;
+    const rect = el.getBoundingClientRect();
+    scrollSpeed.current = edgeScrollSpeed(clientY, rect.top, rect.bottom);
+    if (scrollSpeed.current === 0) stopEdgeScrollTimer();
+    else if (scrollTimer.current == null) {
+      // A timer, not requestAnimationFrame: frames pause in some embedded /
+      // background views, and the pointer may stay still at the edge.
+      scrollTimer.current = window.setInterval(edgeScrollStep, EDGE_SCROLL_FRAME_MS);
+    }
+  }
+
+  function edgeScrollStep() {
+    const el = scrollRef.current;
+    const clientY = lastClientY.current;
+    if (!el || clientY == null || scrollSpeed.current === 0) return stopEdgeScrollTimer();
+    const before = el.scrollTop;
+    el.scrollTop += scrollSpeed.current;
+    if (el.scrollTop === before) return stopEdgeScrollTimer(); // first / last hour
+    // The pointer stays still while the grid moves under it.
+    dragTo(clientY);
+  }
+
+  function stopEdgeScrollTimer() {
+    if (scrollTimer.current != null) window.clearInterval(scrollTimer.current);
+    scrollTimer.current = null;
+  }
+
+  function endEdgeScroll() {
+    scrollSpeed.current = 0;
+    dragStartClientY.current = null;
+    lastClientY.current = null;
+    stopEdgeScrollTimer();
+  }
+
+  useEffect(() => stopEdgeScrollTimer, []);
+
   function handleGridPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     if (e.target !== e.currentTarget) return;
     e.preventDefault();
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    beginEdgeScroll(e);
     const min = pointerMin(e);
     setDrag({ kind: "create", startMin: min, currentMin: min + SNAP_MIN });
   }
 
-  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
-    if (!drag) return;
-    const min = pointerMin(e);
-    if (drag.kind === "create") {
-      setDrag({ ...drag, currentMin: min });
-    } else if (drag.kind === "move") {
-      const activated =
-        drag.activated ||
-        Math.abs(e.clientY - drag.pointerStartClientY) > DRAG_THRESHOLD_PX;
-      setDrag({ ...drag, currentMin: min, activated });
-    } else if (drag.kind === "resize") {
+  /** Updates the drag for a pointer at `clientY` (also called while scrolling). */
+  function dragTo(clientY: number) {
+    const min = minAtClientY(clientY);
+    setDrag((drag) => {
+      if (!drag) return drag;
+      if (drag.kind === "create") return { ...drag, currentMin: min };
+      if (drag.kind === "move") {
+        const activated =
+          drag.activated ||
+          Math.abs(clientY - drag.pointerStartClientY) > DRAG_THRESHOLD_PX;
+        return { ...drag, currentMin: min, activated };
+      }
       if (drag.edge === "top") {
         const newStart = Math.max(
           START_HOUR * 60,
           Math.min(drag.origEnd - SNAP_MIN, min)
         );
-        setDrag({ ...drag, currentStart: newStart });
-      } else {
-        const newEnd = Math.min(
-          END_HOUR * 60,
-          Math.max(drag.origStart + SNAP_MIN, min)
-        );
-        setDrag({ ...drag, currentEnd: newEnd });
+        return { ...drag, currentStart: newStart };
       }
-    }
+      const newEnd = Math.min(
+        END_HOUR * 60,
+        Math.max(drag.origStart + SNAP_MIN, min)
+      );
+      return { ...drag, currentEnd: newEnd };
+    });
+  }
+
+  function handlePointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    if (!drag) return;
+    dragTo(e.clientY);
+    updateEdgeScroll(e.clientY);
   }
 
   function handlePointerUp() {
+    endEdgeScroll();
     if (!drag) return;
     if (drag.kind === "create") {
       const a = Math.min(drag.startMin, drag.currentMin);
@@ -292,9 +366,11 @@ export function TimelineView({
         const task = tasks.find((t) => t.id === drag.taskId);
         if (task) openEdit(task);
       } else {
-        const delta = drag.currentMin - drag.pointerStartMin;
-        const newStart = Math.max(START_HOUR * 60, drag.origStart + delta);
-        const newEnd = Math.min(END_HOUR * 60, drag.origEnd + delta);
+        const { start: newStart, end: newEnd } = movedRange(
+          drag.origStart,
+          drag.origEnd,
+          drag.currentMin - drag.pointerStartMin
+        );
         updateTaskMut.mutate({
           id: drag.taskId,
           patch: {
@@ -372,6 +448,7 @@ export function TimelineView({
   ) {
     e.stopPropagation();
     e.preventDefault();
+    beginEdgeScroll(e);
     const min = pointerMin(e);
     setDrag({
       kind: "move",
@@ -394,6 +471,7 @@ export function TimelineView({
   ) {
     e.stopPropagation();
     e.preventDefault();
+    beginEdgeScroll(e);
     setDrag({
       kind: "resize",
       taskId: task.id,
@@ -453,6 +531,12 @@ export function TimelineView({
                 return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
+              // dragover repeats about every 50ms (~3 frames) while held still.
+              const box = scrollRef.current;
+              if (box) {
+                const r = box.getBoundingClientRect();
+                box.scrollTop += edgeScrollSpeed(e.clientY, r.top, r.bottom) * 3;
+              }
               const rect = gridRef.current!.getBoundingClientRect();
               const y = e.clientY - rect.top;
               const minutesType = e.dataTransfer.types.find((t) =>
@@ -531,19 +615,16 @@ export function TimelineView({
                   drag.activated;
                 const isResizing =
                   drag?.kind === "resize" && drag.taskId === t.id;
-                const start = isMoving
-                  ? Math.max(
-                      START_HOUR * 60,
-                      drag.origStart + (drag.currentMin - drag.pointerStartMin)
-                    )
+                const moved = isMoving
+                  ? movedRange(drag.origStart, drag.origEnd, drag.currentMin - drag.pointerStartMin)
+                  : null;
+                const start = moved
+                  ? moved.start
                   : isResizing
                   ? drag.currentStart
                   : sMin;
-                const end = isMoving
-                  ? Math.min(
-                      END_HOUR * 60,
-                      drag.origEnd + (drag.currentMin - drag.pointerStartMin)
-                    )
+                const end = moved
+                  ? moved.end
                   : isResizing
                   ? drag.currentEnd
                   : eMin;
