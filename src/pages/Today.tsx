@@ -26,6 +26,7 @@ import {
 import {
   canGenerateMenusFor,
   formatMinutes,
+  futureMenuView,
   isLockedSchedule,
   memoOneLine,
   pendingRoutines,
@@ -54,7 +55,8 @@ export default function Today() {
   const isToday = date === today;
 
   // Adds today's routine tasks in the background (ADR-0002). Only when the
-  // displayed date is today; past / future days never generate.
+  // displayed date is today; past days never generate, future days only
+  // through FutureMenuBar's button (Issue #84).
   useEnsureRoutineTasks(date);
   usePlans(); // start loading plan names / colors together with the tasks
 
@@ -397,40 +399,68 @@ function TasksPanel({
  * automatically for a future day.
  */
 function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
-  const { data: plans } = usePlans();
+  const tasksQuery = useTasks(); // cached; only for its loading state
+  const plansQuery = usePlans();
   const generate = useGenerateRoutineTasks();
   const [result, setResult] = useState<number | null>(null);
+  const statusRef = useRef<HTMLParagraphElement>(null);
+  const running = useRef(false);
   const today = todayISO();
   const available = canGenerateMenusFor(date, today);
-  const { data: skipped } = useRoutineSkips(date, available);
+  const skipsQuery = useRoutineSkips(date, available);
   const pending = useMemo(
-    () => pendingRoutines(plans ?? [], tasks, date, skipped),
-    [plans, tasks, date, skipped]
+    () => pendingRoutines(plansQuery.data ?? [], tasks, date, skipsQuery.data),
+    [plansQuery.data, tasks, date, skipsQuery.data]
   );
 
   if (!available) return null;
-  if (pending.length === 0 && result == null && !generate.isError) return null;
+  const view = futureMenuView({
+    ready: tasksQuery.isSuccess && plansQuery.isSuccess && skipsQuery.isSuccess,
+    pending,
+    result,
+    failed: generate.isError,
+  });
 
-  const minutes = pending.reduce((s, r) => s + r.minutes, 0);
+  function run(e: React.MouseEvent<HTMLButtonElement>) {
+    // isPending only changes on the next render; the ref also stops a quick double press.
+    if (running.current) return;
+    running.current = true;
+    const hadFocus = document.activeElement === e.currentTarget;
+    generate.mutate(date, {
+      onSettled: () => {
+        running.current = false;
+      },
+      onSuccess: (count) => {
+        setResult(count);
+        // The button goes away; keep keyboard users on the result.
+        if (hadFocus) requestAnimationFrame(() => statusRef.current?.focus());
+      },
+    });
+  }
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-slate-100 dark:border-notion-border bg-slate-50/60 dark:bg-notion-panel-hover/30">
-      <p className="text-sm muted" role="status">
-        {generate.isError
-          ? "メニューを出せませんでした。もう一度お試しください。"
-          : result != null && pending.length === 0
-          ? result > 0
-            ? `メニューを${result}件追加しました。`
-            : "追加するメニューはありませんでした。"
-          : `この日のメニュー ${pending.length}件（${formatMinutes(minutes)}）はまだ出ていません。`}
+    <div
+      className={
+        view
+          ? "flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-slate-100 dark:border-notion-border bg-slate-50/60 dark:bg-notion-panel-hover/30"
+          : undefined
+      }
+    >
+      {/* Always mounted so the result is announced (role=status). */}
+      <p
+        ref={statusRef}
+        tabIndex={-1}
+        className={view ? "text-sm muted outline-none" : "sr-only"}
+        role="status"
+      >
+        {view?.message ?? ""}
       </p>
-      {pending.length > 0 && (
+      {view?.showButton && (
         <button
           type="button"
-          className="btn-outline text-sm"
-          disabled={generate.isPending}
-          onClick={() =>
-            generate.mutate(date, { onSuccess: (count) => setResult(count) })
-          }
+          className="btn-outline text-sm aria-disabled:opacity-60 aria-disabled:cursor-wait"
+          aria-disabled={generate.isPending}
+          onClick={run}
         >
           {generate.isPending ? "出しています…" : "この日のメニューを出す"}
         </button>

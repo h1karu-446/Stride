@@ -195,6 +195,39 @@ export function pendingRoutines(
   return plans.flatMap((p) => routinesForDate(p, date)).filter((r) => !done.has(r.id));
 }
 
+export interface FutureMenuView {
+  message: string;
+  showButton: boolean;
+}
+
+/**
+ * What FutureMenuBar shows (null = nothing). `ready` is false until the
+ * tasks, plans and skips are loaded, so a half-loaded day never offers menus
+ * that already exist. After one run the result stays and the button is gone.
+ */
+export function futureMenuView(v: {
+  ready: boolean;
+  pending: Routine[];
+  result: number | null;
+  failed: boolean;
+}): FutureMenuView | null {
+  if (v.failed) {
+    return { message: "メニューを出せませんでした。もう一度お試しください。", showButton: v.pending.length > 0 };
+  }
+  if (v.result != null) {
+    return {
+      message: v.result > 0 ? `メニューを${v.result}件追加しました。` : "追加するメニューはありませんでした。",
+      showButton: false,
+    };
+  }
+  if (!v.ready || v.pending.length === 0) return null;
+  const minutes = v.pending.reduce((s, r) => s + r.minutes, 0);
+  return {
+    message: `この日のメニュー ${v.pending.length}件（${formatMinutes(minutes)}）はまだ出ていません。`,
+    showButton: true,
+  };
+}
+
 export interface TodaySummary {
   totalMinutes: number;
   byPlan: { plan: Plan; minutes: number }[];

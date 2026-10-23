@@ -266,7 +266,7 @@ create policy "<table>_owner_all" on public.<table> for all
 1. 計画に紐づくタスクのうち、`scheduled_date > p_today` かつ未完了のものを削除する
 2. 計画を削除する。残ったタスクの `plan_id` / `routine_id` は `on delete set null` で外れる。スキップ記録（1で作られたものを含む）は cascade で消える
 
-`p_today` も `generate_routine_tasks` と同じ範囲チェックを行う。
+`p_today` は `current_date - 1` 〜 `current_date + 1` の範囲チェックを行う（`generate_routine_tasks` は migration 0025 で上限が `+ 8` になったが、`delete_plan` は変えていない）。
 
 ## 5. フロントエンド設計
 
@@ -404,7 +404,7 @@ sequenceDiagram
 #### 未来の日を前もって生成する（Issue #84、ADR-0006）
 
 1. 表示日が明日〜今日+7日（`canGenerateMenusFor`）で、まだ出ていないメニュー（`pendingRoutines`：その日のルーティンのうち、その日のタスクも `routine_skips` もないもの）があれば、タスクの欄の上に「この日のメニューを出す」を出す。自動では生成しない
-2. 押すと同じ RPC を `p_date = 表示日` で呼ぶ（`useGenerateRoutineTasks`）。件数 > 0 なら `["tasks"]` と `["reviews"]` を無効化し、結果（何件追加したか／追加するものがなかったか）を表示する
+2. 押すと同じ RPC を `p_date = 表示日` で呼ぶ（`useGenerateRoutineTasks`）。件数に関係なく `["tasks"]` と `["reviews"]` を無効化し、再取得が終わるまで押せない状態を保つ。結果（何件追加したか／追加するものがなかったか）を表示し、ボタンは消す。表示の分岐は `futureMenuView`。タスク・計画・スキップがすべて読み込まれるまではバーを出さない
 3. スキップは `useRoutineSkips(date)` で読む。キーを `["tasks", "routine_skips", date]` にして、タスクの変更（削除でスキップが増える、元に戻すで消える）と一緒に再取得させる
 4. その日になって今日として開いても、部分一意インデックスで二重に作られず、前もって削除した分はスキップ記録で作られない
 
@@ -475,6 +475,7 @@ Issue #36 で「移動」から「複製」に変えた（仕様 BR-04）。
 | [ADR-0003](../adr/0003-routine-skip-by-delete-trigger.md) | 削除したルーティンタスクの再生成防止 | 削除トリガーでスキップ記録を作る | タスクを論理削除（フラグ）にする |
 | [ADR-0004](../adr/0004-implicit-phase.md) | フェーズを作らない計画の扱い | 暗黙のフェーズを1つ持たせる | ルーティンを計画にも直接ぶら下げられるようにする |
 | [ADR-0005](../adr/0005-achievements-view.md) | 達成の記録の集め方 | ビューで4種類をまとめる | 達成イベントのテーブルに書き込む |
+| [ADR-0006](../adr/0006-generate-future-routine-tasks-on-demand.md) | 未来の日のメニューの出し方 | 7日先までボタンで本物のタスクを作る | 下書きだけ表示する／未来の日を開いたら自動で作る／上限なし |
 
 各判断の詳細は [docs/adr/](../adr/README.md) に1件1ファイルで書いている。
 

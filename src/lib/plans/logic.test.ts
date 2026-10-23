@@ -7,6 +7,7 @@ import {
   formatDateLabel,
   formatMinutes,
   canGenerateMenusFor,
+  futureMenuView,
   pendingRoutines,
   dropTimes,
   initialPhase,
@@ -162,6 +163,31 @@ describe("early menus (Issue #84)", () => {
     expect(pendingRoutines([p], tasks, day).map((r) => r.id)).toEqual(["r2"]);
     expect(pendingRoutines([p], tasks, day, ["r2"])).toEqual([]); // deleted for that day
     expect(pendingRoutines([plan({ status: "paused", phases: p.phases })], [], day)).toEqual([]);
+  });
+});
+
+describe("futureMenuView (Issue #84)", () => {
+  const pending = [routine({ id: "a", minutes: 30 }), routine({ id: "b", minutes: 45 })];
+  it("shows nothing until loaded or when nothing is pending", () => {
+    expect(futureMenuView({ ready: false, pending, result: null, failed: false })).toBeNull();
+    expect(futureMenuView({ ready: true, pending: [], result: null, failed: false })).toBeNull();
+  });
+  it("offers the pending menus", () => {
+    expect(futureMenuView({ ready: true, pending, result: null, failed: false })).toEqual({
+      message: "この日のメニュー 2件（1h15m）はまだ出ていません。", showButton: true,
+    });
+  });
+  it("keeps the result of the run, without the button, whatever the list says", () => {
+    expect(futureMenuView({ ready: true, pending: [], result: 2, failed: false })).toEqual({
+      message: "メニューを2件追加しました。", showButton: false,
+    });
+    // 0 created while the screen still lists menus (stale list): say so, no endless button.
+    expect(futureMenuView({ ready: true, pending, result: 0, failed: false })).toEqual({
+      message: "追加するメニューはありませんでした。", showButton: false,
+    });
+  });
+  it("offers a retry after a failure", () => {
+    expect(futureMenuView({ ready: true, pending, result: null, failed: true })?.showButton).toBe(true);
   });
 });
 

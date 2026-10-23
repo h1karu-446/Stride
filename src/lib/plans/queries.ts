@@ -562,7 +562,8 @@ export function useDeleteRoutine() {
  * Calls generate_routine_tasks for `date` when it is the device's today, once
  * per date. Runs in the background: the task list is never blocked on it, and
  * a failure only goes to the console (it is retried on the next open).
- * Past / future dates never generate (BR-02).
+ * Past dates never generate; future dates only on demand through
+ * useGenerateRoutineTasks (BR-02, Issue #84).
  */
 export function useEnsureRoutineTasks(date: string) {
   const qc = useQueryClient();
@@ -623,11 +624,14 @@ export function useGenerateRoutineTasks() {
       if (error) throw error;
       return typeof data === "number" ? data : 0;
     },
-    onSuccess: (count) => {
-      if (count > 0) {
-        qc.invalidateQueries({ queryKey: ["tasks"] });
-        qc.invalidateQueries({ queryKey: ["reviews"] });
-      }
-    },
+    // Always refetch, even for 0: the screen's pending list may be stale
+    // (another device generated, skips were not loaded yet). The mutation
+    // stays pending until the tasks (and the skips under ["tasks"]) are back,
+    // so the button cannot be pressed again on the old list.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["tasks"] }),
+        qc.invalidateQueries({ queryKey: ["reviews"] }),
+      ]),
   });
 }
