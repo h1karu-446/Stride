@@ -34,7 +34,21 @@ import {
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
-import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
+import {
+  DRAG_ID_TYPE,
+  TimelineView,
+  UnscheduledPanel,
+} from "@/components/TimelineView";
+import { BacklogPanel } from "@/components/BacklogPanel";
+import {
+  BACKLOG_DRAG_TYPE,
+  canScheduleOn,
+  canUnschedule,
+} from "@/lib/backlog/logic";
+import {
+  useScheduleBacklogItem,
+  useUnscheduleTask,
+} from "@/lib/backlog/queries";
 import { TaskUndoNotices } from "@/components/TaskUndoNotices";
 
 type ViewMode = "list" | "timeline";
@@ -260,15 +274,19 @@ export default function Today() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4 lg:items-stretch">
-        <TasksPanel
-          tasks={tasks}
-          date={date}
-          completedCount={completedCount}
-          view={view}
-          onViewChange={setView}
-          bedTarget={bedTarget}
-        />
+      <div className="grid grid-cols-1 lg:grid-cols-[1.7fr_1fr] gap-4 lg:items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          <TasksPanel
+            tasks={tasks}
+            date={date}
+            completedCount={completedCount}
+            view={view}
+            onViewChange={setView}
+            bedTarget={bedTarget}
+          />
+          {/* Issue #83: only on today and later; a past day's score never changes. */}
+          {canScheduleOn(date, today) && <BacklogPanel date={date} tasks={tasks} />}
+        </div>
         <div className="flex flex-col gap-4 min-h-0">
           <SummaryPanel
             key={date}
@@ -351,7 +369,7 @@ function TasksPanel({
       </header>
 
       {view === "list" ? (
-        <>
+        <BacklogDropZone date={date}>
           <QuickAdd defaultDate={date} />
           {tasks.length === 0 ? (
             <p className="px-5 py-8 text-center text-sm muted">
@@ -366,7 +384,7 @@ function TasksPanel({
               </ul>
             </div>
           )}
-        </>
+        </BacklogDropZone>
       ) : (
         <div className="flex flex-col md:flex-row">
           <UnscheduledPanel
@@ -379,6 +397,46 @@ function TasksPanel({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The list view's drop target for to-do list items (Issue #83): a dropped
+ * item becomes a time-less task of the displayed day (today or later).
+ */
+function BacklogDropZone({
+  date,
+  children,
+}: {
+  date: string;
+  children: React.ReactNode;
+}) {
+  const schedule = useScheduleBacklogItem();
+  const [active, setActive] = useState(false);
+  const accepts = canScheduleOn(date, todayISO());
+  return (
+    <div
+      className={active ? "ring-2 ring-inset ring-notion-blue" : undefined}
+      onDragOver={(e) => {
+        if (!accepts || !e.dataTransfer.types.includes(BACKLOG_DRAG_TYPE)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        setActive(true);
+      }}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setActive(false);
+      }}
+      onDrop={(e) => {
+        setActive(false);
+        const itemId = accepts ? e.dataTransfer.getData(BACKLOG_DRAG_TYPE) : "";
+        if (!itemId) return;
+        e.preventDefault();
+        schedule.mutate({ itemId, date });
+      }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -661,6 +719,7 @@ function TaskRow({ task }: { task: Task }) {
   const toggleTask = useToggleTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTaskWithUndo();
+  const unschedule = useUnscheduleTask();
   const { data: plans } = usePlans();
   const plan = task.plan_id
     ? plans?.find((p) => p.id === task.plan_id)
@@ -670,6 +729,8 @@ function TaskRow({ task }: { task: Task }) {
   const duration = taskDurationMinutes(task);
   // A past schedule keeps its completion, importance and existence (BR-04).
   const locked = isLockedSchedule(task, todayISO());
+  // An unfinished hand task can go back to the to-do list (Issue #83).
+  const movable = canUnschedule(task, todayISO());
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
 
@@ -683,7 +744,14 @@ function TaskRow({ task }: { task: Task }) {
   }
 
   return (
-    <li className="group flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition">
+    <li
+      draggable={movable && !editing}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_ID_TYPE, task.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className="group flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition"
+    >
       <input
         type="checkbox"
         className="size-4 rounded accent-notion-blue cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
@@ -770,6 +838,18 @@ function TaskRow({ task }: { task: Task }) {
           updateTask.mutate({ id: task.id, patch: { importance: v } })
         }
       />
+      {movable && (
+        <button
+          type="button"
+          onClick={() => unschedule.mutate(task.id)}
+          disabled={unschedule.isPending}
+          className="text-slate-300 dark:text-notion-muted hover:text-notion-blue opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition text-sm"
+          aria-label={`「${task.title}」をやることリストに戻す`}
+          title="やることリストに戻す"
+        >
+          ↩
+        </button>
+      )}
       {locked ? (
         <span className="w-[1em] text-sm" aria-hidden />
       ) : (

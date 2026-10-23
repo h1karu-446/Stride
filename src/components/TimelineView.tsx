@@ -6,6 +6,8 @@ import {
   useUpdateTask,
 } from "@/lib/queries";
 import { usePlans } from "@/lib/plans/queries";
+import { BACKLOG_DRAG_TYPE, canScheduleOn } from "@/lib/backlog/logic";
+import { useScheduleBacklogItem } from "@/lib/backlog/queries";
 import {
   dropTimes,
   formatMinutes,
@@ -19,11 +21,15 @@ import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 // While dragging, dataTransfer values cannot be read (only the types can), so
 // the duration of the dragged task is carried in the type name to size the
 // preview frame.
-const DRAG_ID_TYPE = "application/x-task-id";
+export const DRAG_ID_TYPE = "application/x-task-id";
 const DRAG_MINUTES_PREFIX = "application/x-task-minutes-";
 // HTML dragover exposes MIME types but not their values. Both panels live on
 // the same page, so keep the active row's title until dragend for the preview.
+// The to-do list (BacklogPanel) sets it for its items too.
 let activeUnscheduledDragTitle: string | null = null;
+export function setActiveDragTitle(title: string | null) {
+  activeUnscheduledDragTitle = title;
+}
 
 const START_HOUR = 0;
 const END_HOUR = 24;
@@ -161,6 +167,9 @@ export function TimelineView({
   const updateTaskMut = useUpdateTask();
   const deleteTask = useDeleteTaskWithUndo();
   const toggleTaskMut = useToggleTask();
+  const scheduleBacklog = useScheduleBacklogItem();
+  // An item of the to-do list can be dropped on today or a later day (Issue #83).
+  const acceptsBacklog = canScheduleOn(date, todayISO());
 
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -438,7 +447,12 @@ export function TimelineView({
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
             onDragOver={(e) => {
-              if (!e.dataTransfer.types.includes(DRAG_ID_TYPE)) return;
+              const types = e.dataTransfer.types;
+              if (
+                !types.includes(DRAG_ID_TYPE) &&
+                !(acceptsBacklog && types.includes(BACKLOG_DRAG_TYPE))
+              )
+                return;
               e.preventDefault();
               e.dataTransfer.dropEffect = "move";
               const rect = gridRef.current!.getBoundingClientRect();
@@ -461,10 +475,21 @@ export function TimelineView({
             onDrop={(e) => {
               e.preventDefault();
               const id = e.dataTransfer.getData(DRAG_ID_TYPE);
+              const itemId = acceptsBacklog ? e.dataTransfer.getData(BACKLOG_DRAG_TYPE) : "";
               setDropRange(null);
-              if (!id) return;
               const rect = gridRef.current!.getBoundingClientRect();
               const y = e.clientY - rect.top;
+              if (itemId) {
+                const { start, end } = dropTimes(snap(yToMin(y)));
+                scheduleBacklog.mutate({
+                  itemId,
+                  date,
+                  start_time: toTime(start),
+                  end_time: toTime(end),
+                });
+                return;
+              }
+              if (!id) return;
               // A task with a duration (routine tasks) gets a frame of that
               // length; others keep the previous 60 minutes.
               const dropped = tasks.find((t) => t.id === id);

@@ -29,7 +29,7 @@
   - `src/types.ts` 型と定数、`supabase/migrations/` DB スキーマと関数
   - `docs/` 運用、`skills/` スキル原本、`scripts/` と `tests/*.py` はテンプレートの補助スクリプトとそのテスト
 - パスの別名: `@/` → `src/`（`vite.config.ts` と `tsconfig.json`）。
-- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`、学習計画機能の `plans` / `phases` / `routines` / `routine_skips`（migration 0007）と `materials` / `material_phases`（migration 0008）。設計は `docs/design/study-plans.md`。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
+- データモデル / 外部サービス / 認証: Supabase。認証はメール + パスワード。主なテーブルは `tasks` と `daily_reviews`、やることリストの `backlog_items`（migration 0026）、学習計画機能の `plans` / `phases` / `routines` / `routine_skips`（migration 0007）と `materials` / `material_phases`（migration 0008）。設計は `docs/design/study-plans.md`。アカウント既定の目標起床・就寝時刻は Supabase Auth の `user_metadata` に保存。
 - デプロイ先: 未設定（リポジトリ内にデプロイ設定なし）。
 
 ### 守るべき制約
@@ -52,6 +52,7 @@
 - **`plans.completed_at`。** `status` が `done` 以外なら NULL、`done` で未指定なら `current_date`（UTC）で補う。日本時間の0〜9時にずれるため、画面は端末の日付を送ること。
 - **タスク削除の取り消し（migration 0016、Issue #56）。** Today の削除（リスト・時刻未設定欄・タイムライン）は RPC `delete_task_for_undo(p_task_id)` で即時に削除し、削除した行を jsonb で丸ごと返す（`carried_from` で参照していた複製の id も返す）。5秒間の「元に戻す」は `restore_deleted_task(p_task, p_carried_copy_ids)` で、同じ id・値の行を入れ直し、同じトランザクションで `(routine_id, scheduled_date)` の `routine_skips` を消し、複製の `carried_from` を戻す。id や同じルーティンの同じ日が既に使われていれば一意制約のエラーで何も変えない（上書きしない）。どちらも `security invoker` で RLS がそのまま効く。`carried_from` は動的SQLで扱うので 0014 の有無に依存しない。Plans の予定一覧の削除は従来の `useDeleteTask` のまま。検証SQLは `supabase/tests/0016_task_delete_undo.sql`。
 - **削除の取り消しの整理（migration 0024、Issue #67）。** `delete_task_for_undo` / `restore_deleted_task` を 0016 と同じ動作で定義し直した。`restore_deleted_task` は挿入の前に計画・ルーティン・持ち越し元（`carried_from`）の存在を確かめ、消えていれば 23503 を返す（以前は RLS が先に 42501 を返し「権限がありません」と出ていた）。`carried_from` は静的SQL、両関数とも `set search_path = ''`。Today の通知は、常設の `role=status` と `role=alert` の読み上げ領域を1つずつ持ち、最新の出来事（削除・元に戻した・失敗）だけを読む（`noticeAnnouncements`）。戻している間のボタンは `aria-disabled`（`disabled` だとフォーカスを失う）。フォーカスのあった通知が消えたら、次の通知のボタンか `<main id="main">` へ移す。検証SQLは `supabase/tests/0024_task_undo_cleanup.sql`（あわせて 0016 の検証SQLを 0024 適用後に流す）。
+- **やることリスト（migration 0026、Issue #83）。** `backlog_items` は日付を持たない「直近やること」（タイトル・優先度 `importance`・任意の締め切り `deadline`・`memo`）。`tasks` には入れないので、スコア（`calculate_daily_score`）にも `useTasks` を読む画面にも出ない。日のタスクへの移動は RPC `schedule_backlog_item(p_item_id, p_date, p_start_time, p_end_time)`、戻すのは `unschedule_task(p_task_id)` に限る（どちらも security invoker、`search_path = ''`、insert と delete を1トランザクションで行う）。移せるのは DB の日付-1日以降（画面は今日以降だけ）。戻せるのは未完了の手入力タスクだけ（計画の予定・メニュー由来・持ち越しの複製・マイルストーン・完了済みは不可。画面の `canUnschedule` も同じ規則）。戻すときに時刻は消え、タイトル・優先度・メモは残る。締め切りはタスクに移すと消える。画面は Today（今日・未来の日）に `BacklogPanel` を置き、リスト表示（時刻なし）・タイムライン（落とした時刻から1時間）へのドラッグと「この日に追加」ボタンで移し、タスクの行の↩ボタンかパネルへのドラッグで戻す。ドラッグの型は `BACKLOG_DRAG_TYPE`（項目）と `DRAG_ID_TYPE`（タスク）。検証SQLは `supabase/tests/0026_backlog_items.sql`。
 - **migration は追記のみ。** 適用済みの migration ファイルは書き換えず、新しい番号のファイルを追加する。
 
 ## セットアップと検証

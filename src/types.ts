@@ -74,6 +74,18 @@ export const CLUSTER_META: Record<
 
 export const IMPORTANCE_LIST: Importance[] = ["重", "中", "軽"];
 
+/** A thing to do soon whose day is not decided yet (Issue #83). Never scored. */
+export interface BacklogItem {
+  id: string;
+  user_id: string;
+  title: string;
+  importance: Importance;
+  deadline?: string; // YYYY-MM-DD, optional
+  memo?: string; // kept from a task moved back to the list
+  created_at: string;
+  updated_at: string;
+}
+
 export type PlanStatus = "idea" | "active" | "paused" | "done";
 export type PlanColor =
   | "pink"
