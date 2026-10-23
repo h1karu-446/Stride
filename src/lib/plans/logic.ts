@@ -167,6 +167,62 @@ export function routinesForDate(plan: Plan, date: string): Routine[] {
     .filter((r) => r.weekdays.includes(wd));
 }
 
+/**
+ * How many days ahead the menus can be generated early (Issue #84). The DB
+ * allows one more day for the time zone (migration 0025).
+ */
+export const FUTURE_MENU_DAYS = 7;
+
+/** Tomorrow .. today + FUTURE_MENU_DAYS. Today generates automatically. */
+export function canGenerateMenusFor(date: string, today: string): boolean {
+  return date > today && date <= addDaysISO(today, FUTURE_MENU_DAYS);
+}
+
+/**
+ * Routines for `date` that generate_routine_tasks would still create: no task
+ * on that day yet and not skipped (deleted) for that day.
+ */
+export function pendingRoutines(
+  plans: Plan[],
+  tasks: Task[],
+  date: string,
+  skippedRoutineIds: readonly string[] = []
+): Routine[] {
+  const done = new Set<string>(skippedRoutineIds);
+  for (const t of tasks) {
+    if (t.scheduled_date === date && t.routine_id) done.add(t.routine_id);
+  }
+  return plans.flatMap((p) => routinesForDate(p, date)).filter((r) => !done.has(r.id));
+}
+
+export type FutureMenuView =
+  /** Menus not generated yet: the button (with the last failure, if any). */
+  | { kind: "offer"; count: number; minutes: number; failed: boolean }
+  /** The run's outcome; the button is gone. */
+  | { kind: "result"; count: number };
+
+/**
+ * What FutureMenuControl shows (null = nothing). `ready` is false until the
+ * tasks, plans and skips are loaded, so a half-loaded day never offers menus
+ * that already exist. After one run the result wins over the (maybe stale)
+ * pending list.
+ */
+export function futureMenuView(v: {
+  ready: boolean;
+  pending: Routine[];
+  result: number | null;
+  failed: boolean;
+}): FutureMenuView | null {
+  if (v.result != null) return { kind: "result", count: v.result };
+  if (!v.ready || v.pending.length === 0) return null;
+  return {
+    kind: "offer",
+    count: v.pending.length,
+    minutes: v.pending.reduce((s, r) => s + r.minutes, 0),
+    failed: v.failed,
+  };
+}
+
 export interface TodaySummary {
   totalMinutes: number;
   byPlan: { plan: Plan; minutes: number }[];

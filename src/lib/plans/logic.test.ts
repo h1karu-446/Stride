@@ -6,6 +6,9 @@ import {
   executionCells,
   formatDateLabel,
   formatMinutes,
+  canGenerateMenusFor,
+  futureMenuView,
+  pendingRoutines,
   dropTimes,
   initialPhase,
   memoOneLine,
@@ -138,6 +141,55 @@ describe("routinesForDate (UT-04 conditions)", () => {
     ] });
     expect(routinesForDate(overlapping, TODAY).map((r) => r.id)).toEqual(["r-a", "r-b"]);
     expect(todaySummary([overlapping], TODAY).totalMinutes).toBe(75);
+  });
+});
+
+describe("early menus (Issue #84)", () => {
+  it("allows tomorrow .. today + 7 only", () => {
+    expect(canGenerateMenusFor(TODAY, TODAY)).toBe(false);
+    expect(canGenerateMenusFor("2026-09-29", TODAY)).toBe(false);
+    expect(canGenerateMenusFor("2026-10-01", TODAY)).toBe(true);
+    expect(canGenerateMenusFor("2026-10-07", TODAY)).toBe(true);
+    expect(canGenerateMenusFor("2026-10-08", TODAY)).toBe(false);
+  });
+  it("lists routines of the day that have no task yet", () => {
+    const p = plan({ phases: [implicit([routine({ id: "r1" }), routine({ id: "r2" })])] });
+    const day = "2026-10-01";
+    expect(pendingRoutines([p], [], day).map((r) => r.id)).toEqual(["r1", "r2"]);
+    const tasks = [
+      task(day, false, { routine_id: "r1" }),
+      task("2026-10-02", false, { routine_id: "r2" }), // another day
+    ];
+    expect(pendingRoutines([p], tasks, day).map((r) => r.id)).toEqual(["r2"]);
+    expect(pendingRoutines([p], tasks, day, ["r2"])).toEqual([]); // deleted for that day
+    expect(pendingRoutines([plan({ status: "paused", phases: p.phases })], [], day)).toEqual([]);
+  });
+});
+
+describe("futureMenuView (Issue #84)", () => {
+  const pending = [routine({ id: "a", minutes: 30 }), routine({ id: "b", minutes: 45 })];
+  it("shows nothing until loaded or when nothing is pending", () => {
+    expect(futureMenuView({ ready: false, pending, result: null, failed: false })).toBeNull();
+    expect(futureMenuView({ ready: true, pending: [], result: null, failed: false })).toBeNull();
+  });
+  it("offers the pending menus with their count and time", () => {
+    expect(futureMenuView({ ready: true, pending, result: null, failed: false })).toEqual({
+      kind: "offer", count: 2, minutes: 75, failed: false,
+    });
+  });
+  it("keeps offering after a failure, marked as failed", () => {
+    expect(futureMenuView({ ready: true, pending, result: null, failed: true })).toMatchObject({
+      kind: "offer", failed: true,
+    });
+  });
+  it("shows the result of the run whatever the list says", () => {
+    expect(futureMenuView({ ready: true, pending: [], result: 2, failed: false })).toEqual({
+      kind: "result", count: 2,
+    });
+    // 0 created while the screen still lists menus (stale list): no endless button.
+    expect(futureMenuView({ ready: true, pending, result: 0, failed: false })).toEqual({
+      kind: "result", count: 0,
+    });
   });
 });
 
