@@ -562,7 +562,8 @@ export function useDeleteRoutine() {
  * Calls generate_routine_tasks for `date` when it is the device's today, once
  * per date. Runs in the background: the task list is never blocked on it, and
  * a failure only goes to the console (it is retried on the next open).
- * Past / future dates never generate (BR-02).
+ * Past dates never generate; future dates only on demand through
+ * useGenerateRoutineTasks (BR-02, Issue #84).
  */
 export function useEnsureRoutineTasks(date: string) {
   const qc = useQueryClient();
@@ -588,4 +589,49 @@ export function useEnsureRoutineTasks(date: string) {
         }
       });
   }, [date, isToday, signedIn, qc]);
+}
+
+/**
+ * Routine ids skipped (deleted) on `date`, so the early-menu button does not
+ * offer them again. Keyed under ["tasks"] so every task change (a delete
+ * records a skip, an undo removes it) refreshes it too.
+ */
+export function useRoutineSkips(date: string, enabled: boolean) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["tasks", "routine_skips", date],
+    enabled: !!session && enabled,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("routine_skips")
+        .select("routine_id")
+        .eq("date", date);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.routine_id as string);
+    },
+  });
+}
+
+/**
+ * Generates the menus of a future day on demand (Issue #84). Resolves to the
+ * number of tasks created; 0 when every menu already exists or was deleted.
+ */
+export function useGenerateRoutineTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (date: string): Promise<number> => {
+      const { data, error } = await supabase.rpc("generate_routine_tasks", { p_date: date });
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
+    // Always refetch, even for 0: the screen's pending list may be stale
+    // (another device generated, skips were not loaded yet). The mutation
+    // stays pending until the tasks (and the skips under ["tasks"]) are back,
+    // so the button cannot be pressed again on the old list.
+    onSuccess: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: ["tasks"] }),
+        qc.invalidateQueries({ queryKey: ["reviews"] }),
+      ]),
+  });
 }
