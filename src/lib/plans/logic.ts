@@ -195,15 +195,17 @@ export function pendingRoutines(
   return plans.flatMap((p) => routinesForDate(p, date)).filter((r) => !done.has(r.id));
 }
 
-export interface FutureMenuView {
-  message: string;
-  showButton: boolean;
-}
+export type FutureMenuView =
+  /** Menus not generated yet: the button (with the last failure, if any). */
+  | { kind: "offer"; count: number; minutes: number; failed: boolean }
+  /** The run's outcome; the button is gone. */
+  | { kind: "result"; count: number };
 
 /**
- * What FutureMenuBar shows (null = nothing). `ready` is false until the
+ * What FutureMenuControl shows (null = nothing). `ready` is false until the
  * tasks, plans and skips are loaded, so a half-loaded day never offers menus
- * that already exist. After one run the result stays and the button is gone.
+ * that already exist. After one run the result wins over the (maybe stale)
+ * pending list.
  */
 export function futureMenuView(v: {
   ready: boolean;
@@ -211,20 +213,13 @@ export function futureMenuView(v: {
   result: number | null;
   failed: boolean;
 }): FutureMenuView | null {
-  if (v.failed) {
-    return { message: "メニューを出せませんでした。もう一度お試しください。", showButton: v.pending.length > 0 };
-  }
-  if (v.result != null) {
-    return {
-      message: v.result > 0 ? `メニューを${v.result}件追加しました。` : "追加するメニューはありませんでした。",
-      showButton: false,
-    };
-  }
+  if (v.result != null) return { kind: "result", count: v.result };
   if (!v.ready || v.pending.length === 0) return null;
-  const minutes = v.pending.reduce((s, r) => s + r.minutes, 0);
   return {
-    message: `この日のメニュー ${v.pending.length}件（${formatMinutes(minutes)}）はまだ出ていません。`,
-    showButton: true,
+    kind: "offer",
+    count: v.pending.length,
+    minutes: v.pending.reduce((s, r) => s + r.minutes, 0),
+    failed: v.failed,
   };
 }
 

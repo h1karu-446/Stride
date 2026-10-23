@@ -346,20 +346,23 @@ function TasksPanel({
 }) {
   return (
     <section className="card !p-0 overflow-hidden">
-      <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4 border-b border-slate-100 dark:border-notion-border">
         <div className="flex items-center gap-3">
-          <h2 className="text-base font-semibold">タスク</h2>
+          <h2 id="tasks-heading" tabIndex={-1} className="text-base font-semibold outline-none">
+            タスク
+          </h2>
           <ViewToggle value={view} onChange={onViewChange} />
         </div>
-        <span className="text-sm tabular-nums muted">
-          <span className="text-slate-900 dark:text-notion-fg font-semibold">
-            {completedCount}
-          </span>{" "}
-          / {tasks.length}
-        </span>
+        <div className="ml-auto flex items-center gap-3">
+          <FutureMenuControl key={date} tasks={tasks} date={date} />
+          <span className="text-sm tabular-nums muted">
+            <span className="text-slate-900 dark:text-notion-fg font-semibold">
+              {completedCount}
+            </span>{" "}
+            / {tasks.length}
+          </span>
+        </div>
       </header>
-
-      <FutureMenuBar key={date} tasks={tasks} date={date} />
 
       {view === "list" ? (
         <>
@@ -393,17 +396,19 @@ function TasksPanel({
   );
 }
 
+const RESULT_MS = 4000;
+
 /**
- * On tomorrow .. today + 7, offers to create the day's menus now so the day
- * can be planned the night before (Issue #84). Nothing is generated
- * automatically for a future day.
+ * On tomorrow .. today + 7, a header button that creates the day's menus now
+ * so the day can be planned the night before (Issue #84). The button itself
+ * says what it adds (count and time); nothing is generated automatically.
  */
-function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
+function FutureMenuControl({ tasks, date }: { tasks: Task[]; date: string }) {
   const tasksQuery = useTasks(); // cached; only for its loading state
   const plansQuery = usePlans();
   const generate = useGenerateRoutineTasks();
   const [result, setResult] = useState<number | null>(null);
-  const statusRef = useRef<HTMLParagraphElement>(null);
+  const [resultShown, setResultShown] = useState(false);
   const running = useRef(false);
   const today = todayISO();
   const available = canGenerateMenusFor(date, today);
@@ -413,6 +418,13 @@ function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
     [plansQuery.data, tasks, date, skipsQuery.data]
   );
 
+  // The outcome is a short confirmation, not a permanent label.
+  useEffect(() => {
+    if (!resultShown) return;
+    const id = window.setTimeout(() => setResultShown(false), RESULT_MS);
+    return () => window.clearTimeout(id);
+  }, [resultShown]);
+
   if (!available) return null;
   const view = futureMenuView({
     ready: tasksQuery.isSuccess && plansQuery.isSuccess && skipsQuery.isSuccess,
@@ -420,6 +432,12 @@ function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
     result,
     failed: generate.isError,
   });
+  const resultText =
+    view?.kind === "result"
+      ? view.count > 0
+        ? `メニューを${view.count}件追加`
+        : "追加するメニューなし"
+      : "";
 
   function run(e: React.MouseEvent<HTMLButtonElement>) {
     // isPending only changes on the next render; the ref also stops a quick double press.
@@ -432,40 +450,42 @@ function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
       },
       onSuccess: (count) => {
         setResult(count);
-        // The button goes away; keep keyboard users on the result.
-        if (hadFocus) requestAnimationFrame(() => statusRef.current?.focus());
+        setResultShown(true);
+        // The button goes away; keep keyboard users in the task panel.
+        if (hadFocus) requestAnimationFrame(() => document.getElementById("tasks-heading")?.focus());
       },
     });
   }
 
   return (
-    <div
-      className={
-        view
-          ? "flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-slate-100 dark:border-notion-border bg-slate-50/60 dark:bg-notion-panel-hover/30"
-          : undefined
-      }
-    >
-      {/* Always mounted so the result is announced (role=status). */}
-      <p
-        ref={statusRef}
-        tabIndex={-1}
-        className={view ? "text-sm muted outline-none" : "sr-only"}
-        role="status"
-      >
-        {view?.message ?? ""}
-      </p>
-      {view?.showButton && (
-        <button
-          type="button"
-          className="btn-outline text-sm aria-disabled:opacity-60 aria-disabled:cursor-wait"
-          aria-disabled={generate.isPending}
-          onClick={run}
-        >
-          {generate.isPending ? "出しています…" : "この日のメニューを出す"}
-        </button>
+    <>
+      {/* Always mounted so each outcome is announced. */}
+      <span className="sr-only" role="status">{resultText}</span>
+      <span className="sr-only" role="alert">
+        {view?.kind === "offer" && view.failed ? "メニューを出せませんでした。もう一度お試しください。" : ""}
+      </span>
+      {view?.kind === "result" && resultShown && (
+        <span className="text-xs muted" aria-hidden>{resultText}</span>
       )}
-    </div>
+      {view?.kind === "offer" && (
+        <>
+          {view.failed && (
+            <span className="text-xs text-rose-600 dark:text-rose-300" aria-hidden>出せませんでした</span>
+          )}
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 rounded-md border border-slate-200 dark:border-notion-border px-2.5 py-1 text-xs hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition aria-disabled:opacity-60 aria-disabled:cursor-wait"
+            aria-disabled={generate.isPending}
+            aria-label={`この日のメニュー${view.count}件（${formatMinutes(view.minutes)}）をタスクに追加`}
+            onClick={run}
+          >
+            <span className="text-notion-blue" aria-hidden>+</span>
+            メニュー {view.count}件
+            <span className="muted tabular-nums">{formatMinutes(view.minutes)}</span>
+          </button>
+        </>
+      )}
+    </>
   );
 }
 

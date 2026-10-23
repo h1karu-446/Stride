@@ -172,22 +172,24 @@ describe("futureMenuView (Issue #84)", () => {
     expect(futureMenuView({ ready: false, pending, result: null, failed: false })).toBeNull();
     expect(futureMenuView({ ready: true, pending: [], result: null, failed: false })).toBeNull();
   });
-  it("offers the pending menus", () => {
+  it("offers the pending menus with their count and time", () => {
     expect(futureMenuView({ ready: true, pending, result: null, failed: false })).toEqual({
-      message: "この日のメニュー 2件（1h15m）はまだ出ていません。", showButton: true,
+      kind: "offer", count: 2, minutes: 75, failed: false,
     });
   });
-  it("keeps the result of the run, without the button, whatever the list says", () => {
+  it("keeps offering after a failure, marked as failed", () => {
+    expect(futureMenuView({ ready: true, pending, result: null, failed: true })).toMatchObject({
+      kind: "offer", failed: true,
+    });
+  });
+  it("shows the result of the run whatever the list says", () => {
     expect(futureMenuView({ ready: true, pending: [], result: 2, failed: false })).toEqual({
-      message: "メニューを2件追加しました。", showButton: false,
+      kind: "result", count: 2,
     });
-    // 0 created while the screen still lists menus (stale list): say so, no endless button.
+    // 0 created while the screen still lists menus (stale list): no endless button.
     expect(futureMenuView({ ready: true, pending, result: 0, failed: false })).toEqual({
-      message: "追加するメニューはありませんでした。", showButton: false,
+      kind: "result", count: 0,
     });
-  });
-  it("offers a retry after a failure", () => {
-    expect(futureMenuView({ ready: true, pending, result: null, failed: true })?.showButton).toBe(true);
   });
 });
 
