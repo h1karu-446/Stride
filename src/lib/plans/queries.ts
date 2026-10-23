@@ -589,3 +589,45 @@ export function useEnsureRoutineTasks(date: string) {
       });
   }, [date, isToday, signedIn, qc]);
 }
+
+/**
+ * Routine ids skipped (deleted) on `date`, so the early-menu button does not
+ * offer them again. Keyed under ["tasks"] so every task change (a delete
+ * records a skip, an undo removes it) refreshes it too.
+ */
+export function useRoutineSkips(date: string, enabled: boolean) {
+  const { session } = useAuth();
+  return useQuery({
+    queryKey: ["tasks", "routine_skips", date],
+    enabled: !!session && enabled,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("routine_skips")
+        .select("routine_id")
+        .eq("date", date);
+      if (error) throw error;
+      return (data ?? []).map((r) => r.routine_id as string);
+    },
+  });
+}
+
+/**
+ * Generates the menus of a future day on demand (Issue #84). Resolves to the
+ * number of tasks created; 0 when every menu already exists or was deleted.
+ */
+export function useGenerateRoutineTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (date: string): Promise<number> => {
+      const { data, error } = await supabase.rpc("generate_routine_tasks", { p_date: date });
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
+    onSuccess: (count) => {
+      if (count > 0) {
+        qc.invalidateQueries({ queryKey: ["tasks"] });
+        qc.invalidateQueries({ queryKey: ["reviews"] });
+      }
+    },
+  });
+}

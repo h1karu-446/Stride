@@ -17,11 +17,18 @@ import {
 } from "@/lib/queries";
 import { addDaysISO, rangeBefore, todayISO } from "@/lib/date";
 import { normalizeRecordedTime } from "@/lib/recordedTime";
-import { useEnsureRoutineTasks, usePlans } from "@/lib/plans/queries";
 import {
+  useEnsureRoutineTasks,
+  useGenerateRoutineTasks,
+  usePlans,
+  useRoutineSkips,
+} from "@/lib/plans/queries";
+import {
+  canGenerateMenusFor,
   formatMinutes,
   isLockedSchedule,
   memoOneLine,
+  pendingRoutines,
   taskDurationMinutes,
 } from "@/lib/plans/logic";
 import { planHex } from "@/lib/plans/colors";
@@ -350,6 +357,8 @@ function TasksPanel({
         </span>
       </header>
 
+      <FutureMenuBar key={date} tasks={tasks} date={date} />
+
       {view === "list" ? (
         <>
           <QuickAdd defaultDate={date} />
@@ -379,6 +388,54 @@ function TasksPanel({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * On tomorrow .. today + 7, offers to create the day's menus now so the day
+ * can be planned the night before (Issue #84). Nothing is generated
+ * automatically for a future day.
+ */
+function FutureMenuBar({ tasks, date }: { tasks: Task[]; date: string }) {
+  const { data: plans } = usePlans();
+  const generate = useGenerateRoutineTasks();
+  const [result, setResult] = useState<number | null>(null);
+  const today = todayISO();
+  const available = canGenerateMenusFor(date, today);
+  const { data: skipped } = useRoutineSkips(date, available);
+  const pending = useMemo(
+    () => pendingRoutines(plans ?? [], tasks, date, skipped),
+    [plans, tasks, date, skipped]
+  );
+
+  if (!available) return null;
+  if (pending.length === 0 && result == null && !generate.isError) return null;
+
+  const minutes = pending.reduce((s, r) => s + r.minutes, 0);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-2.5 border-b border-slate-100 dark:border-notion-border bg-slate-50/60 dark:bg-notion-panel-hover/30">
+      <p className="text-sm muted" role="status">
+        {generate.isError
+          ? "メニューを出せませんでした。もう一度お試しください。"
+          : result != null && pending.length === 0
+          ? result > 0
+            ? `メニューを${result}件追加しました。`
+            : "追加するメニューはありませんでした。"
+          : `この日のメニュー ${pending.length}件（${formatMinutes(minutes)}）はまだ出ていません。`}
+      </p>
+      {pending.length > 0 && (
+        <button
+          type="button"
+          className="btn-outline text-sm"
+          disabled={generate.isPending}
+          onClick={() =>
+            generate.mutate(date, { onSuccess: (count) => setResult(count) })
+          }
+        >
+          {generate.isPending ? "出しています…" : "この日のメニューを出す"}
+        </button>
+      )}
+    </div>
   );
 }
 
