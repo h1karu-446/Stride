@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
-import { IMPORTANCE_WEIGHT, type BacklogItem, type Task } from "@/types";
+import { IMPORTANCE_WEIGHT, type BacklogItem, type Importance, type Task } from "@/types";
 
 // Pure helpers for the to-do list (やることリスト, Issue #83). No Supabase
 // access here so they can be unit tested (see logic.test.ts).
@@ -60,4 +60,20 @@ export function deadlineLabel(deadline: string, today: string): string {
 /** "今日" or "10/24". */
 export function dayName(date: string, today: string): string {
   return date === today ? "今日" : format(parseISO(date), "M/d");
+}
+
+export interface BacklogDraft {
+  title: string;
+  importance: Importance;
+  deadline?: string;
+}
+
+/**
+ * The add form after an add succeeded. The form stays editable while saving,
+ * so it is cleared only if it still holds what was sent; a next entry typed
+ * meanwhile is kept. The priority stays for the next entry either way.
+ */
+export function draftAfterAdd(current: BacklogDraft, sent: BacklogDraft): BacklogDraft {
+  if (current.title !== sent.title || current.deadline !== sent.deadline) return current;
+  return { ...current, title: "", deadline: undefined };
 }

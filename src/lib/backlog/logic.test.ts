@@ -6,6 +6,7 @@ import {
   deadlineLabel,
   deadlineState,
   dayName,
+  draftAfterAdd,
   sortBacklog,
 } from "./logic";
 
@@ -83,5 +84,18 @@ describe("dayName", () => {
   it("names the displayed day", () => {
     expect(dayName(TODAY, TODAY)).toBe("今日");
     expect(dayName("2026-10-24", TODAY)).toBe("10/24");
+  });
+});
+
+describe("draftAfterAdd", () => {
+  const sent = { title: "A", importance: "重" as const, deadline: "2026-10-30" };
+  it("clears the title and deadline it sent, keeping the priority", () => {
+    expect(draftAfterAdd(sent, sent)).toEqual({ title: "", importance: "重", deadline: undefined });
+  });
+  it("keeps a next entry typed while the add was saving", () => {
+    const next = { title: "B", importance: "重" as const, deadline: "2026-11-02" };
+    expect(draftAfterAdd(next, sent)).toBe(next);
+    const sameTitleNewDeadline = { ...sent, deadline: "2026-11-02" };
+    expect(draftAfterAdd(sameTitleNewDeadline, sent)).toBe(sameTitleNewDeadline);
   });
 });

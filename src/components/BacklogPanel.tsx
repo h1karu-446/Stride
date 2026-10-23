@@ -5,6 +5,7 @@ import {
   deadlineLabel,
   deadlineState,
   dayName,
+  draftAfterAdd,
   sortBacklog,
 } from "@/lib/backlog/logic";
 import {
@@ -143,8 +144,10 @@ function BacklogAdd() {
     e?.preventDefault();
     const title = v.title.trim();
     if (!title) return;
-    // Cleared only on success, so a failure keeps what was typed.
-    add.mutate({ ...v, title }, { onSuccess: () => setV((cur) => ({ ...cur, title: "", deadline: undefined })) });
+    // Cleared only on success (a failure keeps what was typed), and only if
+    // the form still holds what was sent (an entry typed meanwhile stays).
+    const sent = v;
+    add.mutate({ ...v, title }, { onSuccess: () => setV((cur) => draftAfterAdd(cur, sent)) });
   }
 
   return (
