@@ -4,9 +4,6 @@ import { IMPORTANCE_WEIGHT, type BacklogItem, type Task } from "@/types";
 // Pure helpers for the to-do list (やることリスト, Issue #83). No Supabase
 // access here so they can be unit tested (see logic.test.ts).
 
-/** dataTransfer type of a dragged list item; its value is the item id. */
-export const BACKLOG_DRAG_TYPE = "application/x-backlog-item-id";
-
 /** Importance (重 → 軽), then the nearest deadline (none last), then oldest first. */
 export function sortBacklog(items: readonly BacklogItem[]): BacklogItem[] {
   return [...items].sort(

@@ -1,8 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { todayISO } from "@/lib/date";
 import {
-  BACKLOG_DRAG_TYPE,
-  canScheduleOn,
   canUnschedule,
   deadlineLabel,
   deadlineState,
@@ -18,7 +16,13 @@ import {
   useUpdateBacklogItem,
   type BacklogInput,
 } from "@/lib/backlog/queries";
-import { DRAG_ID_TYPE, setActiveDragTitle } from "@/components/TimelineView";
+import {
+  BACKLOG_DRAG_TYPE,
+  DRAG_ID_TYPE,
+  DRAG_MOVABLE_TYPE,
+  setActiveDragTitle,
+} from "@/lib/dnd";
+import { useBacklogNotice } from "@/lib/backlog/notice";
 import DatePicker from "@/components/common/DatePicker";
 import { IMPORTANCE_LIST, type BacklogItem, type Importance, type Task } from "@/types";
 
@@ -46,12 +50,7 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
   const schedule = useScheduleBacklogItem();
   const unschedule = useUnscheduleTask();
   const [dropActive, setDropActive] = useState(false);
-  const schedulable = canScheduleOn(date, today);
-  const error = schedule.isError
-    ? "タスクにできませんでした。もう一度お試しください。"
-    : unschedule.isError
-    ? "やることリストに戻せませんでした。もう一度お試しください。"
-    : null;
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   return (
     <section
@@ -61,7 +60,8 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
       }
       aria-labelledby="backlog-heading"
       onDragOver={(e) => {
-        if (!e.dataTransfer.types.includes(DRAG_ID_TYPE)) return;
+        // Only a task that can go back (DRAG_MOVABLE_TYPE) shows the drop frame.
+        if (!e.dataTransfer.types.includes(DRAG_MOVABLE_TYPE)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = "move";
         setDropActive(true);
@@ -76,24 +76,23 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
         const task = tasks.find((t) => t.id === id);
         if (!task || !canUnschedule(task, today)) return;
         e.preventDefault();
-        unschedule.mutate(task.id);
+        unschedule.mutate(task);
       }}
     >
       <header className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-notion-border">
         <div>
-          <h2 id="backlog-heading" className="text-base font-semibold">やることリスト</h2>
+          <h2 id="backlog-heading" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+            やることリスト
+          </h2>
           <p className="text-[11px] muted mt-0.5">
-            日付を決めていないこと。
-            {schedulable ? "タスクへドラッグするとこの日に入ります" : "過去の日には追加できません"}
+            日付を決めていないこと。タスクへドラッグするとこの日に入ります
           </p>
         </div>
         <span className="text-sm tabular-nums muted">{items.length}</span>
       </header>
 
       <BacklogAdd />
-
-      <p className="sr-only" role="alert">{error ?? ""}</p>
-      {error && <p className="px-5 py-2 text-xs text-rose-600 dark:text-rose-300">{error}</p>}
+      <BacklogNotices />
 
       {isLoading ? null : items.length === 0 ? (
         <p className="px-5 py-6 text-center text-sm muted">
@@ -106,13 +105,41 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
               key={item.id}
               item={item}
               today={today}
-              date={schedulable ? date : null}
-              onSchedule={() => schedule.mutate({ itemId: item.id, date })}
+              date={date}
+              onSchedule={(hadFocus) => {
+                schedule.mutate({ itemId: item.id, date });
+                // The row leaves at once; keep keyboard users in the panel.
+                if (hadFocus) headingRef.current?.focus();
+              }}
             />
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+const NOTICE_MS = { status: 5000, alert: 10000 } as const;
+
+/**
+ * The latest move's outcome, from wherever it started. The two live regions
+ * stay mounted so screen readers announce each new text.
+ */
+function BacklogNotices() {
+  const notice = useBacklogNotice((s) => s.notice);
+  const dismiss = useBacklogNotice((s) => s.dismiss);
+  useEffect(() => {
+    if (!notice) return;
+    const id = window.setTimeout(() => dismiss(notice.id), NOTICE_MS[notice.kind]);
+    return () => window.clearTimeout(id);
+  }, [notice, dismiss]);
+  const status = notice?.kind === "status" ? notice.text : "";
+  const alert = notice?.kind === "alert" ? notice.text : "";
+  return (
+    <>
+      <p role="status" className={status ? "px-5 pt-2 text-xs muted" : "sr-only"}>{status}</p>
+      <p role="alert" className={alert ? "px-5 pt-2 text-xs text-rose-600 dark:text-rose-300" : "sr-only"}>{alert}</p>
+    </>
   );
 }
 
@@ -124,8 +151,8 @@ function BacklogAdd() {
     e?.preventDefault();
     const title = v.title.trim();
     if (!title) return;
-    add.mutate({ ...v, title });
-    setV({ title: "", importance: v.importance });
+    // Cleared only on success, so a failure keeps what was typed.
+    add.mutate({ ...v, title }, { onSuccess: () => setV((cur) => ({ ...cur, title: "", deadline: undefined })) });
   }
 
   return (
@@ -188,7 +215,7 @@ function BacklogFields({
           </button>
         ))}
       </div>
-      <div className="w-36">
+      <div className="w-56 max-w-full">
         <DatePicker
           label="締め切り"
           value={value.deadline ?? ""}
@@ -209,9 +236,9 @@ function BacklogRow({
 }: {
   item: BacklogItem;
   today: string;
-  /** The day an item can go to; null on a past day. */
-  date: string | null;
-  onSchedule: () => void;
+  /** The displayed day (today or later: the panel is not shown on a past day). */
+  date: string;
+  onSchedule: (hadFocus: boolean) => void;
 }) {
   const update = useUpdateBacklogItem();
   const remove = useDeleteBacklogItem();
@@ -263,7 +290,7 @@ function BacklogRow({
 
   return (
     <li
-      draggable={date != null}
+      draggable
       onDragStart={(e) => {
         setActiveDragTitle(item.title);
         e.dataTransfer.setData(BACKLOG_DRAG_TYPE, item.id);
@@ -272,12 +299,10 @@ function BacklogRow({
       onDragEnd={() => setActiveDragTitle(null)}
       className={
         "group flex items-center gap-2 px-5 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition " +
-        (date != null ? "cursor-grab active:cursor-grabbing" : "")
+        "cursor-grab active:cursor-grabbing"
       }
     >
-      {date != null && (
-        <span className="text-slate-300 dark:text-notion-muted text-xs select-none" aria-hidden>⋮⋮</span>
-      )}
+      <span className="text-slate-300 dark:text-notion-muted text-xs select-none" aria-hidden>⋮⋮</span>
       <span className={"inline-block w-1.5 h-4 rounded-sm flex-shrink-0 " + DOT[item.importance]} aria-hidden />
       <span className="sr-only">優先度 {item.importance}</span>
       <div className="flex-1 min-w-0">
@@ -298,16 +323,14 @@ function BacklogRow({
           {deadlineLabel(item.deadline, today)}
         </span>
       )}
-      {date != null && (
-        <button
-          type="button"
-          className="flex-shrink-0 rounded border border-slate-200 dark:border-notion-border px-2 py-0.5 text-[11px] muted hover:text-slate-900 dark:hover:text-notion-fg hover:bg-white dark:hover:bg-notion-panel transition"
-          onClick={onSchedule}
-          aria-label={`「${item.title}」を${scheduleButtonLabel(date, today)}`}
-        >
-          {scheduleButtonLabel(date, today)}
-        </button>
-      )}
+      <button
+        type="button"
+        className="flex-shrink-0 rounded border border-slate-200 dark:border-notion-border px-2 py-0.5 text-[11px] muted hover:text-slate-900 dark:hover:text-notion-fg hover:bg-white dark:hover:bg-notion-panel transition"
+        onClick={(e) => onSchedule(document.activeElement === e.currentTarget)}
+        aria-label={`「${item.title}」を${scheduleButtonLabel(date, today)}`}
+      >
+        {scheduleButtonLabel(date, today)}
+      </button>
     </li>
   );
 }

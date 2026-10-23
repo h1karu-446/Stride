@@ -8,12 +8,14 @@
 --   deletes the item in one transaction, and returns the task id. p_date may
 --   not be before DB date - 1 (the screen sends its local date and only
 --   offers today and later; the 1 day is the time zone, as elsewhere).
---   Both times or neither (a time-less task).
+--   Both times or neither (a time-less task); the end after the start
+--   (24:00 is allowed as the end, as the timeline sends it).
 -- - unschedule_task(p_task_id): moves a task back to the list: inserts an
 --   item (title, importance, memo) and deletes the task in one transaction,
 --   and returns the item id. Only an unfinished hand task of DB date - 1 or
 --   later: not completed, no plan (schedules), not from a routine, not a
---   carried copy, not a milestone. Such a task has no routine_id, so
+--   carried copy, not a milestone, and with a title that is not blank (tasks
+--   allow it, backlog_items do not). Such a task has no routine_id, so
 --   tasks_record_routine_skip records nothing; trg_touch_review_on_task
 --   rescores the day as for any delete. Times are not kept.
 -- - Both functions are security invoker with search_path '': RLS decides
@@ -68,6 +70,9 @@ begin
   if (p_start_time is null) <> (p_end_time is null) then
     raise exception 'give both times or neither' using errcode = '22023';
   end if;
+  if p_end_time <= p_start_time then
+    raise exception 'the end must be after the start' using errcode = '22023';
+  end if;
 
   select * into v_item from public.backlog_items where id = p_item_id for update;
   if not found then
@@ -105,7 +110,8 @@ begin
      or v_task.from_routine
      or v_task.routine_id is not null
      or v_task.carried_from is not null
-     or v_task.is_milestone then
+     or v_task.is_milestone
+     or char_length(btrim(v_task.title)) = 0 then
     raise exception 'task % cannot be moved back to the list', p_task_id using errcode = '22023';
   end if;
   if v_task.scheduled_date is null or v_task.scheduled_date < current_date - 1 then

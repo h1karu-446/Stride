@@ -68,6 +68,10 @@ begin
     perform public.schedule_backlog_item(item, current_date, '09:00', null);
     raise exception 'only a start time accepted';
   exception when invalid_parameter_value then null; end;
+  begin
+    perform public.schedule_backlog_item(item, current_date, '15:00', '09:00');
+    raise exception 'an end before the start accepted';
+  exception when invalid_parameter_value then null; end;
   if not exists (select 1 from public.backlog_items where id = item) then
     raise exception 'a failed move removed the item';
   end if;
@@ -134,6 +138,33 @@ begin
     raise exception 'a milestone moved back';
   exception when invalid_parameter_value then null; end;
 
+  insert into public.plans (id, user_id, name, color, status)
+  values ('a2600000-0000-0000-0000-000000000011', me, 'Plan', 'blue', 'active');
+  insert into public.tasks (user_id, title, importance, scheduled_date, plan_id)
+  values (me, 'Schedule', '中', current_date, 'a2600000-0000-0000-0000-000000000011') returning id into t;
+  begin
+    perform public.unschedule_task(t);
+    raise exception 'a plan schedule moved back';
+  exception when invalid_parameter_value then null; end;
+
+  insert into public.tasks (user_id, title, importance, scheduled_date, carried_from)
+  values (me, 'Copy', '中', current_date, t) returning id into t;
+  begin
+    perform public.unschedule_task(t);
+    raise exception 'a carried copy moved back';
+  exception when invalid_parameter_value then null; end;
+
+  insert into public.tasks (user_id, title, importance, scheduled_date)
+  values (me, '  ', '中', current_date) returning id into t;
+  begin
+    perform public.unschedule_task(t);
+    raise exception 'a blank title moved back';
+  exception when invalid_parameter_value then null; end;
+
+  -- 24:00 is a valid end (the timeline's last slot).
+  insert into public.backlog_items (user_id, title) values (me, 'Late') returning id into item;
+  perform public.schedule_backlog_item(item, current_date, '23:00', '24:00');
+
   insert into public.tasks (user_id, title, importance, scheduled_date)
   values (me, 'Old', '中', current_date - 2) returning id into t;
   begin
@@ -166,13 +197,15 @@ do $$ begin
     values ('a2600000-0000-0000-0000-000000000001', 'Forged');
     raise exception 'B inserted an item for A';
   exception when insufficient_privilege then null; end;
+  update public.backlog_items set title = 'Changed' where id = current_setting('stride.test_item')::uuid;
+  delete from public.backlog_items where id = current_setting('stride.test_item')::uuid;
 end $$;
 
 reset role;
 do $$ begin
   if not exists (select 1 from public.backlog_items
-                  where id = current_setting('stride.test_item')::uuid) then
-    raise exception 'A item changed by B';
+                  where id = current_setting('stride.test_item')::uuid and title = 'Item') then
+    raise exception 'A item changed or deleted by B';
   end if;
   if not exists (select 1 from public.tasks
                   where id = current_setting('stride.test_task')::uuid) then

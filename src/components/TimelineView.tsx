@@ -6,7 +6,14 @@ import {
   useUpdateTask,
 } from "@/lib/queries";
 import { usePlans } from "@/lib/plans/queries";
-import { BACKLOG_DRAG_TYPE, canScheduleOn } from "@/lib/backlog/logic";
+import { canScheduleOn, canUnschedule } from "@/lib/backlog/logic";
+import {
+  activeDragTitleOrEmpty,
+  BACKLOG_DRAG_TYPE,
+  DRAG_ID_TYPE,
+  DRAG_MOVABLE_TYPE,
+  setActiveDragTitle,
+} from "@/lib/dnd";
 import { useScheduleBacklogItem } from "@/lib/backlog/queries";
 import {
   dropTimes,
@@ -18,18 +25,9 @@ import { todayISO } from "@/lib/date";
 import { planHex } from "@/lib/plans/colors";
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 
-// While dragging, dataTransfer values cannot be read (only the types can), so
-// the duration of the dragged task is carried in the type name to size the
-// preview frame.
-export const DRAG_ID_TYPE = "application/x-task-id";
+// The duration of the dragged task is carried in the type name to size the
+// preview frame (only the types can be read while dragging, see lib/dnd).
 const DRAG_MINUTES_PREFIX = "application/x-task-minutes-";
-// HTML dragover exposes MIME types but not their values. Both panels live on
-// the same page, so keep the active row's title until dragend for the preview.
-// The to-do list (BacklogPanel) sets it for its items too.
-let activeUnscheduledDragTitle: string | null = null;
-export function setActiveDragTitle(title: string | null) {
-  activeUnscheduledDragTitle = title;
-}
 
 const START_HOUR = 0;
 const END_HOUR = 24;
@@ -465,7 +463,7 @@ export function TimelineView({
                 : undefined;
               setDropRange({
                 ...dropTimes(snap(yToMin(y)), minutes),
-                title: activeUnscheduledDragTitle ?? "",
+                title: activeDragTitleOrEmpty(),
               });
             }}
             onDragLeave={(e) => {
@@ -959,8 +957,9 @@ export function UnscheduledPanel({
             key={t.id}
             draggable
             onDragStart={(e) => {
-              activeUnscheduledDragTitle = t.title;
+              setActiveDragTitle(t.title);
               e.dataTransfer.setData(DRAG_ID_TYPE, t.id);
+              if (canUnschedule(t, today)) e.dataTransfer.setData(DRAG_MOVABLE_TYPE, "");
               if (t.planned_minutes) {
                 e.dataTransfer.setData(
                   DRAG_MINUTES_PREFIX + t.planned_minutes,
@@ -970,7 +969,7 @@ export function UnscheduledPanel({
               e.dataTransfer.effectAllowed = "move";
             }}
             onDragEnd={() => {
-              activeUnscheduledDragTitle = null;
+              setActiveDragTitle(null);
             }}
             className={
               "group flex items-center gap-2 px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition cursor-grab active:cursor-grabbing"

@@ -34,17 +34,10 @@ import {
 import { IMPORTANCE_LIST, Importance, Task } from "@/types";
 import { ScoreRing } from "@/components/ScoreRing";
 import { ClusterBadge } from "@/components/ClusterBadge";
-import {
-  DRAG_ID_TYPE,
-  TimelineView,
-  UnscheduledPanel,
-} from "@/components/TimelineView";
+import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
 import { BacklogPanel } from "@/components/BacklogPanel";
-import {
-  BACKLOG_DRAG_TYPE,
-  canScheduleOn,
-  canUnschedule,
-} from "@/lib/backlog/logic";
+import { canScheduleOn, canUnschedule } from "@/lib/backlog/logic";
+import { BACKLOG_DRAG_TYPE, DRAG_ID_TYPE, DRAG_MOVABLE_TYPE } from "@/lib/dnd";
 import {
   useScheduleBacklogItem,
   useUnscheduleTask,
@@ -285,7 +278,9 @@ export default function Today() {
             bedTarget={bedTarget}
           />
           {/* Issue #83: only on today and later; a past day's score never changes. */}
-          {canScheduleOn(date, today) && <BacklogPanel date={date} tasks={tasks} />}
+          {canScheduleOn(date, today) && (
+            <BacklogPanel key={date} date={date} tasks={tasks} />
+          )}
         </div>
         <div className="flex flex-col gap-4 min-h-0">
           <SummaryPanel
@@ -748,6 +743,7 @@ function TaskRow({ task }: { task: Task }) {
       draggable={movable && !editing}
       onDragStart={(e) => {
         e.dataTransfer.setData(DRAG_ID_TYPE, task.id);
+        e.dataTransfer.setData(DRAG_MOVABLE_TYPE, "");
         e.dataTransfer.effectAllowed = "move";
       }}
       className="group flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition"
@@ -841,9 +837,9 @@ function TaskRow({ task }: { task: Task }) {
       {movable && (
         <button
           type="button"
-          onClick={() => unschedule.mutate(task.id)}
+          onClick={() => unschedule.mutate(task)}
           disabled={unschedule.isPending}
-          className="text-slate-300 dark:text-notion-muted hover:text-notion-blue opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition text-sm"
+          className="text-slate-300 dark:text-notion-muted hover:text-notion-blue opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition text-sm"
           aria-label={`「${task.title}」をやることリストに戻す`}
           title="やることリストに戻す"
         >
