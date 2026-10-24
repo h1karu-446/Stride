@@ -284,7 +284,7 @@ function BacklogRow({
       }}
       onDragEnd={() => setActiveDragTitle(null)}
       className={
-        "group flex items-center gap-2 px-5 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition " +
+        "flex items-center gap-2 px-5 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition " +
         "cursor-grab active:cursor-grabbing"
       }
     >

@@ -46,9 +46,7 @@ import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
 import { BacklogPanel } from "@/components/BacklogPanel";
 import { canScheduleOn, canUnschedule } from "@/lib/backlog/logic";
 import { BACKLOG_DRAG_TYPE, DRAG_ID_TYPE, DRAG_MOVABLE_TYPE } from "@/lib/dnd";
-import {
-  useScheduleBacklogItem,
-} from "@/lib/backlog/queries";
+import { useScheduleBacklogItem } from "@/lib/backlog/queries";
 import { TaskUndoNotices } from "@/components/TaskUndoNotices";
 
 type ViewMode = "list" | "timeline";
