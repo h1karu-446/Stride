@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
 // The latest outcome of a move between the to-do list and a day (Issue #83).
-// Moves start from several places (the panel, the list view, the timeline, a
-// task row), so the result is kept here and BacklogPanel announces it.
+// Moves start from several drop targets (the panel, the list view, the
+// timeline), so the result is kept here and BacklogPanel announces it.
 export interface BacklogNotice {
   id: number;
   kind: "status" | "alert";

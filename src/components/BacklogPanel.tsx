@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { todayISO } from "@/lib/date";
 import {
   canUnschedule,
   deadlineLabel,
   deadlineState,
-  dayName,
   draftAfterAdd,
   sortBacklog,
 } from "@/lib/backlog/logic";
@@ -12,7 +11,6 @@ import {
   useAddBacklogItem,
   useBacklogItems,
   useDeleteBacklogItem,
-  useScheduleBacklogItem,
   useUnscheduleTask,
   useUpdateBacklogItem,
   type BacklogInput,
@@ -28,8 +26,9 @@ import DatePicker from "@/components/common/DatePicker";
 import { IMPORTANCE_LIST, type BacklogItem, type Importance, type Task } from "@/types";
 
 // やることリスト (Issue #83): things to do soon without a day. Drag an item to
-// the day's task list or timeline (or press its button) to make it a task of
-// the displayed day; drag an unfinished hand task here to move it back.
+// the day's task list or timeline to make it a task of the displayed day;
+// drag an unfinished hand task here to move it back. Moving is drag only
+// (Issue #87): touch screens drag after a long press.
 
 const DOT: Record<Importance, string> = {
   重: "bg-rose-400",
@@ -44,14 +43,12 @@ const DEADLINE_STYLE: Record<ReturnType<typeof deadlineState>, string> = {
   later: "muted",
 };
 
-export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
+export function BacklogPanel({ tasks }: { tasks: Task[] }) {
   const today = todayISO();
   const { data, isLoading } = useBacklogItems();
   const items = useMemo(() => sortBacklog(data ?? []), [data]);
-  const schedule = useScheduleBacklogItem();
   const unschedule = useUnscheduleTask();
   const [dropActive, setDropActive] = useState(false);
-  const headingRef = useRef<HTMLHeadingElement>(null);
 
   return (
     <section
@@ -81,7 +78,7 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
       }}
     >
       <header className="flex items-center justify-between px-5 py-3 border-b border-slate-100 dark:border-notion-border">
-        <h2 id="backlog-heading" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-none">
+        <h2 id="backlog-heading" className="text-base font-semibold">
           やることリスト
         </h2>
         <span className="text-sm tabular-nums muted">{items.length}</span>
@@ -98,12 +95,6 @@ export function BacklogPanel({ date, tasks }: { date: string; tasks: Task[] }) {
               key={item.id}
               item={item}
               today={today}
-              date={date}
-              onSchedule={(hadFocus) => {
-                schedule.mutate({ itemId: item.id, date });
-                // The row leaves at once; keep keyboard users in the panel.
-                if (hadFocus) headingRef.current?.focus();
-              }}
             />
           ))}
         </ul>
@@ -231,14 +222,9 @@ function BacklogFields({
 function BacklogRow({
   item,
   today,
-  date,
-  onSchedule,
 }: {
   item: BacklogItem;
   today: string;
-  /** The displayed day (today or later: the panel is not shown on a past day). */
-  date: string;
-  onSchedule: (hadFocus: boolean) => void;
 }) {
   const update = useUpdateBacklogItem();
   const remove = useDeleteBacklogItem();
@@ -298,7 +284,7 @@ function BacklogRow({
       }}
       onDragEnd={() => setActiveDragTitle(null)}
       className={
-        "group flex items-center gap-2 px-5 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition " +
+        "flex items-center gap-2 px-5 py-2 text-sm hover:bg-slate-50 dark:hover:bg-notion-panel-hover transition " +
         "cursor-grab active:cursor-grabbing"
       }
     >
@@ -323,15 +309,6 @@ function BacklogRow({
           {deadlineLabel(item.deadline, today)}
         </span>
       )}
-      {/* Shown on hover / focus with a mouse; always on touch, where it is the only way. */}
-      <button
-        type="button"
-        className="flex-shrink-0 rounded-md border border-slate-200 dark:border-notion-border px-2 py-1 text-xs muted hover:text-slate-900 dark:hover:text-notion-fg hover:bg-white dark:hover:bg-notion-panel opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition"
-        onClick={(e) => onSchedule(document.activeElement === e.currentTarget)}
-        aria-label={`「${item.title}」を${dayName(date, today)}のタスクにする`}
-      >
-        {dayName(date, today)}へ
-      </button>
     </li>
   );
 }

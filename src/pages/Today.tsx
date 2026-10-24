@@ -46,10 +46,7 @@ import { TimelineView, UnscheduledPanel } from "@/components/TimelineView";
 import { BacklogPanel } from "@/components/BacklogPanel";
 import { canScheduleOn, canUnschedule } from "@/lib/backlog/logic";
 import { BACKLOG_DRAG_TYPE, DRAG_ID_TYPE, DRAG_MOVABLE_TYPE } from "@/lib/dnd";
-import {
-  useScheduleBacklogItem,
-  useUnscheduleTask,
-} from "@/lib/backlog/queries";
+import { useScheduleBacklogItem } from "@/lib/backlog/queries";
 import { TaskUndoNotices } from "@/components/TaskUndoNotices";
 
 type ViewMode = "list" | "timeline";
@@ -288,7 +285,7 @@ export default function Today() {
           />
           {/* Issue #83: only on today and later; a past day's score never changes. */}
           {canScheduleOn(date, today) && (
-            <BacklogPanel key={date} date={date} tasks={tasks} />
+            <BacklogPanel key={date} tasks={tasks} />
           )}
         </div>
         <div className="flex flex-col gap-4 min-h-0">
@@ -821,7 +818,6 @@ function TaskRow({ task }: { task: Task }) {
   const toggleTask = useToggleTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTaskWithUndo();
-  const unschedule = useUnscheduleTask();
   const { data: plans } = usePlans();
   const plan = task.plan_id
     ? plans?.find((p) => p.id === task.plan_id)
@@ -831,7 +827,7 @@ function TaskRow({ task }: { task: Task }) {
   const duration = taskDurationMinutes(task);
   // A past schedule keeps its completion, importance and existence (BR-04).
   const locked = isLockedSchedule(task, todayISO());
-  // An unfinished hand task can go back to the to-do list (Issue #83).
+  // An unfinished hand task can be dragged back to the to-do list (Issue #83, #87).
   const movable = canUnschedule(task, todayISO());
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
@@ -941,18 +937,6 @@ function TaskRow({ task }: { task: Task }) {
           updateTask.mutate({ id: task.id, patch: { importance: v } })
         }
       />
-      {movable && (
-        <button
-          type="button"
-          onClick={() => unschedule.mutate(task)}
-          disabled={unschedule.isPending}
-          className="text-slate-300 dark:text-notion-muted hover:text-notion-blue opacity-0 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 transition text-sm"
-          aria-label={`「${task.title}」をやることリストに戻す`}
-          title="やることリストに戻す"
-        >
-          ↩
-        </button>
-      )}
       {locked ? (
         <span className="w-[1em] text-sm" aria-hidden />
       ) : (
